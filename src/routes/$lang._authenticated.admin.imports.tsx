@@ -381,6 +381,17 @@ function ImportCard({
               </Link>
             </Button>
           )}
+          {categoryMappingReached && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to="/$lang/admin/category-mappings"
+                params={{ lang }}
+                search={{ returnTo }}
+              >
+                Category mappings
+              </Link>
+            </Button>
+          )}
           {["uploaded", "analyzing", "ready", "importing"].includes(status) && (
             <Button size="sm" variant="destructive" onClick={onCancel}>
               Cancel
