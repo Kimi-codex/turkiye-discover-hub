@@ -97,12 +97,28 @@ export function normalize(input: string): string {
     .trim();
 }
 
+function tokens(s: string): string[] {
+  return s.split(/\s+/).filter(Boolean);
+}
+
+/** True if any query token matches the needle exactly, or one is a 4+ char prefix of the other. */
 function containsWord(haystack: string, needle: string): boolean {
-  if (!needle) return false;
   const n = normalize(needle);
   if (!n) return false;
-  const h = ` ${haystack} `;
-  return h.includes(` ${n} `) || h.includes(` ${n}`) || h.includes(`${n} `);
+  const qTokens = tokens(haystack);
+  const nTokens = tokens(n);
+  if (nTokens.length === 0) return false;
+  // Multi-word label: require the sequence to appear contiguously.
+  if (nTokens.length > 1) {
+    return ` ${haystack} `.includes(` ${n} `);
+  }
+  const nt = nTokens[0]!;
+  return qTokens.some((qt) => {
+    if (qt === nt) return true;
+    if (nt.length >= 4 && qt.startsWith(nt)) return true;
+    if (qt.length >= 4 && nt.startsWith(qt)) return true;
+    return false;
+  });
 }
 
 interface Named {
@@ -115,7 +131,6 @@ function findMatch<T extends Named>(
   items: T[],
   locale: Locale,
 ): T | null {
-  // Prefer longest label match first for precision.
   const scored: { item: T; score: number }[] = [];
   for (const item of items) {
     const labels = new Set<string>();
@@ -124,7 +139,6 @@ function findMatch<T extends Named>(
       const v = item.name[l];
       if (v) labels.add(v);
     }
-    // preferred locale first
     const pref = pickLocalized(item.name, locale);
     if (pref) labels.add(pref);
     for (const label of labels) {
