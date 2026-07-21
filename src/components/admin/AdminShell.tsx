@@ -1,11 +1,13 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch, Image as ImageIcon } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch, Image as ImageIcon, ClipboardList, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "", label: "Dashboard", icon: LayoutDashboard },
   { to: "/businesses", label: "Businesses", icon: Building2 },
+  { to: "/change-requests", label: "Change Requests", icon: ClipboardList },
+  { to: "/reply-moderation", label: "Reply Moderation", icon: MessageSquare },
   { to: "/categories", label: "Categories", icon: Tags },
   { to: "/category-mappings", label: "Category Mappings", icon: GitBranch },
   { to: "/cities", label: "Cities", icon: MapPin },

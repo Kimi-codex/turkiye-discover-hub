@@ -90,7 +90,7 @@ async function processJob(admin: SbAdmin, adapter: R2StorageAdapter, job: {
 }): Promise<{ jobId: string; status: string; detail?: string }> {
   const { data: img, error: imgErr } = await admin
     .from("business_images")
-    .select("id, business_id, source_url, source_type, storage_status")
+    .select("id, business_id, place_id, source_url, source_type, storage_status")
     .eq("id", job.business_image_id).single();
   if (imgErr || !img) return failJob(admin, job, "IMAGE_NOT_FOUND", imgErr?.message);
   if (img.storage_status === "uploaded") return succeed(admin, job, { note: "already uploaded" });
@@ -107,9 +107,9 @@ async function processJob(admin: SbAdmin, adapter: R2StorageAdapter, job: {
   const normalized = await normalizeImage(dl.bytes);
   const key = buildImageKey({
     businessId: img.business_id,
+    placeId: (img as { place_id?: string | null }).place_id ?? "unknown",
     contentHash: normalized.contentHash,
     ext: normalized.ext,
-    size: "orig",
   });
 
   const put = await adapter.put({

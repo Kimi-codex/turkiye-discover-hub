@@ -77,6 +77,14 @@ export function SiteHeader() {
                 <User className="h-4 w-4" aria-hidden="true" />
                 {accountLabel}
               </LocaleLink>
+              {user && (
+                <LocaleLink
+                  to="/owner"
+                  className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-accent"
+                >
+                  {t("owner.portal")}
+                </LocaleLink>
+              )}
               <LocaleLink
                 to="/list-your-business"
                 className="mt-3 inline-flex items-center justify-center rounded-lg bg-brand px-4 py-2.5 text-sm font-semibold text-brand-foreground hover:bg-brand/90"
