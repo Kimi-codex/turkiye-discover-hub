@@ -529,6 +529,34 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     if (!batch) throw new Response("Not found", { status: 404 });
     if (!batch.storage_object_path) throw new Response("Batch has no file", { status: 400 });
 
+    // Server-side gate: an active field_mapping approval must match the
+    // current field_mapping_hash. Any file/mapping change invalidates it.
+    if (batch.stage !== "analyze")
+      throw new Response(
+        `Cannot analyze in stage ${batch.stage}. Approve field mapping first.`,
+        { status: 400 },
+      );
+    if (!batch.field_mapping_hash)
+      throw new Response("Missing field_mapping_hash — detect + approve mapping first", {
+        status: 400,
+      });
+    const { data: approval } = await supabase
+      .from("import_approvals")
+      .select("id, artifact_hash")
+      .eq("batch_id", data.id)
+      .eq("approval_kind", "field_mapping")
+      .is("invalidated_at", null)
+      .order("approved_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!approval)
+      throw new Response("Field mapping is not approved for this batch", { status: 400 });
+    if (approval.artifact_hash !== batch.field_mapping_hash)
+      throw new Response(
+        "Field mapping changed since approval — re-approve before analysis",
+        { status: 400 },
+      );
+
     await supabase
       .from("import_batches")
       .update({ status: "analyzing", error_message: null })
