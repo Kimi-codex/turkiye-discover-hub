@@ -19,6 +19,7 @@ import { OpeningHoursBlock } from "@/components/business/OpeningHours";
 import { RatingStars } from "@/components/business/RatingStars";
 import { ReviewCard } from "@/components/business/ReviewCard";
 import { BusinessCard } from "@/components/business/BusinessCard";
+import { WriteReviewDialog } from "@/components/business/WriteReviewDialog";
 import { services } from "@/lib/repos";
 import {
   DEFAULT_LOCALE,
