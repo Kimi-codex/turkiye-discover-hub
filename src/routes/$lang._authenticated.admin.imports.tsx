@@ -224,28 +224,63 @@ function ImportsPage() {
   );
 }
 
-type NextActionSpec = { label: string; run: (id: string) => Promise<unknown> };
+type NextActionSpec = {
+  label: string;
+  description: string;
+  run: (id: string) => Promise<unknown>;
+};
 
 const NEXT_ACTIONS: Record<string, NextActionSpec> = {
-  detect_schema: { label: "Detect schema", run: (id) => detectImportSchema({ data: { id } }) },
+  detect_schema: {
+    label: "Detect schema",
+    description: "Scan the uploaded JSON and build the field inventory.",
+    run: (id) => detectImportSchema({ data: { id } }),
+  },
   field_mapping: {
     label: "Approve field mapping",
+    description: "Lock in the source → target field mapping and unlock analysis.",
     run: (id) => approveImportFieldMapping({ data: { id } }),
   },
-  analyze: { label: "Run analysis", run: (id) => analyzeImportBatch({ data: { id } }) },
+  analyze: {
+    label: "Run analysis",
+    description: "Normalize every record and count valid / invalid rows.",
+    run: (id) => analyzeImportBatch({ data: { id } }),
+  },
   mapping: {
     label: "Confirm category mappings",
+    description: "Approve how source categories map to catalog categories.",
     run: (id) => confirmImportMappings({ data: { id } }),
   },
-  validation: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
-  preview: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
-  execute: { label: "Run next chunk", run: (id) => runImportChunk({ data: { id } }) },
+  validation: {
+    label: "Compute preview",
+    description: "Diff every record against the database (inserts / updates / noops).",
+    run: (id) => computeImportPreview({ data: { id } }),
+  },
+  preview: {
+    label: "Compute preview",
+    description: "Diff every record against the database (inserts / updates / noops).",
+    run: (id) => computeImportPreview({ data: { id } }),
+  },
+  execute: {
+    label: "Run next chunk",
+    description: "Write the next batch of approved records to the database.",
+    run: (id) => runImportChunk({ data: { id } }),
+  },
   translations: {
     label: "Enqueue translations",
+    description: "Queue TR/EN/AR translation jobs for imported businesses.",
     run: (id) => enqueueBatchTranslations({ data: { id } }),
   },
-  images: { label: "Mark images done", run: (id) => markImagesStageDone({ data: { id } }) },
-  publish: { label: "Publish", run: (id) => publishImportBatch({ data: { id } }) },
+  images: {
+    label: "Mark images done",
+    description: "Image pipeline is blocked; advance past this stage to publish.",
+    run: (id) => markImagesStageDone({ data: { id } }),
+  },
+  publish: {
+    label: "Publish",
+    description: "Flip imported businesses from pending review to published.",
+    run: (id) => publishImportBatch({ data: { id } }),
+  },
 };
 
 function ImportCard({
