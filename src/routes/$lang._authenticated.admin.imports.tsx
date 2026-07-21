@@ -68,7 +68,7 @@ const STAGE_SHORT: Record<string, string> = {
   detect_schema: "Schema",
   field_mapping: "Field map",
   analyze: "Analyze",
-  mapping: "Categories",
+  mapping: "Cat map",
   validation: "Validate",
   preview: "Preview",
   execute: "Execute",
@@ -174,7 +174,7 @@ function ImportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Imports</h1>
           <p className="text-sm text-muted-foreground">
-            10-stage workflow — each stage waits for you. Click{" "}
+            12-stage workflow — each stage waits for you. Click{" "}
             <span className="font-medium text-foreground">Next: …</span> on a card to advance one step.
           </p>
         </div>
@@ -243,12 +243,12 @@ const NEXT_ACTIONS: Record<string, NextActionSpec> = {
   },
   analyze: {
     label: "Run analysis",
-    description: "Normalize every record and count valid / invalid rows.",
+    description: "Normalize records, then review discovered category labels in the next stage.",
     run: (id) => analyzeImportBatch({ data: { id } }),
   },
   mapping: {
-    label: "Confirm category mappings",
-    description: "Approve how source categories map to catalog categories.",
+    label: "Continue after category mapping",
+    description: "Approve or ignore source category labels first, then continue to validation.",
     run: (id) => confirmImportMappings({ data: { id } }),
   },
   validation: {
