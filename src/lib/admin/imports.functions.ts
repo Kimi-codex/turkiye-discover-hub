@@ -589,6 +589,23 @@ export const runImportChunk = createServerFn({ method: "POST" })
       }
     }
 
+    // Enqueue translation jobs for every business touched this chunk.
+    // Isolated from item loop so a translation failure never fails an item.
+    if (touchedBusinessIds.size > 0) {
+      try {
+        const { enqueueMissingTranslations } = await import(
+          "@/lib/translations/service.server"
+        );
+        for (const bid of touchedBusinessIds) {
+          await enqueueMissingTranslations(bid).catch((err) => {
+            console.warn("[import] enqueueMissingTranslations failed", bid, err);
+          });
+        }
+      } catch (err) {
+        console.warn("[import] translation enqueue module failed", err);
+      }
+    }
+
     // Increment counters on the batch row
     await supabase.rpc("record_audit", {
       _action: "import.chunk",
