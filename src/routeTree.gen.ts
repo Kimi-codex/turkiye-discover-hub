@@ -31,10 +31,12 @@ import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang.
 import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
 import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
 import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
+import { Route as LangAuthenticatedAdminReplyModerationRouteImport } from './routes/$lang._authenticated.admin.reply-moderation'
 import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
 import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
 import { Route as LangAuthenticatedAdminImagesRouteImport } from './routes/$lang._authenticated.admin.images'
 import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
+import { Route as LangAuthenticatedAdminChangeRequestsRouteImport } from './routes/$lang._authenticated.admin.change-requests'
 import { Route as LangAuthenticatedAdminCategoryMappingsRouteImport } from './routes/$lang._authenticated.admin.category-mappings'
 import { Route as LangAuthenticatedAdminCategoriesRouteImport } from './routes/$lang._authenticated.admin.categories'
 import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$lang._authenticated.admin.businesses'
@@ -49,6 +51,7 @@ import { Route as LangAuthenticatedOwnerBusinessIdImagesRouteImport } from './ro
 import { Route as LangAuthenticatedOwnerBusinessIdHoursRouteImport } from './routes/$lang._authenticated.owner.$businessId.hours'
 import { Route as LangAuthenticatedOwnerBusinessIdAttributesRouteImport } from './routes/$lang._authenticated.owner.$businessId.attributes'
 import { Route as LangAuthenticatedAdminImportsIdRouteImport } from './routes/$lang._authenticated.admin.imports.$id'
+import { Route as LangAuthenticatedAdminChangeRequestsIdRouteImport } from './routes/$lang._authenticated.admin.change-requests.$id'
 import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
 
 const LangRoute = LangRouteImport.update({
@@ -171,6 +174,12 @@ const LangAuthenticatedAdminReportsRoute =
     path: '/reports',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
+const LangAuthenticatedAdminReplyModerationRoute =
+  LangAuthenticatedAdminReplyModerationRouteImport.update({
+    id: '/reply-moderation',
+    path: '/reply-moderation',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
 const LangAuthenticatedAdminOwnershipClaimsRoute =
   LangAuthenticatedAdminOwnershipClaimsRouteImport.update({
     id: '/ownership-claims',
@@ -193,6 +202,12 @@ const LangAuthenticatedAdminCitiesRoute =
   LangAuthenticatedAdminCitiesRouteImport.update({
     id: '/cities',
     path: '/cities',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminChangeRequestsRoute =
+  LangAuthenticatedAdminChangeRequestsRouteImport.update({
+    id: '/change-requests',
+    path: '/change-requests',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
 const LangAuthenticatedAdminCategoryMappingsRoute =
@@ -279,6 +294,12 @@ const LangAuthenticatedAdminImportsIdRoute =
     path: '/$id',
     getParentRoute: () => LangAuthenticatedAdminImportsRoute,
   } as any)
+const LangAuthenticatedAdminChangeRequestsIdRoute =
+  LangAuthenticatedAdminChangeRequestsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminChangeRequestsRoute,
+  } as any)
 const LangAuthenticatedAdminBusinessesIdRoute =
   LangAuthenticatedAdminBusinessesIdRouteImport.update({
     id: '/$id',
@@ -303,10 +324,12 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/admin/change-requests': typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
@@ -318,6 +341,7 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner/': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/admin/change-requests/$id': typeof LangAuthenticatedAdminChangeRequestsIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
   '/$lang/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
   '/$lang/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
@@ -342,10 +366,12 @@ export interface FileRoutesByTo {
   '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/admin/change-requests': typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
@@ -356,6 +382,7 @@ export interface FileRoutesByTo {
   '/$lang/admin': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/admin/change-requests/$id': typeof LangAuthenticatedAdminChangeRequestsIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
   '/$lang/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
   '/$lang/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
@@ -385,10 +412,12 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/_authenticated/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/_authenticated/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/_authenticated/admin/change-requests': typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   '/$lang/_authenticated/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/_authenticated/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/_authenticated/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/_authenticated/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/_authenticated/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/_authenticated/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/_authenticated/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/_authenticated/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
@@ -400,6 +429,7 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/_authenticated/owner/': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/_authenticated/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/_authenticated/admin/change-requests/$id': typeof LangAuthenticatedAdminChangeRequestsIdRoute
   '/$lang/_authenticated/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
   '/$lang/_authenticated/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
   '/$lang/_authenticated/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
@@ -429,10 +459,12 @@ export interface FileRouteTypes {
     | '/$lang/admin/businesses'
     | '/$lang/admin/categories'
     | '/$lang/admin/category-mappings'
+    | '/$lang/admin/change-requests'
     | '/$lang/admin/cities'
     | '/$lang/admin/images'
     | '/$lang/admin/imports'
     | '/$lang/admin/ownership-claims'
+    | '/$lang/admin/reply-moderation'
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
@@ -444,6 +476,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/'
     | '/$lang/owner/'
     | '/$lang/admin/businesses/$id'
+    | '/$lang/admin/change-requests/$id'
     | '/$lang/admin/imports/$id'
     | '/$lang/owner/$businessId/attributes'
     | '/$lang/owner/$businessId/hours'
@@ -468,10 +501,12 @@ export interface FileRouteTypes {
     | '/$lang/admin/businesses'
     | '/$lang/admin/categories'
     | '/$lang/admin/category-mappings'
+    | '/$lang/admin/change-requests'
     | '/$lang/admin/cities'
     | '/$lang/admin/images'
     | '/$lang/admin/imports'
     | '/$lang/admin/ownership-claims'
+    | '/$lang/admin/reply-moderation'
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
@@ -482,6 +517,7 @@ export interface FileRouteTypes {
     | '/$lang/admin'
     | '/$lang/owner'
     | '/$lang/admin/businesses/$id'
+    | '/$lang/admin/change-requests/$id'
     | '/$lang/admin/imports/$id'
     | '/$lang/owner/$businessId/attributes'
     | '/$lang/owner/$businessId/hours'
@@ -510,10 +546,12 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/businesses'
     | '/$lang/_authenticated/admin/categories'
     | '/$lang/_authenticated/admin/category-mappings'
+    | '/$lang/_authenticated/admin/change-requests'
     | '/$lang/_authenticated/admin/cities'
     | '/$lang/_authenticated/admin/images'
     | '/$lang/_authenticated/admin/imports'
     | '/$lang/_authenticated/admin/ownership-claims'
+    | '/$lang/_authenticated/admin/reply-moderation'
     | '/$lang/_authenticated/admin/reports'
     | '/$lang/_authenticated/admin/reviews'
     | '/$lang/_authenticated/admin/settings'
@@ -525,6 +563,7 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/'
     | '/$lang/_authenticated/owner/'
     | '/$lang/_authenticated/admin/businesses/$id'
+    | '/$lang/_authenticated/admin/change-requests/$id'
     | '/$lang/_authenticated/admin/imports/$id'
     | '/$lang/_authenticated/owner/$businessId/attributes'
     | '/$lang/_authenticated/owner/$businessId/hours'
@@ -698,6 +737,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminReportsRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
+    '/$lang/_authenticated/admin/reply-moderation': {
+      id: '/$lang/_authenticated/admin/reply-moderation'
+      path: '/reply-moderation'
+      fullPath: '/$lang/admin/reply-moderation'
+      preLoaderRoute: typeof LangAuthenticatedAdminReplyModerationRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
     '/$lang/_authenticated/admin/ownership-claims': {
       id: '/$lang/_authenticated/admin/ownership-claims'
       path: '/ownership-claims'
@@ -724,6 +770,13 @@ declare module '@tanstack/react-router' {
       path: '/cities'
       fullPath: '/$lang/admin/cities'
       preLoaderRoute: typeof LangAuthenticatedAdminCitiesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/change-requests': {
+      id: '/$lang/_authenticated/admin/change-requests'
+      path: '/change-requests'
+      fullPath: '/$lang/admin/change-requests'
+      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
     '/$lang/_authenticated/admin/category-mappings': {
@@ -824,6 +877,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminImportsIdRouteImport
       parentRoute: typeof LangAuthenticatedAdminImportsRoute
     }
+    '/$lang/_authenticated/admin/change-requests/$id': {
+      id: '/$lang/_authenticated/admin/change-requests/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/change-requests/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminChangeRequestsRoute
+    }
     '/$lang/_authenticated/admin/businesses/$id': {
       id: '/$lang/_authenticated/admin/businesses/$id'
       path: '/$id'
@@ -849,6 +909,21 @@ const LangAuthenticatedAdminBusinessesRouteWithChildren =
     LangAuthenticatedAdminBusinessesRouteChildren,
   )
 
+interface LangAuthenticatedAdminChangeRequestsRouteChildren {
+  LangAuthenticatedAdminChangeRequestsIdRoute: typeof LangAuthenticatedAdminChangeRequestsIdRoute
+}
+
+const LangAuthenticatedAdminChangeRequestsRouteChildren: LangAuthenticatedAdminChangeRequestsRouteChildren =
+  {
+    LangAuthenticatedAdminChangeRequestsIdRoute:
+      LangAuthenticatedAdminChangeRequestsIdRoute,
+  }
+
+const LangAuthenticatedAdminChangeRequestsRouteWithChildren =
+  LangAuthenticatedAdminChangeRequestsRoute._addFileChildren(
+    LangAuthenticatedAdminChangeRequestsRouteChildren,
+  )
+
 interface LangAuthenticatedAdminImportsRouteChildren {
   LangAuthenticatedAdminImportsIdRoute: typeof LangAuthenticatedAdminImportsIdRoute
 }
@@ -868,10 +943,12 @@ interface LangAuthenticatedAdminRouteChildren {
   LangAuthenticatedAdminBusinessesRoute: typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   LangAuthenticatedAdminCategoriesRoute: typeof LangAuthenticatedAdminCategoriesRoute
   LangAuthenticatedAdminCategoryMappingsRoute: typeof LangAuthenticatedAdminCategoryMappingsRoute
+  LangAuthenticatedAdminChangeRequestsRoute: typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   LangAuthenticatedAdminCitiesRoute: typeof LangAuthenticatedAdminCitiesRoute
   LangAuthenticatedAdminImagesRoute: typeof LangAuthenticatedAdminImagesRoute
   LangAuthenticatedAdminImportsRoute: typeof LangAuthenticatedAdminImportsRouteWithChildren
   LangAuthenticatedAdminOwnershipClaimsRoute: typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  LangAuthenticatedAdminReplyModerationRoute: typeof LangAuthenticatedAdminReplyModerationRoute
   LangAuthenticatedAdminReportsRoute: typeof LangAuthenticatedAdminReportsRoute
   LangAuthenticatedAdminReviewsRoute: typeof LangAuthenticatedAdminReviewsRoute
   LangAuthenticatedAdminSettingsRoute: typeof LangAuthenticatedAdminSettingsRoute
@@ -888,12 +965,16 @@ const LangAuthenticatedAdminRouteChildren: LangAuthenticatedAdminRouteChildren =
       LangAuthenticatedAdminCategoriesRoute,
     LangAuthenticatedAdminCategoryMappingsRoute:
       LangAuthenticatedAdminCategoryMappingsRoute,
+    LangAuthenticatedAdminChangeRequestsRoute:
+      LangAuthenticatedAdminChangeRequestsRouteWithChildren,
     LangAuthenticatedAdminCitiesRoute: LangAuthenticatedAdminCitiesRoute,
     LangAuthenticatedAdminImagesRoute: LangAuthenticatedAdminImagesRoute,
     LangAuthenticatedAdminImportsRoute:
       LangAuthenticatedAdminImportsRouteWithChildren,
     LangAuthenticatedAdminOwnershipClaimsRoute:
       LangAuthenticatedAdminOwnershipClaimsRoute,
+    LangAuthenticatedAdminReplyModerationRoute:
+      LangAuthenticatedAdminReplyModerationRoute,
     LangAuthenticatedAdminReportsRoute: LangAuthenticatedAdminReportsRoute,
     LangAuthenticatedAdminReviewsRoute: LangAuthenticatedAdminReviewsRoute,
     LangAuthenticatedAdminSettingsRoute: LangAuthenticatedAdminSettingsRoute,
