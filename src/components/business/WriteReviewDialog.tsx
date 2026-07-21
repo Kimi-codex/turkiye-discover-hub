@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 import { cn } from "@/lib/utils";
-import { n as useAuth } from "@/hooks/n";
+import { n as useAuth } from "@/hooks/use-auth";
 import { submitReview, getMyReviewForBusiness } from "@/lib/reviews/reviews.functions";
 import { translate, type Locale } from "@/lib/i18n";
 
