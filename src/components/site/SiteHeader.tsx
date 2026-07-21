@@ -11,6 +11,7 @@ import { LocaleLink } from "./LocaleLink";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 const NAV_ITEMS = [
   { to: "/", key: "nav.home" as const },
@@ -22,6 +23,9 @@ const NAV_ITEMS = [
 
 export function SiteHeader() {
   const t = useT();
+  const { user } = useAuth();
+  const accountHref = user ? "/account" : "/auth";
+  const accountLabel = user ? t("account.title") : t("nav.signin");
 
   return (
     <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-sm">
