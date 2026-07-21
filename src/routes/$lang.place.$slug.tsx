@@ -59,7 +59,10 @@ export const Route = createFileRoute("/$lang/place/$slug")({
     }
     const b = loaderData.business;
     const desc = pickLocalized(b.description, locale) || b.address;
-    const title = `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)} · ${pickLocalized(b.city.name, locale)}`;
+    const cityName = pickLocalized(b.city?.name, locale);
+    const title = cityName
+      ? `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)} · ${cityName}`
+      : `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)}`;
     const cover = getBusinessImageUrl(
       b.images.find((i) => i.isCover) ?? b.images[0],
     );
