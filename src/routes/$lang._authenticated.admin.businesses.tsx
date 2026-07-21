@@ -183,7 +183,7 @@ function BusinessesPage() {
                   <td className="px-3 py-2 text-right">
                     <div className="flex justify-end gap-1">
                       <Button asChild size="sm" variant="outline">
-                        <Link to="/$lang/$businessSlug" params={{ lang, businessSlug: b.slug }}>
+                        <Link to="/$lang/place/$slug" params={{ lang, slug: b.slug }}>
                           View
                         </Link>
                       </Button>
