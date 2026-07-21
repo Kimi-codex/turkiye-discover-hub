@@ -1,0 +1,14 @@
+{
+  "places": [
+    {
+      "place_id": "FIXTURE_SINGLE_100",
+      "name": "Antalya Sahil Kafe",
+      "formatted_address": "Konyaaltı, Antalya, Türkiye",
+      "geometry": { "location": { "lat": 36.8541, "lng": 30.6339 } },
+      "types": ["cafe"],
+      "primary_category": "cafe",
+      "rating": 4.5,
+      "user_ratings_total": 92
+    }
+  ]
+}
