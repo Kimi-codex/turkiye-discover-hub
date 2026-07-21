@@ -408,6 +408,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
     let failed = 0;
     let reviewsWritten = 0;
     let imagesWritten = 0;
+    const touchedBusinessIds = new Set<string>();
 
     for (const item of items) {
       const rp = (item.raw_payload as Record<string, unknown> | null) ?? {};
