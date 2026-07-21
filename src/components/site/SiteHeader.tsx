@@ -11,6 +11,7 @@ import { LocaleLink } from "./LocaleLink";
 import { LanguageSwitcher } from "./LanguageSwitcher";
 import { useT } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/hooks/use-auth";
 
 const NAV_ITEMS = [
   { to: "/", key: "nav.home" as const },
@@ -22,6 +23,9 @@ const NAV_ITEMS = [
 
 export function SiteHeader() {
   const t = useT();
+  const { user } = useAuth();
+  const accountHref = user ? "/account" : "/auth";
+  const accountLabel = user ? t("account.title") : t("nav.signin");
 
   return (
     <header className="sticky top-0 z-40 bg-primary text-primary-foreground shadow-sm">
@@ -60,18 +64,18 @@ export function SiteHeader() {
               </LocaleLink>
               <div className="my-3 h-px bg-border" />
               <LocaleLink
-                to="/favorites"
+                to={user ? "/account" : "/auth"}
                 className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-accent"
               >
                 <Heart className="h-4 w-4" aria-hidden="true" />
                 {t("nav.favorites")}
               </LocaleLink>
               <LocaleLink
-                to="/signin"
+                to={accountHref}
                 className="flex items-center gap-2 rounded-lg px-3 py-2.5 text-base font-medium text-foreground hover:bg-accent"
               >
                 <User className="h-4 w-4" aria-hidden="true" />
-                {t("nav.signin")}
+                {accountLabel}
               </LocaleLink>
               <LocaleLink
                 to="/list-your-business"
@@ -126,18 +130,18 @@ export function SiteHeader() {
           </LocaleLink>
           <LanguageSwitcher />
           <LocaleLink
-            to="/favorites"
+            to={user ? "/account" : "/auth"}
             className="hidden h-10 w-10 place-items-center rounded-full text-primary-foreground/90 transition-colors hover:bg-white/10 hover:text-primary-foreground sm:grid"
             aria-label={t("nav.favorites")}
           >
             <Heart className="h-5 w-5" aria-hidden="true" />
           </LocaleLink>
           <LocaleLink
-            to="/signin"
+            to={accountHref}
             className="hidden items-center gap-2 rounded-lg px-3 py-2 text-sm font-medium text-primary-foreground/90 transition-colors hover:bg-white/10 hover:text-primary-foreground sm:inline-flex"
           >
             <User className="h-4 w-4" aria-hidden="true" />
-            <span>{t("nav.signin")}</span>
+            <span>{accountLabel}</span>
           </LocaleLink>
           <LocaleLink
             to="/list-your-business"

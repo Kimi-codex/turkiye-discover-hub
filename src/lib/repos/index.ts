@@ -173,13 +173,18 @@ function sortBusinesses(items: Business[], sort: SortOption): Business[] {
 }
 
 // -----------------------------------------------------------------------------
-// Service registry — swap here in Phase 2 for Supabase-backed implementations.
+// Service registry — Phase 2: Supabase-backed repositories.
+// The demo classes above remain available for tests/preview and are kept
+// exported for reference. To use them, replace the imports below.
+import { supabaseServices } from "./supabase-repos";
 
-export const services = {
+export const services = supabaseServices;
+export type Services = typeof services;
+
+/** Demo repositories, still available for local previews and tests. */
+export const demoServices = {
   businesses: new DemoBusinessRepository() as BusinessRepository,
   categories: new DemoCategoryRepository() as CategoryRepository,
   cities: new DemoCityRepository() as CityRepository,
   reviews: new DemoReviewRepository() as ReviewRepository,
 };
-
-export type Services = typeof services;
