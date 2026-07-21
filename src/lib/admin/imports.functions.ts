@@ -239,7 +239,7 @@ export const getImportBatch = createServerFn({ method: "GET" })
         if (normalized.primaryCategorySource) catLabels.add(normalized.primaryCategorySource);
       }
     });
-    let mappingRows: Array<Record<string, unknown>> = [];
+    let mappingRows: unknown[] = [];
     if (catLabels.size > 0) {
       const { data: m } = await supabase
         .from("category_mappings")
