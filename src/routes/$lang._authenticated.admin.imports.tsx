@@ -344,12 +344,23 @@ function ImportCard({
   const failed = Number(batch.failed_items ?? 0);
   const invalid = Number(batch.invalid_items ?? 0);
   const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
+  const hasAnalyzedItems = total > 0 && Number(batch.valid_items ?? 0) + invalid > 0;
   const canDelete = !["execute", "translations", "images", "publish", "completed"].includes(stage);
   const canArchive =
     status !== "archived" &&
     ["completed", "partially_completed", "failed", "cancelled"].includes(status);
 
-  const nextSpec = NEXT_ACTIONS[stage];
+  const nextSpec =
+    stage === "analyze" && hasAnalyzedItems
+      ? {
+          label: "Continue to category confirmation",
+          description:
+            "Analysis data already exists. Confirm resolved category labels to unlock validation.",
+          successMessage: "Category mappings confirmed — opening Validation.",
+          next: { kind: "detail", tab: "validation" } as const,
+          run: (id: string) => confirmImportMappings({ data: { id } }),
+        }
+      : NEXT_ACTIONS[stage];
   const nextMut = useMutation({
     mutationFn: () => nextSpec!.run(batch.id),
     onSuccess: async () => {
@@ -375,7 +386,7 @@ function ImportCard({
   const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
   const schemaReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
   const mappingReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
-  const categoryMappingReached = currentIdx >= STAGE_ORDER.indexOf("mapping");
+  const categoryMappingReached = currentIdx >= STAGE_ORDER.indexOf("mapping") || hasAnalyzedItems;
   const returnTo = `/${lang}/admin/imports/${batch.id}?tab=categories`;
 
   return (
