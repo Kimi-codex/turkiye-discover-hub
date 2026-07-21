@@ -239,6 +239,7 @@ function ImportDetailPage() {
   const approvals = (q.data as { approvals?: Array<Record<string, unknown>> }).approvals ?? [];
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "");
+  const hasAnalyzedItems = items.length > 0 && Number(batch.valid_items ?? 0) + Number(batch.invalid_items ?? 0) > 0;
   const detectedSchema = (batch.detected_schema as import("@/lib/import/schema-detector").DetectedSchema | null) ?? null;
   const fieldMapping = (batch.field_mapping as MappingRow[] | null) ?? [];
   const fieldMappingHash = String(batch.field_mapping_hash ?? "");
@@ -259,7 +260,8 @@ function ImportDetailPage() {
       : "",
     categories:
       STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
-      STAGE_ORDER.indexOf("mapping")
+        STAGE_ORDER.indexOf("mapping") &&
+      !hasAnalyzedItems
         ? "Run analysis first."
         : "",
     validation:
@@ -293,6 +295,7 @@ function ImportDetailPage() {
 
       <NextAction
         stage={stage}
+        hasAnalyzedItems={hasAnalyzedItems}
         storageExists={storageExists}
         isFmApproved={isFmApproved}
         onDetect={() => detectMut.mutate()}
@@ -430,6 +433,7 @@ function ImportDetailPage() {
 
 function NextAction(props: {
   stage: string;
+  hasAnalyzedItems: boolean;
   storageExists: boolean;
   isFmApproved: boolean;
   onDetect: () => void;
@@ -460,10 +464,17 @@ function NextAction(props: {
     onClick = props.onApproveMapping;
     disabled = props.approving;
   } else if (stage === "analyze") {
-    label = "Run analysis";
-    description = "Normalize every record and count valid / invalid rows.";
-    onClick = props.onAnalyze;
-    disabled = !isFmApproved;
+    if (props.hasAnalyzedItems) {
+      label = "Continue to category confirmation";
+      description = "Analysis data already exists. Confirm resolved category labels to unlock validation.";
+      onClick = props.onConfirmMapping;
+      disabled = !isFmApproved;
+    } else {
+      label = "Run analysis";
+      description = "Normalize every record and count valid / invalid rows.";
+      onClick = props.onAnalyze;
+      disabled = !isFmApproved;
+    }
   } else if (stage === "mapping") {
     label = "Confirm category mappings";
     description = "First resolve every pending label in Category mappings; this button then unlocks validation.";

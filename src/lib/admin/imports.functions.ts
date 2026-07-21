@@ -65,18 +65,21 @@ async function advanceStage(
   patch: Record<string, unknown> = {},
 ) {
   const nowIso = new Date().toISOString();
-  const { data: b } = await supabase
+  const { data: b, error: readError } = await supabase
     .from("import_batches")
     .select("stage, stage_history")
     .eq("id", id)
     .maybeSingle();
+  if (readError) throw new Response(readError.message, { status: 500 });
+  if (!b) throw new Response("Import batch not found", { status: 404 });
   const history = Array.isArray(b?.stage_history) ? (b.stage_history as unknown[]) : [];
   const entry = { at: nowIso, from: b?.stage ?? null, to: stage };
   const nextHistory = [...history, entry].slice(-50);
-  await supabase
+  const { error: updateError } = await supabase
     .from("import_batches")
     .update({ stage, stage_history: nextHistory, ...patch })
     .eq("id", id);
+  if (updateError) throw new Response(`Could not advance import stage to ${stage}: ${updateError.message}`, { status: 500 });
 }
 
 // ---------- Create + upload ----------
@@ -740,7 +743,7 @@ export const confirmImportMappings = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!batch) throw new Response("Not found", { status: 404 });
-    if (batch.stage !== "mapping" && batch.stage !== "validation")
+    if (!["analyze", "mapping", "validation"].includes(batch.stage))
       throw new Response(`Cannot confirm mappings in stage ${batch.stage}`, { status: 400 });
 
     // Collect labels this batch touches.
@@ -757,6 +760,9 @@ export const confirmImportMappings = createServerFn({ method: "POST" })
         if (n.primaryCategorySource) labels.add(n.primaryCategorySource);
       }
     });
+    if (batch.stage === "analyze" && labels.size === 0) {
+      throw new Response("Run analysis before confirming category mappings", { status: 400 });
+    }
     // Require every touched source label to be explicitly resolved. The importer must
     // never auto-approve category labels, and it must not advance while the admin still
     // has unresolved labels in the global category mapping queue.

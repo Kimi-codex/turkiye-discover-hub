@@ -1,76 +1,63 @@
-## الخلاصة بالعربي
-المشكلة الظاهرة ليست فقط في النصوص؛ هناك فجوة في تجربة الاستيراد:
-- زرّ Next ينفّذ Server Action ثم يبقى المستخدم على نفس البطاقة/التبويب بدون انتقال واضح للخطوة التالية.
-- روابط مثل Category mappings موجودة، لكن المستخدم لا يحصل على توجيه تلقائي بعد التحليل، فيبدو كأن الزر لم يعمل.
-- صفحة Category mappings تعرض المابينج العالمي فقط، ولا تضمن أن المستخدم يرى فقط التصنيفات الخاصة بالدفعة الحالية؛ لذلك قد تظهر فارغة أو غير مرتبطة بما ضغطت عليه.
-- صفحة التفاصيل عند تغيير `tab` قد لا تعطي Feedback كافٍ، خصوصًا بين Analyze → Category mapping → Validation.
+## التشخيص المؤكد
 
-## خطة الإصلاح الجذري
+المشكلة ليست أنك لم تضغط الزر صح. يوجد خلل فعلي في الـ workflow:
 
-### 1. جعل أزرار Next تعمل كتدفّق واضح وليس مجرد Action
-- بعد نجاح كل Next Action سيتم نقل المستخدم تلقائيًا إلى المكان الصحيح:
-  - Detect schema → صفحة الدفعة تبويب Field Mapping.
-  - Approve field mapping → تبويب Analysis.
-  - Run analysis → تبويب Categories أو صفحة Category mappings مع فلتر الدفعة.
-  - Confirm category mappings → تبويب Validation.
-  - Compute preview → تبويب Import.
-  - Run import chunk عند الانتهاء → Translations.
-  - Translations → Images.
-  - Images → Publish.
-  - Publish → Completed.
-- إضافة Toast/رسالة نجاح واضحة تقول: “تمت الخطوة، انتقل الآن إلى …”.
+- الدفعة `final.json` تم تحليلها فعلاً: فيها `40` عنصر، كلها صالحة، وتم إنشاء `40` صف في عناصر الاستيراد.
+- Field mapping موافق عليه فعلاً.
+- تم استخراج `46` تصنيف من الملف، وكلها حالياً `approved` ومربوطة بتصنيفات.
+- لكن الدفعة بقيت في مرحلة `analyze` بدل أن تنتقل إلى `mapping`.
 
-### 2. إصلاح روابط الإدارة نهائيًا
-- مراجعة كل روابط Imports / Field map / Category mappings / Return to batch.
-- استخدام TanStack `<Link>` و `navigate` بدل `<a href>` في العودة من صفحة المابينج، حتى لا يتم Reload أو فقدان state.
-- ضمان أن الرابط الفعلي للمستخدم يكون مثل:
-  - `/:lang/admin/imports/:id?tab=field_mapping`
-  - `/:lang/admin/imports/:id?tab=categories`
-  - `/:lang/admin/category-mappings?batchId=:id&returnTo=...`
+السبب الجذري: الكود يحاول نقل المرحلة إلى `mapping`، لكن شرط قاعدة البيانات `import_batches_stage_check` لا يسمح بقيمة `mapping` أصلاً؛ يسمح بـ `entity_mapping` بدلها. تحديث المرحلة يفشل، ودالة `advanceStage` لا تفحص الخطأ، لذلك الواجهة تعتقد أن العملية نجحت وتنقلك لصفحة Category mappings، ثم ترجع فتجد نفس الزر لأن المرحلة لم تتغير.
 
-### 3. جعل Category mappings مرتبطة بالدفعة الحالية
-- إضافة `batchId` كـ search param في صفحة Category mappings.
-- تعديل قراءة المابينج لتدعم فلتر Labels الخاصة بالدفعة الحالية فقط، بدل عرض كل المابينج العالمي فقط.
-- إذا لا توجد Labels بعد، تظهر رسالة واضحة: “لم يتم استخراج التصنيفات بعد، ارجع واضغط Run analysis”.
-- إذا توجد Labels pending، تعرض فقط المطلوب حله لهذه الدفعة.
+سبب صفحة Category mappings الفارغة: الصفحة تفتح افتراضياً على فلتر `pending`، بينما تصنيفات هذه الدفعة كلها `approved`، فتظهر فارغة رغم وجود البيانات.
 
-### 4. تحسين Bulk Actions في Category mappings
-- إبقاء Select all، لكن جعله أوضح دائمًا حتى لو لا يوجد تحديد.
-- إضافة أزرار مباشرة:
-  - Select all visible
-  - Clear selection
-  - Apply category to all selected
-  - Approve selected
-  - Ignore selected
-- تعطيل Approve selected مع سبب واضح إذا لم يتم اختيار category.
-- إظهار عدّاد: selected / visible / pending.
+## الخطة الجذرية للإصلاح
 
-### 5. تحسين بطاقة الاستيراد والتفاصيل برسالة “ماذا أفعل الآن؟”
-- إضافة صندوق Next Action بالعربي/الإنجليزي حسب الواجهة يشرح:
-  - أين أنت الآن.
-  - لماذا الزر الحالي مطلوب.
-  - أين سيذهب بك بعد الضغط.
-- في مرحلة Analyze تحديدًا: “اضغط Run analysis؛ بعدها ستظهر التصنيفات في Category mappings”.
-- في مرحلة Category mapping: “افتح Category mappings، اختر التصنيف، Approve، ثم ارجع واضغط Continue”.
+1. **إصلاح قاعدة البيانات**
+   - تعديل شرط مراحل `import_batches` ليقبل المرحلة الفعلية المستخدمة في الكود: `mapping`.
+   - الإبقاء على المراحل القديمة/المرادفة عند الحاجة حتى لا تتعطل دفعات سابقة.
 
-### 6. معالجة أخطاء Server Actions بوضوح
-- عند فشل action مثل وجود pending categories، لا نكتفي بـ toast فقط؛ نعرض رسالة داخل البطاقة مع زر مباشر لفتح صفحة Category mappings بالفلتر الصحيح.
-- إظهار status/progress بعد invalidation مباشرة، وليس انتظار refetch interval فقط.
+2. **منع الفشل الصامت نهائياً**
+   - تحديث `advanceStage` حتى يفحص نتيجة تحديث المرحلة.
+   - إذا فشل تحديث المرحلة، يظهر خطأ واضح في الواجهة بدل أن يبدو الزر وكأنه “ما عمل شيء”.
 
-### 7. التحقق بعد التنفيذ
-- سأتحقق من:
-  - أن الضغط على Next يغيّر المرحلة أو ينقل للتبويب الصحيح.
-  - أن Field map لا يعطي 404.
-  - أن Category mappings تفتح من الدفعة وتعرض التصنيفات الخاصة بها.
-  - أن Bulk Approve يعمل ويعيد المستخدم للدفعة.
-  - أن الدفعة لا تبقى “واقف هنا” بدون رسالة واضحة.
+3. **إصلاح الدفعة الحالية تلقائياً**
+   - بما أن تحليل الدفعة تم فعلاً وتصنيفاتها كلها محلولة، سنجعل المسار يتعافى بأمان:
+     - إما نقلها إلى `mapping` إذا نحتاج خطوة تأكيد التصنيفات.
+     - أو السماح بزر “Confirm category mappings” بنقلها إلى `validation` بعد التحقق أن كل التصنيفات approved/ignored.
 
-## الملفات المتوقع تعديلها
-- `src/routes/$lang._authenticated.admin.imports.tsx`
-- `src/routes/$lang._authenticated.admin.imports.$id.tsx`
-- `src/routes/$lang._authenticated.admin.category-mappings.tsx`
-- `src/lib/admin/domain.functions.ts`
-- وربما `src/lib/admin/imports.functions.ts` فقط إذا احتجنا endpoint مساعد لإرجاع labels الخاصة بالدفعة.
+4. **تحسين Category mappings حتى لا تظهر فاضية بشكل مضلل**
+   - عندما تكون الصفحة مفتوحة بـ `batchId` وكل التصنيفات محلولة، تعرض رسالة واضحة: “كل تصنيفات هذه الدفعة محلولة، ارجع للدفعة واضغط Continue/Confirm”.
+   - إضافة ملخص counts للدفعة: pending / approved / ignored.
+   - إذا pending = 0، إظهار زر مباشر “Return and continue import”.
 
-## النتيجة المتوقعة
-بعد الإصلاح، المستخدم لن يحتاج يخمّن. كل زر Next سيأخذه للخطوة التالية أو يفتح الصفحة المطلوبة، وصفحة Category mappings ستعرض مابينج الدفعة نفسها مع bulk actions واضحة.
+5. **إصلاح أزرار Schema و Field map**
+   - عندما يضغط المستخدم Schema أو Field map، لا يكون تغيير رابط فقط؛ الصفحة تعرض محتوى التبويب فعلياً أو رسالة مقفلة واضحة مع زر الإجراء الصحيح.
+   - إبقاء الروابط typed وصحيحة بدون `_authenticated` في URL.
+
+6. **توضيح Next Action حسب الحالة الحقيقية**
+   - إذا المرحلة `analyze` لكن يوجد items محللة مسبقاً، لا يعرض “Run analysis” مرة أخرى كأنه لم يحدث شيء.
+   - يعرض بدلاً من ذلك “Continue to category confirmation” أو “Open resolved category summary” حسب حالة التصنيفات.
+
+7. **التحقق بعد التنفيذ**
+   - اختبار الدفعة الحالية حتى تصل بالتسلسل إلى:
+     `mapping → validation → preview → execute → translations → images → publish → completed`.
+   - التأكد أن كل زر يغيّر الحالة فعلياً وليس الرابط فقط.
+
+## الملفات/الأجزاء التي سيتم تعديلها
+
+- Migration لإصلاح شرط مراحل `import_batches`.
+- `src/lib/admin/imports.functions.ts` لإصلاح `advanceStage` ومنع الفشل الصامت والتعامل مع الدفعات المحللة سابقاً.
+- `src/routes/$lang._authenticated.admin.imports.tsx` لتحسين next action والانتقال.
+- `src/routes/$lang._authenticated.admin.imports.$id.tsx` لتحسين التبويبات وحالة الدفعة الحالية.
+- `src/routes/$lang._authenticated.admin.category-mappings.tsx` لإزالة الالتباس عندما لا توجد pending لأن كل شيء approved.
+
+بعد تطبيق الخطة سأتحقق من الدفعة الحالية نفسها، وليس فقط الكود، حتى تتأكد أنك تستطيع الوصول للنشر بسلام.
+
+<presentation-actions>
+  <presentation-open-history>View History</presentation-open-history>
+</presentation-actions>
+
+<presentation-actions>
+<presentation-link url="https://docs.lovable.dev/tips-tricks/troubleshooting">Troubleshooting docs</presentation-link>
+</presentation-actions>
