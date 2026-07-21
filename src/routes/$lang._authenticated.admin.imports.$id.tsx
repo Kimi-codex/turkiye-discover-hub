@@ -186,11 +186,80 @@ function ImportDetailPage() {
   const provenance = q.data!.provenance as Array<Record<string, unknown>>;
   const mappings = q.data!.mappings as Array<{ source_category: string; category_id: string | null; mapping_status: string }>;
   const storageExists = q.data!.storageExists as boolean;
+  const approvals = (q.data as { approvals?: Array<Record<string, unknown>> }).approvals ?? [];
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "");
+  const detectedSchema = (batch.detected_schema as import("@/lib/import/schema-detector").DetectedSchema | null) ?? null;
+  const fieldMapping = (batch.field_mapping as MappingRow[] | null) ?? [];
+  const fieldMappingHash = String(batch.field_mapping_hash ?? "");
+  const activeFmApproval = approvals.find(
+    (a) => a.approval_kind === "field_mapping" && a.invalidated_at == null,
+  );
+  const isFmApproved =
+    !!activeFmApproval && activeFmApproval.artifact_hash === fieldMappingHash;
 
   const setTab = (tab: TabId) =>
     navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
+
+  const detectMut = useMutation({
+    mutationFn: () => detectImportSchema({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Detected ${r.fieldCount} fields across ${r.totalItems} items`);
+      invalidate();
+      setTab("field_mapping");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const approveMappingMut = useMutation({
+    mutationFn: () => approveImportFieldMapping({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Field mapping approved — analysis unlocked");
+      invalidate();
+      setTab("analysis");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const restoreMappingMut = useMutation({
+    mutationFn: () => restoreSuggestedFieldMapping({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Restored suggested mapping");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const editMappingMut = useMutation({
+    mutationFn: (edits: Array<Partial<MappingRow> & { sourcePath: string }>) =>
+      updateImportFieldMapping({ data: { id, edits } }),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const lockedReason: Partial<Record<TabId, string>> = {
+    schema: stage === "upload" ? "Upload the file first." : "",
+    field_mapping:
+      stage === "upload" || stage === "detect_schema"
+        ? "Run schema detection before editing the field mapping."
+        : "",
+    analysis: !isFmApproved
+      ? "Approve field mapping before running analysis."
+      : "",
+    categories:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("mapping")
+        ? "Run analysis first."
+        : "",
+    validation:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("validation")
+        ? "Confirm category mappings first."
+        : "",
+    import:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("preview")
+        ? "Compute preview first."
+        : "",
+  };
+  const isLocked = (t: TabId) => !!lockedReason[t];
 
   return (
     <div className="space-y-4">
@@ -210,21 +279,42 @@ function ImportDetailPage() {
 
       <StageProgress currentStage={stage} />
 
-      {/* Tabs */}
+      <NextAction
+        stage={stage}
+        storageExists={storageExists}
+        isFmApproved={isFmApproved}
+        onDetect={() => detectMut.mutate()}
+        onApproveMapping={() => approveMappingMut.mutate()}
+        onAnalyze={() => analyzeMut.mutate()}
+        onConfirmMapping={() => confirmMappingMut.mutate()}
+        onPreview={() => previewMut.mutate()}
+        onRun={() => runMut.mutate()}
+        onTranslations={() => translationsMut.mutate()}
+        onImagesDone={() => imagesDoneMut.mutate()}
+        onPublish={() => publishMut.mutate()}
+        detecting={detectMut.isPending}
+        approving={approveMappingMut.isPending}
+      />
+
       <div className="flex flex-wrap gap-1 border-b">
-        {TAB_IDS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`border-b-2 px-3 py-1.5 text-sm capitalize transition-colors ${
-              currentTab === t
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        {TAB_IDS.map((t) => {
+          const locked = isLocked(t);
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`border-b-2 px-3 py-1.5 text-sm capitalize transition-colors ${
+                currentTab === t
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              } ${locked ? "opacity-60" : ""}`}
+              title={locked ? lockedReason[t] : undefined}
+            >
+              {t.replace("_", " ")}
+              {locked ? " 🔒" : ""}
+            </button>
+          );
+        })}
       </div>
 
       {currentTab === "overview" && (
@@ -251,23 +341,150 @@ function ImportDetailPage() {
           isRunning={runMut.isPending}
         />
       )}
-      {currentTab === "analysis" && <AnalysisTab batch={batch} items={items} />}
-      {currentTab === "mapping" && <MappingTab lang={lang} mappings={mappings} items={items} />}
-      {currentTab === "validation" && <ValidationTab items={items} />}
+      {currentTab === "schema" && (
+        isLocked("schema") ? (
+          <LockedPanel reason={lockedReason.schema!} />
+        ) : (
+          <SchemaTab
+            schema={detectedSchema}
+            onDetect={() => detectMut.mutate()}
+            detecting={detectMut.isPending}
+          />
+        )
+      )}
+      {currentTab === "field_mapping" && (
+        isLocked("field_mapping") ? (
+          <LockedPanel reason={lockedReason.field_mapping!} />
+        ) : (
+          <FieldMappingTab
+            mapping={fieldMapping}
+            schema={detectedSchema}
+            isApproved={isFmApproved}
+            activeApproval={activeFmApproval}
+            fieldMappingHash={fieldMappingHash}
+            onEdit={(edits) => editMappingMut.mutate(edits)}
+            onRestore={() => restoreMappingMut.mutate()}
+            onApprove={() => approveMappingMut.mutate()}
+            saving={editMappingMut.isPending}
+            restoring={restoreMappingMut.isPending}
+            approving={approveMappingMut.isPending}
+          />
+        )
+      )}
+      {currentTab === "analysis" && (
+        isLocked("analysis") ? (
+          <LockedPanel reason={lockedReason.analysis!} />
+        ) : (
+          <AnalysisTab batch={batch} items={items} />
+        )
+      )}
+      {currentTab === "categories" && (
+        isLocked("categories") ? (
+          <LockedPanel reason={lockedReason.categories!} />
+        ) : (
+          <MappingTab lang={lang} mappings={mappings} items={items} />
+        )
+      )}
+      {currentTab === "validation" && (
+        isLocked("validation") ? (
+          <LockedPanel reason={lockedReason.validation!} />
+        ) : (
+          <ValidationTab items={items} />
+        )
+      )}
       {currentTab === "import" && (
-        <ImportTab
-          items={items}
-          onToggleField={(itemId, current, field, checked) => {
-            const next = checked
-              ? Array.from(new Set([...current, field]))
-              : current.filter((f) => f !== field);
-            setApprovalMut.mutate({ itemId, approvedFields: next });
-          }}
-        />
+        isLocked("import") ? (
+          <LockedPanel reason={lockedReason.import!} />
+        ) : (
+          <ImportTab
+            items={items}
+            onToggleField={(itemId, current, field, checked) => {
+              const next = checked
+                ? Array.from(new Set([...current, field]))
+                : current.filter((f) => f !== field);
+              setApprovalMut.mutate({ itemId, approvedFields: next });
+            }}
+          />
+        )
       )}
       {currentTab === "translations" && <TranslationsTab provenance={provenance} />}
       {currentTab === "images" && <ImagesTab provenance={provenance} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
+    </div>
+  );
+}
+
+function NextAction(props: {
+  stage: string;
+  storageExists: boolean;
+  isFmApproved: boolean;
+  onDetect: () => void;
+  onApproveMapping: () => void;
+  onAnalyze: () => void;
+  onConfirmMapping: () => void;
+  onPreview: () => void;
+  onRun: () => void;
+  onTranslations: () => void;
+  onImagesDone: () => void;
+  onPublish: () => void;
+  detecting: boolean;
+  approving: boolean;
+}) {
+  const { stage, storageExists, isFmApproved } = props;
+  let label = "";
+  let onClick: (() => void) | null = null;
+  let disabled = false;
+  if (stage === "detect_schema") {
+    label = props.detecting ? "Detecting…" : "Detect schema";
+    onClick = props.onDetect;
+    disabled = !storageExists || props.detecting;
+  } else if (stage === "field_mapping") {
+    label = props.approving ? "Approving…" : "Approve field mapping → analysis";
+    onClick = props.onApproveMapping;
+    disabled = props.approving;
+  } else if (stage === "analyze") {
+    label = "Run analysis";
+    onClick = props.onAnalyze;
+    disabled = !isFmApproved;
+  } else if (stage === "mapping") {
+    label = "Confirm category mappings";
+    onClick = props.onConfirmMapping;
+  } else if (stage === "validation" || stage === "preview") {
+    label = "Compute import preview";
+    onClick = props.onPreview;
+  } else if (stage === "execute") {
+    label = "Run next execute chunk";
+    onClick = props.onRun;
+  } else if (stage === "translations") {
+    label = "Enqueue translations";
+    onClick = props.onTranslations;
+  } else if (stage === "images") {
+    label = "Advance images stage";
+    onClick = props.onImagesDone;
+  } else if (stage === "publish") {
+    label = "Publish imported businesses";
+    onClick = props.onPublish;
+  }
+  if (!onClick) return null;
+  return (
+    <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
+      <div className="text-sm">
+        <div className="font-medium">Next action</div>
+        <div className="text-xs text-muted-foreground">Current stage: {stage}</div>
+      </div>
+      <Button onClick={onClick} disabled={disabled}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+function LockedPanel({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+      <div className="text-2xl">🔒</div>
+      <div className="mt-2 font-medium text-foreground">This tab is locked</div>
+      <div className="mt-1 text-xs">{reason}</div>
     </div>
   );
 }
