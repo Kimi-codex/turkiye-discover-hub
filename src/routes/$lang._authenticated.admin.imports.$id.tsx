@@ -433,6 +433,7 @@ function ImportDetailPage() {
 
 function NextAction(props: {
   stage: string;
+  hasAnalyzedItems: boolean;
   storageExists: boolean;
   isFmApproved: boolean;
   onDetect: () => void;
@@ -463,10 +464,17 @@ function NextAction(props: {
     onClick = props.onApproveMapping;
     disabled = props.approving;
   } else if (stage === "analyze") {
-    label = "Run analysis";
-    description = "Normalize every record and count valid / invalid rows.";
-    onClick = props.onAnalyze;
-    disabled = !isFmApproved;
+    if (props.hasAnalyzedItems) {
+      label = "Continue to category confirmation";
+      description = "Analysis data already exists. Confirm resolved category labels to unlock validation.";
+      onClick = props.onConfirmMapping;
+      disabled = !isFmApproved;
+    } else {
+      label = "Run analysis";
+      description = "Normalize every record and count valid / invalid rows.";
+      onClick = props.onAnalyze;
+      disabled = !isFmApproved;
+    }
   } else if (stage === "mapping") {
     label = "Confirm category mappings";
     description = "First resolve every pending label in Category mappings; this button then unlocks validation.";
