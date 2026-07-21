@@ -1237,13 +1237,17 @@ export type Database = {
           created_at: string
           created_by: string | null
           delete_requested_at: string | null
+          detected_schema: Json | null
           duplicate_items: number
           entity_mapping_hash: string | null
           entity_mappings: Json
           error_message: string | null
           failed_items: number
           field_inventory: Json
+          field_mapping: Json | null
+          field_mapping_approved_at: string | null
           field_mapping_hash: string | null
+          field_mapping_updated_at: string | null
           file_hash: string | null
           file_size: number | null
           id: string
@@ -1261,6 +1265,7 @@ export type Database = {
           processing_lock_by: string | null
           publication_hash: string | null
           published_at: string | null
+          schema_detected_at: string | null
           schema_hash: string | null
           skipped_items: number
           source: string
@@ -1283,13 +1288,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delete_requested_at?: string | null
+          detected_schema?: Json | null
           duplicate_items?: number
           entity_mapping_hash?: string | null
           entity_mappings?: Json
           error_message?: string | null
           failed_items?: number
           field_inventory?: Json
+          field_mapping?: Json | null
+          field_mapping_approved_at?: string | null
           field_mapping_hash?: string | null
+          field_mapping_updated_at?: string | null
           file_hash?: string | null
           file_size?: number | null
           id?: string
@@ -1307,6 +1316,7 @@ export type Database = {
           processing_lock_by?: string | null
           publication_hash?: string | null
           published_at?: string | null
+          schema_detected_at?: string | null
           schema_hash?: string | null
           skipped_items?: number
           source: string
@@ -1329,13 +1339,17 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           delete_requested_at?: string | null
+          detected_schema?: Json | null
           duplicate_items?: number
           entity_mapping_hash?: string | null
           entity_mappings?: Json
           error_message?: string | null
           failed_items?: number
           field_inventory?: Json
+          field_mapping?: Json | null
+          field_mapping_approved_at?: string | null
           field_mapping_hash?: string | null
+          field_mapping_updated_at?: string | null
           file_hash?: string | null
           file_size?: number | null
           id?: string
@@ -1353,6 +1367,7 @@ export type Database = {
           processing_lock_by?: string | null
           publication_hash?: string | null
           published_at?: string | null
+          schema_detected_at?: string | null
           schema_hash?: string | null
           skipped_items?: number
           source?: string
