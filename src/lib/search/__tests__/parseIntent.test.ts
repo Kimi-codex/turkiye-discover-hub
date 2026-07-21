@@ -61,15 +61,21 @@ const districts: District[] = [
     cityId: "ci1",
     slug: "sultanahmet",
     sortOrder: 1,
+    latitude: 0,
+    longitude: 0,
+    isActive: true,
     name: { tr: "Sultanahmet", en: "Sultanahmet", ar: "السلطان أحمد" },
-  } as District,
+  } as unknown as District,
   {
     id: "d2",
     cityId: "ci1",
     slug: "basaksehir",
     sortOrder: 2,
+    latitude: 0,
+    longitude: 0,
+    isActive: true,
     name: { tr: "Başakşehir", en: "Başakşehir", ar: "باشاك شهير" },
-  } as District,
+  } as unknown as District,
 ];
 
 const dict = { categories, cities, districts };
