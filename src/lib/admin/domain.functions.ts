@@ -371,7 +371,7 @@ export const upsertCategoryAdmin = createServerFn({ method: "POST" })
         .filter((t) => ["ar", "en", "tr"].includes(t.language) && t.name)
         .map((t) => ({
           category_id: categoryId,
-          language: t.language,
+          language_code: t.language,
           name: t.name,
           description: t.description ?? null,
         }));
@@ -528,7 +528,7 @@ export const upsertCityAdmin = createServerFn({ method: "POST" })
       .filter((t) => ["ar", "en", "tr"].includes(t.language) && t.name)
       .map((t) => ({
         city_id: cityId,
-        language: t.language,
+        language_code: t.language,
         name: t.name,
         description: t.description ?? null,
       }));
@@ -612,7 +612,7 @@ export const upsertDistrictAdmin = createServerFn({ method: "POST" })
     await supabase.from("district_translations").delete().eq("district_id", id);
     const rows = data.translations
       .filter((t) => ["ar", "en", "tr"].includes(t.language) && t.name)
-      .map((t) => ({ district_id: id, language: t.language, name: t.name }));
+      .map((t) => ({ district_id: id, language_code: t.language, name: t.name }));
     if (rows.length > 0) {
       const { error } = await supabase.from("district_translations").insert(rows);
       if (error) throw new Response(error.message, { status: 400 });
