@@ -63,7 +63,7 @@ export function OpeningHoursBlock({ hours }: OpeningHoursProps) {
               )}
             >
               <span className="text-foreground">
-                {t(`days.${h.dayOfWeek}` as const)}
+                {t(`days.${h.dayOfWeek}` as import("@/lib/i18n").MessageKey)}
               </span>
               <span className="text-muted-foreground">
                 {h.isClosed || !h.openTime

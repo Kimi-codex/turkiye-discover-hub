@@ -38,7 +38,7 @@ export function SiteHeader() {
               <Menu className="h-5 w-5" aria-hidden="true" />
             </Button>
           </SheetTrigger>
-          <SheetContent side="start" className="w-80 max-w-[85vw]">
+          <SheetContent side="left" className="w-80 max-w-[85vw]">
             <SheetHeader>
               <SheetTitle>{t("brand.name")}</SheetTitle>
             </SheetHeader>
