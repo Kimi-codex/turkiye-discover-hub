@@ -166,7 +166,7 @@ function ImportDetailPage() {
   const status = String(batch.status ?? "");
 
   const setTab = (tab: TabId) =>
-    navigate({ search: (prev) => ({ ...prev, tab }), replace: true });
+    navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
 
   return (
     <div className="space-y-4">
