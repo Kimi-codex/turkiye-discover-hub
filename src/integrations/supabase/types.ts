@@ -159,11 +159,14 @@ export type Database = {
       business_change_requests: {
         Row: {
           admin_notes: string | null
+          approved_fields: Json | null
           business_id: string
           changes: Json
           created_at: string
           id: string
           original_values: Json | null
+          rejected_fields: Json | null
+          request_type: string
           reviewed_at: string | null
           reviewed_by: string | null
           status: string
@@ -171,11 +174,14 @@ export type Database = {
         }
         Insert: {
           admin_notes?: string | null
+          approved_fields?: Json | null
           business_id: string
           changes: Json
           created_at?: string
           id?: string
           original_values?: Json | null
+          rejected_fields?: Json | null
+          request_type?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -183,11 +189,14 @@ export type Database = {
         }
         Update: {
           admin_notes?: string | null
+          approved_fields?: Json | null
           business_id?: string
           changes?: Json
           created_at?: string
           id?: string
           original_values?: Json | null
+          rejected_fields?: Json | null
+          request_type?: string
           reviewed_at?: string | null
           reviewed_by?: string | null
           status?: string
@@ -1675,6 +1684,16 @@ export type Database = {
       }
     }
     Functions: {
+      _bcr_field_allowlist: { Args: { _type: string }; Returns: string[] }
+      apply_business_change_request: {
+        Args: {
+          _admin_notes: string
+          _approve: Json
+          _reject: Json
+          _request_id: string
+        }
+        Returns: Json
+      }
       approve_ownership_claim: { Args: { _claim_id: string }; Returns: Json }
       bootstrap_admin: { Args: { _target_user: string }; Returns: Json }
       claim_next_image_jobs: {
@@ -1711,6 +1730,8 @@ export type Database = {
         Returns: boolean
       }
       is_suspended: { Args: { _user: string }; Returns: boolean }
+      owner_authz: { Args: { _business_id: string }; Returns: Json }
+      owner_has_business: { Args: { _user: string }; Returns: boolean }
       reap_stale_image_jobs: { Args: never; Returns: number }
       record_audit: {
         Args: {
@@ -1722,6 +1743,10 @@ export type Database = {
           _metadata: Json
         }
         Returns: string
+      }
+      revoke_ownership: {
+        Args: { _business_id: string; _reason: string }
+        Returns: Json
       }
       set_user_role: {
         Args: {
