@@ -5,6 +5,8 @@ import {
   createImportBatch,
   listImportBatches,
   cancelImportBatch,
+  markImportBatchUploaded,
+  markImportBatchFailed,
 } from "@/lib/admin/imports.functions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -19,6 +21,7 @@ function ImportsPage() {
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
   const q = useQuery({
     queryKey: ["admin", "imports"],
     queryFn: () => listImportBatches(),
@@ -35,23 +38,54 @@ function ImportsPage() {
 
   async function handleUpload(file: File) {
     setUploading(true);
+    setUploadError(null);
+    let batchId: string | null = null;
     try {
+      // Guard: JSON only, size cap
+      if (!/\.json$/i.test(file.name) && file.type && !/json/i.test(file.type)) {
+        throw new Error(`Not a JSON file: ${file.name}`);
+      }
+      if (file.size > 200 * 1024 * 1024) {
+        throw new Error(`File exceeds 200MB (${Math.round(file.size / 1024 / 1024)}MB)`);
+      }
+
       const res = await createImportBatch({
-        data: { fileName: file.name, fileSize: file.size, contentType: file.type || "application/json" },
+        data: {
+          fileName: file.name,
+          fileSize: file.size,
+          contentType: file.type || "application/json",
+        },
       });
-      // Upload directly to signed URL (never through server function)
+      batchId = res.batchId;
+
       const up = await fetch(res.uploadUrl, {
         method: "PUT",
         headers: { "Content-Type": file.type || "application/json" },
         body: file,
       });
-      if (!up.ok) throw new Error(`Upload failed: ${up.status}`);
-      toast.success("Uploaded — analyzing…");
+      if (!up.ok) {
+        const body = await up.text().catch(() => "");
+        throw new Error(`Storage PUT ${up.status}: ${body.slice(0, 200) || up.statusText}`);
+      }
+
+      await markImportBatchUploaded({ data: { id: batchId } });
+      toast.success("Uploaded");
       qc.invalidateQueries({ queryKey: ["admin", "imports"] });
-      // Navigate to detail so user can trigger analyze/run
-      window.location.assign(`/${lang}/admin/imports/${res.batchId}`);
+      window.location.assign(`/${lang}/admin/imports/${batchId}`);
     } catch (e) {
-      toast.error((e as Error).message);
+      const msg = (e as Error).message ?? "Upload failed";
+      setUploadError(msg);
+      toast.error(msg);
+      if (batchId) {
+        try {
+          await markImportBatchFailed({
+            data: { id: batchId, step: "upload", message: msg },
+          });
+          qc.invalidateQueries({ queryKey: ["admin", "imports"] });
+        } catch {
+          /* already surfaced */
+        }
+      }
     } finally {
       setUploading(false);
       if (fileRef.current) fileRef.current.value = "";
@@ -79,6 +113,12 @@ function ImportsPage() {
           </Button>
         </div>
       </div>
+      {uploadError && (
+        <div className="rounded-lg border border-destructive/40 bg-destructive/5 p-3 text-sm text-destructive">
+          <div className="font-medium">Upload failed</div>
+          <div className="mt-1 text-xs">{uploadError}</div>
+        </div>
+      )}
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -87,6 +127,7 @@ function ImportsPage() {
               <th className="px-3 py-2">File</th>
               <th className="px-3 py-2">Status</th>
               <th className="px-3 py-2">Items</th>
+              <th className="px-3 py-2">Error</th>
               <th className="px-3 py-2 text-right">Actions</th>
             </tr>
           </thead>
@@ -97,15 +138,23 @@ function ImportsPage() {
                   {new Date(String(b.created_at)).toLocaleString()}
                 </td>
                 <td className="px-3 py-2">
-                  <div className="font-medium">{String(b.file_name ?? "—")}</div>
+                  <div className="font-medium">{String(b.original_filename ?? "—")}</div>
                   <div className="text-xs text-muted-foreground">
-                    {Math.round(Number(b.file_size_bytes ?? 0) / 1024)} KB
+                    {Math.round(Number(b.file_size ?? 0) / 1024)} KB
                   </div>
                 </td>
-                <td className="px-3 py-2 text-xs">{String(b.status)}</td>
                 <td className="px-3 py-2 text-xs">
-                  {String(b.valid_items ?? 0)} valid · {String(b.invalid_items ?? 0)} invalid ·{" "}
-                  {String(b.total_items ?? 0)} total
+                  <StatusPill status={String(b.status)} />
+                </td>
+                <td className="px-3 py-2 text-xs">
+                  {String(b.total_items ?? 0)} total ·{" "}
+                  <span className="text-emerald-600">{String(b.inserted_items ?? 0)} new</span> ·{" "}
+                  <span className="text-blue-600">{String(b.updated_items ?? 0)} upd</span> ·{" "}
+                  <span className="text-amber-600">{String(b.skipped_items ?? 0)} skip</span> ·{" "}
+                  <span className="text-destructive">{String(b.failed_items ?? 0)} fail</span>
+                </td>
+                <td className="px-3 py-2 text-xs text-destructive max-w-[280px] truncate">
+                  {String(b.error_message ?? "")}
                 </td>
                 <td className="px-3 py-2 text-right">
                   <div className="flex justify-end gap-1">
@@ -117,7 +166,7 @@ function ImportsPage() {
                         Open
                       </Link>
                     </Button>
-                    {["uploading", "analyzed", "running", "paused"].includes(String(b.status)) && (
+                    {["uploaded", "analyzing", "ready", "importing"].includes(String(b.status)) && (
                       <Button
                         size="sm"
                         variant="destructive"
@@ -132,7 +181,7 @@ function ImportsPage() {
             ))}
             {rows.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
+                <td colSpan={6} className="px-3 py-8 text-center text-muted-foreground">
                   No imports yet
                 </td>
               </tr>
@@ -141,5 +190,24 @@ function ImportsPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+function StatusPill({ status }: { status: string }) {
+  const tone: Record<string, string> = {
+    pending: "bg-muted text-muted-foreground",
+    uploaded: "bg-blue-100 text-blue-700",
+    analyzing: "bg-blue-100 text-blue-700",
+    ready: "bg-amber-100 text-amber-700",
+    importing: "bg-amber-100 text-amber-700",
+    completed: "bg-emerald-100 text-emerald-700",
+    partially_completed: "bg-amber-100 text-amber-700",
+    failed: "bg-destructive/10 text-destructive",
+    cancelled: "bg-muted text-muted-foreground",
+  };
+  return (
+    <span className={`inline-flex rounded px-2 py-0.5 text-xs ${tone[status] ?? "bg-muted"}`}>
+      {status}
+    </span>
   );
 }
