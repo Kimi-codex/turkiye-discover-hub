@@ -18,6 +18,7 @@ import { summarizeR2Config } from "@/lib/storage/env.server";
 type Sb = any;
 
 const idInput = z.object({ imageId: z.string().uuid() });
+const idsInput = z.object({ imageIds: z.array(z.string().uuid()).min(1).max(200) });
 
 async function countHead(sb: Sb, table: string, filters: Array<[string, unknown]>): Promise<number> {
   let q = sb.from(table).select("*", { count: "exact", head: true });
@@ -310,6 +311,43 @@ export const retryImageJob = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw error;
     return { job };
+  });
+
+async function softDeleteImageRecords(sb: Sb, imageIds: string[]) {
+  const now = new Date().toISOString();
+
+  const { error: jobsError } = await sb
+    .from("image_processing_jobs")
+    .update({ status: "cancelled", updated_at: now })
+    .in("business_image_id", imageIds)
+    .in("status", ["pending", "processing", "retry"]);
+  if (jobsError) throw jobsError;
+
+  const { data: images, error: imagesError } = await sb
+    .from("business_images")
+    .update({ deleted_at: now, is_cover: false, updated_at: now })
+    .in("id", imageIds)
+    .is("deleted_at", null)
+    .select("id");
+  if (imagesError) throw imagesError;
+
+  return images ?? [];
+}
+
+export const deleteImageRecord = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((v) => idInput.parse(v))
+  .handler(async ({ context, data }) => {
+    const deleted = await softDeleteImageRecords(context.supabase as Sb, [data.imageId]);
+    return { ok: true as const, deleted: deleted.length };
+  });
+
+export const deleteImageRecords = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((v) => idsInput.parse(v))
+  .handler(async ({ context, data }) => {
+    const deleted = await softDeleteImageRecords(context.supabase as Sb, data.imageIds);
+    return { ok: true as const, deleted: deleted.length };
   });
 
 export const queueImagesAfterImport = createServerFn({ method: "POST" })

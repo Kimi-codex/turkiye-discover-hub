@@ -44,6 +44,7 @@ import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$
 import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
 import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 import { Route as LangAuthenticatedOwnerBusinessIdIndexRouteImport } from './routes/$lang._authenticated.owner.$businessId.index'
+import { Route as LangAuthenticatedAdminImportsIndexRouteImport } from './routes/$lang._authenticated.admin.imports.index'
 import { Route as LangAuthenticatedOwnerBusinessIdTranslationsRouteImport } from './routes/$lang._authenticated.owner.$businessId.translations'
 import { Route as LangAuthenticatedOwnerBusinessIdServicesRouteImport } from './routes/$lang._authenticated.owner.$businessId.services'
 import { Route as LangAuthenticatedOwnerBusinessIdReviewsRouteImport } from './routes/$lang._authenticated.owner.$businessId.reviews'
@@ -253,6 +254,12 @@ const LangAuthenticatedOwnerBusinessIdIndexRoute =
     path: '/',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
+const LangAuthenticatedAdminImportsIndexRoute =
+  LangAuthenticatedAdminImportsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
+  } as any)
 const LangAuthenticatedOwnerBusinessIdTranslationsRoute =
   LangAuthenticatedOwnerBusinessIdTranslationsRouteImport.update({
     id: '/translations',
@@ -358,6 +365,7 @@ export interface FileRoutesByFullPath {
   '/$lang/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
   '/$lang/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
   '/$lang/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
+  '/$lang/admin/imports/': typeof LangAuthenticatedAdminImportsIndexRoute
   '/$lang/owner/$businessId/': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -377,7 +385,6 @@ export interface FileRoutesByTo {
   '/$lang/admin/change-requests': typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
-  '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
@@ -400,6 +407,7 @@ export interface FileRoutesByTo {
   '/$lang/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
   '/$lang/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
   '/$lang/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
+  '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsIndexRoute
   '/$lang/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRoutesById {
@@ -448,6 +456,7 @@ export interface FileRoutesById {
   '/$lang/_authenticated/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
   '/$lang/_authenticated/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
   '/$lang/_authenticated/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
+  '/$lang/_authenticated/admin/imports/': typeof LangAuthenticatedAdminImportsIndexRoute
   '/$lang/_authenticated/owner/$businessId/': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -496,6 +505,7 @@ export interface FileRouteTypes {
     | '/$lang/owner/$businessId/reviews'
     | '/$lang/owner/$businessId/services'
     | '/$lang/owner/$businessId/translations'
+    | '/$lang/admin/imports/'
     | '/$lang/owner/$businessId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -515,7 +525,6 @@ export interface FileRouteTypes {
     | '/$lang/admin/change-requests'
     | '/$lang/admin/cities'
     | '/$lang/admin/images'
-    | '/$lang/admin/imports'
     | '/$lang/admin/ownership-claims'
     | '/$lang/admin/reply-moderation'
     | '/$lang/admin/reports'
@@ -538,6 +547,7 @@ export interface FileRouteTypes {
     | '/$lang/owner/$businessId/reviews'
     | '/$lang/owner/$businessId/services'
     | '/$lang/owner/$businessId/translations'
+    | '/$lang/admin/imports'
     | '/$lang/owner/$businessId'
   id:
     | '__root__'
@@ -585,6 +595,7 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/owner/$businessId/reviews'
     | '/$lang/_authenticated/owner/$businessId/services'
     | '/$lang/_authenticated/owner/$businessId/translations'
+    | '/$lang/_authenticated/admin/imports/'
     | '/$lang/_authenticated/owner/$businessId/'
   fileRoutesById: FileRoutesById
 }
@@ -841,6 +852,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdIndexRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
+    '/$lang/_authenticated/admin/imports/': {
+      id: '/$lang/_authenticated/admin/imports/'
+      path: '/'
+      fullPath: '/$lang/admin/imports/'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsIndexRouteImport
+      parentRoute: typeof LangAuthenticatedAdminImportsRoute
+    }
     '/$lang/_authenticated/owner/$businessId/translations': {
       id: '/$lang/_authenticated/owner/$businessId/translations'
       path: '/translations'
@@ -946,11 +964,14 @@ const LangAuthenticatedAdminChangeRequestsRouteWithChildren =
 
 interface LangAuthenticatedAdminImportsRouteChildren {
   LangAuthenticatedAdminImportsIdRoute: typeof LangAuthenticatedAdminImportsIdRoute
+  LangAuthenticatedAdminImportsIndexRoute: typeof LangAuthenticatedAdminImportsIndexRoute
 }
 
 const LangAuthenticatedAdminImportsRouteChildren: LangAuthenticatedAdminImportsRouteChildren =
   {
     LangAuthenticatedAdminImportsIdRoute: LangAuthenticatedAdminImportsIdRoute,
+    LangAuthenticatedAdminImportsIndexRoute:
+      LangAuthenticatedAdminImportsIndexRoute,
   }
 
 const LangAuthenticatedAdminImportsRouteWithChildren =
