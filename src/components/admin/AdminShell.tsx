@@ -1,14 +1,21 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Building2, Upload, Flag, Shield } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
   { to: "", label: "Dashboard", icon: LayoutDashboard },
-  { to: "/users", label: "Users", icon: Users },
   { to: "/businesses", label: "Businesses", icon: Building2 },
-  { to: "/imports", label: "Imports", icon: Upload },
+  { to: "/categories", label: "Categories", icon: Tags },
+  { to: "/category-mappings", label: "Category Mappings", icon: GitBranch },
+  { to: "/cities", label: "Cities", icon: MapPin },
+  { to: "/reviews", label: "Reviews", icon: Star },
   { to: "/reports", label: "Reports", icon: Flag },
+  { to: "/ownership-claims", label: "Ownership Claims", icon: FileCheck },
+  { to: "/imports", label: "Imports", icon: Upload },
+  { to: "/users", label: "Users", icon: Users },
+  { to: "/audit-logs", label: "Audit Logs", icon: ScrollText },
+  { to: "/settings", label: "Settings", icon: Settings },
 ] as const;
 
 export function AdminShell({ children }: { children: ReactNode }) {
