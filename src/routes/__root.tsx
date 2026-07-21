@@ -101,6 +101,12 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
       { name: "theme-color", content: "#1f2340" },
+      { property: "og:title", content: "Keşfet Türkiye — Türkiye'nin premium yerel keşif rehberi" },
+      { name: "twitter:title", content: "Keşfet Türkiye — Türkiye'nin premium yerel keşif rehberi" },
+      { property: "og:description", content: "Türkiye'deki restoranları, otelleri, klinikleri ve turistik yerleri keşfedin. Doğrulanmış işletmeler tek bir yerde." },
+      { name: "twitter:description", content: "Türkiye'deki restoranları, otelleri, klinikleri ve turistik yerleri keşfedin. Doğrulanmış işletmeler tek bir yerde." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/054c1068-40e4-4e71-bae6-4e9b67e55204/id-preview-c11b8718--b6357c62-90f0-4b89-b027-1caa97ddb99c.lovable.app-1784645488350.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/054c1068-40e4-4e71-bae6-4e9b67e55204/id-preview-c11b8718--b6357c62-90f0-4b89-b027-1caa97ddb99c.lovable.app-1784645488350.png" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
