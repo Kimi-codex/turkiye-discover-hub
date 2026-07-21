@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 
 type JobStatus = "pending" | "processing" | "retry" | "uploaded" | "failed" | "cancelled";
+type ImageRecord = Awaited<ReturnType<typeof listImageRecords>>[number];
 
 const statusQuery = queryOptions({
   queryKey: ["admin", "images", "status"],
@@ -88,8 +89,8 @@ function AdminImagesPage() {
   });
   const deleteOne = useMutation({
     mutationFn: (id: string) => deleteRecordFn({ data: { imageId: id } }),
-    onSuccess: async (r) => {
-      setSelectedRecords((prev) => prev.filter((id) => id !== String((r as { imageId?: string }).imageId ?? "")));
+    onSuccess: async (r, id) => {
+      setSelectedRecords((prev) => prev.filter((recordId) => recordId !== id));
       toast.success(`Deleted ${r.deleted} image record`);
       await qc.invalidateQueries({ queryKey: ["admin", "images"] });
     },
@@ -107,7 +108,7 @@ function AdminImagesPage() {
 
   const r = status.records;
   const j = status.jobs;
-  const allVisibleSelected = records.length > 0 && records.every((row) => selectedRecords.includes(row.id));
+  const allVisibleSelected = records.length > 0 && records.every((row: ImageRecord) => selectedRecords.includes(row.id));
   const toggleRecord = (id: string, checked: boolean) => {
     setSelectedRecords((prev) =>
       checked ? Array.from(new Set([...prev, id])) : prev.filter((recordId) => recordId !== id),
@@ -210,7 +211,7 @@ function AdminImagesPage() {
               <Button
                 size="sm"
                 variant="outline"
-                onClick={() => setSelectedRecords(allVisibleSelected ? [] : records.map((row) => row.id))}
+                onClick={() => setSelectedRecords(allVisibleSelected ? [] : records.map((row: ImageRecord) => row.id))}
                 disabled={records.length === 0}
               >
                 {allVisibleSelected ? "Clear selection" : "Select all visible"}
@@ -235,7 +236,7 @@ function AdminImagesPage() {
                       aria-label="Select all visible image records"
                       checked={allVisibleSelected}
                       onChange={(e) =>
-                        setSelectedRecords(e.currentTarget.checked ? records.map((row) => row.id) : [])
+                        setSelectedRecords(e.currentTarget.checked ? records.map((row: ImageRecord) => row.id) : [])
                       }
                     />
                   </th>
