@@ -13,8 +13,11 @@ import { Route as LangRouteImport } from './routes/$lang'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as LangIndexRouteImport } from './routes/$lang.index'
 import { Route as LangSearchRouteImport } from './routes/$lang.search'
+import { Route as LangAuthRouteImport } from './routes/$lang.auth'
+import { Route as LangAuthenticatedRouteImport } from './routes/$lang._authenticated'
 import { Route as LangSlugRouteImport } from './routes/$lang.$slug'
 import { Route as LangPlaceSlugRouteImport } from './routes/$lang.place.$slug'
+import { Route as LangAuthenticatedAccountRouteImport } from './routes/$lang._authenticated.account'
 import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
 import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 
@@ -38,6 +41,15 @@ const LangSearchRoute = LangSearchRouteImport.update({
   path: '/search',
   getParentRoute: () => LangRoute,
 } as any)
+const LangAuthRoute = LangAuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
+  getParentRoute: () => LangRoute,
+} as any)
+const LangAuthenticatedRoute = LangAuthenticatedRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => LangRoute,
+} as any)
 const LangSlugRoute = LangSlugRouteImport.update({
   id: '/$slug',
   path: '/$slug',
@@ -48,6 +60,12 @@ const LangPlaceSlugRoute = LangPlaceSlugRouteImport.update({
   path: '/place/$slug',
   getParentRoute: () => LangRoute,
 } as any)
+const LangAuthenticatedAccountRoute =
+  LangAuthenticatedAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
+    getParentRoute: () => LangAuthenticatedRoute,
+  } as any)
 const LangCitySlugCategorySlugRoute =
   LangCitySlugCategorySlugRouteImport.update({
     id: '/$citySlug/$categorySlug',
@@ -65,18 +83,22 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/$lang': typeof LangRouteWithChildren
   '/$lang/$slug': typeof LangSlugRoute
+  '/$lang/auth': typeof LangAuthRoute
   '/$lang/search': typeof LangSearchRoute
   '/$lang/': typeof LangIndexRoute
   '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/account': typeof LangAuthenticatedAccountRoute
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/$lang/$slug': typeof LangSlugRoute
-  '/$lang/search': typeof LangSearchRoute
   '/$lang': typeof LangIndexRoute
+  '/$lang/auth': typeof LangAuthRoute
+  '/$lang/search': typeof LangSearchRoute
   '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/account': typeof LangAuthenticatedAccountRoute
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
@@ -85,9 +107,12 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/$lang': typeof LangRouteWithChildren
   '/$lang/$slug': typeof LangSlugRoute
+  '/$lang/_authenticated': typeof LangAuthenticatedRouteWithChildren
+  '/$lang/auth': typeof LangAuthRoute
   '/$lang/search': typeof LangSearchRoute
   '/$lang/': typeof LangIndexRoute
   '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/_authenticated/account': typeof LangAuthenticatedAccountRoute
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
@@ -97,18 +122,22 @@ export interface FileRouteTypes {
     | '/'
     | '/$lang'
     | '/$lang/$slug'
+    | '/$lang/auth'
     | '/$lang/search'
     | '/$lang/'
     | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/account'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
     | '/$lang/$slug'
-    | '/$lang/search'
     | '/$lang'
+    | '/$lang/auth'
+    | '/$lang/search'
     | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/account'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
   id:
@@ -116,9 +145,12 @@ export interface FileRouteTypes {
     | '/'
     | '/$lang'
     | '/$lang/$slug'
+    | '/$lang/_authenticated'
+    | '/$lang/auth'
     | '/$lang/search'
     | '/$lang/'
     | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/_authenticated/account'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
   fileRoutesById: FileRoutesById
@@ -158,6 +190,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangSearchRouteImport
       parentRoute: typeof LangRoute
     }
+    '/$lang/auth': {
+      id: '/$lang/auth'
+      path: '/auth'
+      fullPath: '/$lang/auth'
+      preLoaderRoute: typeof LangAuthRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/_authenticated': {
+      id: '/$lang/_authenticated'
+      path: ''
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangAuthenticatedRouteImport
+      parentRoute: typeof LangRoute
+    }
     '/$lang/$slug': {
       id: '/$lang/$slug'
       path: '/$slug'
@@ -171,6 +217,13 @@ declare module '@tanstack/react-router' {
       fullPath: '/$lang/place/$slug'
       preLoaderRoute: typeof LangPlaceSlugRouteImport
       parentRoute: typeof LangRoute
+    }
+    '/$lang/_authenticated/account': {
+      id: '/$lang/_authenticated/account'
+      path: '/account'
+      fullPath: '/$lang/account'
+      preLoaderRoute: typeof LangAuthenticatedAccountRouteImport
+      parentRoute: typeof LangAuthenticatedRoute
     }
     '/$lang/$citySlug/$categorySlug': {
       id: '/$lang/$citySlug/$categorySlug'
@@ -189,8 +242,21 @@ declare module '@tanstack/react-router' {
   }
 }
 
+interface LangAuthenticatedRouteChildren {
+  LangAuthenticatedAccountRoute: typeof LangAuthenticatedAccountRoute
+}
+
+const LangAuthenticatedRouteChildren: LangAuthenticatedRouteChildren = {
+  LangAuthenticatedAccountRoute: LangAuthenticatedAccountRoute,
+}
+
+const LangAuthenticatedRouteWithChildren =
+  LangAuthenticatedRoute._addFileChildren(LangAuthenticatedRouteChildren)
+
 interface LangRouteChildren {
   LangSlugRoute: typeof LangSlugRoute
+  LangAuthenticatedRoute: typeof LangAuthenticatedRouteWithChildren
+  LangAuthRoute: typeof LangAuthRoute
   LangSearchRoute: typeof LangSearchRoute
   LangIndexRoute: typeof LangIndexRoute
   LangCitySlugCategorySlugRoute: typeof LangCitySlugCategorySlugRoute
@@ -200,6 +266,8 @@ interface LangRouteChildren {
 
 const LangRouteChildren: LangRouteChildren = {
   LangSlugRoute: LangSlugRoute,
+  LangAuthenticatedRoute: LangAuthenticatedRouteWithChildren,
+  LangAuthRoute: LangAuthRoute,
   LangSearchRoute: LangSearchRoute,
   LangIndexRoute: LangIndexRoute,
   LangCitySlugCategorySlugRoute: LangCitySlugCategorySlugRoute,
@@ -217,13 +285,3 @@ const rootRouteChildren: RootRouteChildren = {
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
