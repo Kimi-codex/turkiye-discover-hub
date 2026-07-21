@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCategoriesAdmin,
@@ -13,14 +13,20 @@ const STATUSES = ["pending", "approved", "ignored"] as const;
 
 export const Route = createFileRoute("/$lang/_authenticated/admin/category-mappings")({
   ssr: false,
+  validateSearch: (s: Record<string, unknown>): { returnTo?: string } => {
+    const returnTo = typeof s.returnTo === "string" && s.returnTo.startsWith("/") ? s.returnTo : undefined;
+    return { returnTo };
+  },
   component: MappingsPage,
 });
 
 function MappingsPage() {
+  const search = Route.useSearch();
   const qc = useQueryClient();
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("pending");
   const [selection, setSelection] = useState<Record<string, string>>({});
   const [checked, setChecked] = useState<Set<string>>(new Set());
+  const [bulkCategoryId, setBulkCategoryId] = useState("");
 
   const cats = useQuery({
     queryKey: ["admin", "categories"],
@@ -55,32 +61,82 @@ function MappingsPage() {
   });
 
   const rows = q.data?.rows ?? [];
+  const visibleIds = rows.map((r: Record<string, unknown>) => String(r.id));
+  const allVisibleChecked = visibleIds.length > 0 && visibleIds.every((id) => checked.has(id));
+  const selectedIds = Array.from(checked);
+  const applyBulkCategory = () => {
+    if (!bulkCategoryId) return;
+    setSelection((prev) => {
+      const next = { ...prev };
+      selectedIds.forEach((id) => {
+        next[id] = bulkCategoryId;
+      });
+      return next;
+    });
+  };
 
   return (
     <div className="space-y-4">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold">Category mappings</h1>
-        <select
-          className="rounded-md border bg-background px-2 py-1 text-sm"
-          value={status}
-          onChange={(e) => setStatus(e.target.value as (typeof STATUSES)[number])}
-        >
-          {STATUSES.map((s) => (
-            <option key={s} value={s}>
-              {s}
-            </option>
-          ))}
-        </select>
+        <div>
+          <h1 className="text-2xl font-semibold">Category mappings</h1>
+          <p className="text-xs text-muted-foreground">
+            Map source labels to catalog categories, then return to the import batch and continue validation.
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          {search.returnTo && (
+            <Button asChild size="sm" variant="outline">
+              <Link to={search.returnTo}>Return to import batch</Link>
+            </Button>
+          )}
+          <select
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+            value={status}
+            onChange={(e) => {
+              setStatus(e.target.value as (typeof STATUSES)[number]);
+              setChecked(new Set());
+            }}
+          >
+            {STATUSES.map((s) => (
+              <option key={s} value={s}>
+                {s}
+              </option>
+            ))}
+          </select>
+        </div>
       </div>
       {checked.size > 0 && (
-        <div className="flex items-center gap-2 rounded-xl border bg-card p-3 text-sm">
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 text-sm">
           <span>{checked.size} selected</span>
+          <select
+            className="rounded-md border bg-background px-2 py-1 text-sm"
+            value={bulkCategoryId}
+            onChange={(e) => setBulkCategoryId(e.target.value)}
+          >
+            <option value="">Choose category for selected…</option>
+            {catOptions.map((o: { id: string; label: string }) => (
+              <option key={o.id} value={o.id}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" variant="outline" disabled={!bulkCategoryId} onClick={applyBulkCategory}>
+            Apply category to selected
+          </Button>
+          <Button
+            size="sm"
+            disabled={!bulkCategoryId || mut.isPending}
+            onClick={() => mut.mutate({ ids: selectedIds, status: "approved", categoryId: bulkCategoryId })}
+          >
+            Approve selected
+          </Button>
           <Button
             size="sm"
             variant="outline"
-            onClick={() => mut.mutate({ ids: Array.from(checked), status: "ignored" })}
+            onClick={() => mut.mutate({ ids: selectedIds, status: "ignored" })}
           >
-            Ignore
+            Ignore selected
           </Button>
           <Button size="sm" variant="ghost" onClick={() => setChecked(new Set())}>
             Clear
@@ -91,7 +147,17 @@ function MappingsPage() {
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
             <tr>
-              <th className="px-3 py-2 w-8"></th>
+              <th className="px-3 py-2 w-8">
+                <input
+                  type="checkbox"
+                  aria-label="Select all visible mappings"
+                  checked={allVisibleChecked}
+                  onChange={(e) => {
+                    if (e.target.checked) setChecked(new Set(visibleIds));
+                    else setChecked(new Set());
+                  }}
+                />
+              </th>
               <th className="px-3 py-2">Source label</th>
               <th className="px-3 py-2">Usage</th>
               <th className="px-3 py-2">Map to category</th>
