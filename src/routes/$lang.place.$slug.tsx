@@ -74,7 +74,7 @@ export const Route = createFileRoute("/$lang/place/$slug")({
       address: {
         "@type": "PostalAddress",
         streetAddress: b.address,
-        addressLocality: pickLocalized(b.city.name, "en"),
+        addressLocality: pickLocalized(b.city?.name, "en"),
         addressCountry: "TR",
       },
       geo: {
