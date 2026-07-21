@@ -27,6 +27,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -45,6 +46,14 @@ function AuthPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 8) {
+      toast.error(t("auth.password_too_short"));
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error(t("auth.password_mismatch"));
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -56,6 +65,7 @@ function AuthPage() {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
+    // Generic message: never expose whether admin was granted.
     toast.success(t("auth.check_email"));
   }
 
@@ -150,11 +160,31 @@ function AuthPage() {
                 id="up-pass"
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
+                aria-describedby="up-pass-hint"
               />
+              <p id="up-pass-hint" className="text-xs text-muted-foreground">
+                {t("auth.password_hint")}
+              </p>
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="up-pass-confirm">{t("auth.confirm_password")}</Label>
+              <Input
+                id="up-pass-confirm"
+                type="password"
+                required
+                minLength={8}
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+                aria-invalid={confirmPassword.length > 0 && confirmPassword !== password}
+              />
+              {confirmPassword.length > 0 && confirmPassword !== password ? (
+                <p className="text-xs text-destructive">{t("auth.password_mismatch")}</p>
+              ) : null}
             </div>
             <Button type="submit" disabled={busy}>
               {t("auth.signup")}
