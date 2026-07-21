@@ -319,6 +319,58 @@ export type Database = {
           },
         ]
       }
+      business_import_provenance: {
+        Row: {
+          applied_action: string
+          applied_at: string
+          applied_fields: string[]
+          business_id: string
+          id: string
+          import_batch_id: string
+          import_batch_item_id: string | null
+        }
+        Insert: {
+          applied_action: string
+          applied_at?: string
+          applied_fields?: string[]
+          business_id: string
+          id?: string
+          import_batch_id: string
+          import_batch_item_id?: string | null
+        }
+        Update: {
+          applied_action?: string
+          applied_at?: string
+          applied_fields?: string[]
+          business_id?: string
+          id?: string
+          import_batch_id?: string
+          import_batch_item_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_import_provenance_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_import_provenance_import_batch_id_fkey"
+            columns: ["import_batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_import_provenance_import_batch_item_id_fkey"
+            columns: ["import_batch_item_id"]
+            isOneToOne: false
+            referencedRelation: "import_batch_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       business_opening_hours: {
         Row: {
           business_id: string
@@ -1044,42 +1096,57 @@ export type Database = {
       import_batch_items: {
         Row: {
           action: string | null
+          approved_fields: string[]
           business_id: string | null
           created_at: string
+          current_snapshot: Json | null
           error_message: string | null
           id: string
           import_batch_id: string
+          intent: string | null
           item_index: number | null
           place_id: string | null
+          preview_hash: string | null
           processed_at: string | null
+          proposed_diff: Json | null
           raw_payload: Json | null
           status: string
           updated_at: string
         }
         Insert: {
           action?: string | null
+          approved_fields?: string[]
           business_id?: string | null
           created_at?: string
+          current_snapshot?: Json | null
           error_message?: string | null
           id?: string
           import_batch_id: string
+          intent?: string | null
           item_index?: number | null
           place_id?: string | null
+          preview_hash?: string | null
           processed_at?: string | null
+          proposed_diff?: Json | null
           raw_payload?: Json | null
           status?: string
           updated_at?: string
         }
         Update: {
           action?: string | null
+          approved_fields?: string[]
           business_id?: string | null
           created_at?: string
+          current_snapshot?: Json | null
           error_message?: string | null
           id?: string
           import_batch_id?: string
+          intent?: string | null
           item_index?: number | null
           place_id?: string | null
+          preview_hash?: string | null
           processed_at?: string | null
+          proposed_diff?: Json | null
           raw_payload?: Json | null
           status?: string
           updated_at?: string
@@ -1103,9 +1170,11 @@ export type Database = {
       }
       import_batches: {
         Row: {
+          archived_at: string | null
           completed_at: string | null
           created_at: string
           created_by: string | null
+          delete_requested_at: string | null
           duplicate_items: number
           error_message: string | null
           failed_items: number
@@ -1115,15 +1184,21 @@ export type Database = {
           import_options: Json
           inserted_items: number
           invalid_items: number
+          mapping_confirmed_at: string | null
           metadata: Json | null
           needs_mapping_items: number
           original_filename: string | null
+          preview_hash: string | null
+          previewed_at: string | null
           processed_items: number
           processing_lock_at: string | null
           processing_lock_by: string | null
+          published_at: string | null
           skipped_items: number
           source: string
           source_provider: string
+          stage: string
+          stage_history: Json
           started_at: string | null
           status: string
           storage_bucket: string
@@ -1134,9 +1209,11 @@ export type Database = {
           valid_items: number
         }
         Insert: {
+          archived_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          delete_requested_at?: string | null
           duplicate_items?: number
           error_message?: string | null
           failed_items?: number
@@ -1146,15 +1223,21 @@ export type Database = {
           import_options?: Json
           inserted_items?: number
           invalid_items?: number
+          mapping_confirmed_at?: string | null
           metadata?: Json | null
           needs_mapping_items?: number
           original_filename?: string | null
+          preview_hash?: string | null
+          previewed_at?: string | null
           processed_items?: number
           processing_lock_at?: string | null
           processing_lock_by?: string | null
+          published_at?: string | null
           skipped_items?: number
           source: string
           source_provider?: string
+          stage?: string
+          stage_history?: Json
           started_at?: string | null
           status?: string
           storage_bucket?: string
@@ -1165,9 +1248,11 @@ export type Database = {
           valid_items?: number
         }
         Update: {
+          archived_at?: string | null
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          delete_requested_at?: string | null
           duplicate_items?: number
           error_message?: string | null
           failed_items?: number
@@ -1177,15 +1262,21 @@ export type Database = {
           import_options?: Json
           inserted_items?: number
           invalid_items?: number
+          mapping_confirmed_at?: string | null
           metadata?: Json | null
           needs_mapping_items?: number
           original_filename?: string | null
+          preview_hash?: string | null
+          previewed_at?: string | null
           processed_items?: number
           processing_lock_at?: string | null
           processing_lock_by?: string | null
+          published_at?: string | null
           skipped_items?: number
           source?: string
           source_provider?: string
+          stage?: string
+          stage_history?: Json
           started_at?: string | null
           status?: string
           storage_bucket?: string
