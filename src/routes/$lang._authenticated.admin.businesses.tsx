@@ -121,7 +121,7 @@ function BusinessesPage() {
               </tr>
             </thead>
             <tbody>
-              {rows.map((b) => (
+              {rows.map((b: Record<string, unknown>) => (
                 <tr key={b.id} className="border-t align-top">
                   <td className="px-3 py-2">
                     <div className="font-medium">{b.name}</div>

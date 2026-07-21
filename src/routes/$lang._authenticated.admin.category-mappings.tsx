@@ -126,7 +126,7 @@ function MappingsPage() {
                       onChange={(e) => setSelection((s) => ({ ...s, [id]: e.target.value }))}
                     >
                       <option value="">Select…</option>
-                      {catOptions.map((o) => (
+                      {catOptions.map((o: { id: string; label: string }) => (
                         <option key={o.id} value={o.id}>
                           {o.label}
                         </option>

@@ -22,7 +22,19 @@ import { Route as LangAuthenticatedAccountRouteImport } from './routes/$lang._au
 import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
 import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
 import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
+import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
+import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
+import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
+import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
+import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
+import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
+import { Route as LangAuthenticatedAdminCategoryMappingsRouteImport } from './routes/$lang._authenticated.admin.category-mappings'
+import { Route as LangAuthenticatedAdminCategoriesRouteImport } from './routes/$lang._authenticated.admin.categories'
+import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$lang._authenticated.admin.businesses'
+import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
 import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
+import { Route as LangAuthenticatedAdminImportsIdRouteImport } from './routes/$lang._authenticated.admin.imports.$id'
+import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
 
 const LangRoute = LangRouteImport.update({
   id: '/$lang',
@@ -92,11 +104,83 @@ const LangAuthenticatedAdminUsersRoute =
     path: '/users',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
+const LangAuthenticatedAdminSettingsRoute =
+  LangAuthenticatedAdminSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminReviewsRoute =
+  LangAuthenticatedAdminReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminReportsRoute =
+  LangAuthenticatedAdminReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminOwnershipClaimsRoute =
+  LangAuthenticatedAdminOwnershipClaimsRouteImport.update({
+    id: '/ownership-claims',
+    path: '/ownership-claims',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminImportsRoute =
+  LangAuthenticatedAdminImportsRouteImport.update({
+    id: '/imports',
+    path: '/imports',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCitiesRoute =
+  LangAuthenticatedAdminCitiesRouteImport.update({
+    id: '/cities',
+    path: '/cities',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCategoryMappingsRoute =
+  LangAuthenticatedAdminCategoryMappingsRouteImport.update({
+    id: '/category-mappings',
+    path: '/category-mappings',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCategoriesRoute =
+  LangAuthenticatedAdminCategoriesRouteImport.update({
+    id: '/categories',
+    path: '/categories',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminBusinessesRoute =
+  LangAuthenticatedAdminBusinessesRouteImport.update({
+    id: '/businesses',
+    path: '/businesses',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminAuditLogsRoute =
+  LangAuthenticatedAdminAuditLogsRouteImport.update({
+    id: '/audit-logs',
+    path: '/audit-logs',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
 const LangCitySlugDistrictSlugCategorySlugRoute =
   LangCitySlugDistrictSlugCategorySlugRouteImport.update({
     id: '/$citySlug/$districtSlug/$categorySlug',
     path: '/$citySlug/$districtSlug/$categorySlug',
     getParentRoute: () => LangRoute,
+  } as any)
+const LangAuthenticatedAdminImportsIdRoute =
+  LangAuthenticatedAdminImportsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
+  } as any)
+const LangAuthenticatedAdminBusinessesIdRoute =
+  LangAuthenticatedAdminBusinessesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminBusinessesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -111,8 +195,20 @@ export interface FileRoutesByFullPath {
   '/$lang/admin': typeof LangAuthenticatedAdminRouteWithChildren
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
+  '/$lang/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
+  '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
+  '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
+  '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
+  '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
+  '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
+  '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/admin/': typeof LangAuthenticatedAdminIndexRoute
+  '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -124,8 +220,20 @@ export interface FileRoutesByTo {
   '/$lang/account': typeof LangAuthenticatedAccountRoute
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
+  '/$lang/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
+  '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
+  '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
+  '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
+  '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
+  '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
+  '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/admin': typeof LangAuthenticatedAdminIndexRoute
+  '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -141,8 +249,20 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin': typeof LangAuthenticatedAdminRouteWithChildren
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
+  '/$lang/_authenticated/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
+  '/$lang/_authenticated/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
+  '/$lang/_authenticated/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
+  '/$lang/_authenticated/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
+  '/$lang/_authenticated/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/_authenticated/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
+  '/$lang/_authenticated/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  '/$lang/_authenticated/admin/reports': typeof LangAuthenticatedAdminReportsRoute
+  '/$lang/_authenticated/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
+  '/$lang/_authenticated/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/_authenticated/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/_authenticated/admin/': typeof LangAuthenticatedAdminIndexRoute
+  '/$lang/_authenticated/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
+  '/$lang/_authenticated/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -158,8 +278,20 @@ export interface FileRouteTypes {
     | '/$lang/admin'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
+    | '/$lang/admin/audit-logs'
+    | '/$lang/admin/businesses'
+    | '/$lang/admin/categories'
+    | '/$lang/admin/category-mappings'
+    | '/$lang/admin/cities'
+    | '/$lang/admin/imports'
+    | '/$lang/admin/ownership-claims'
+    | '/$lang/admin/reports'
+    | '/$lang/admin/reviews'
+    | '/$lang/admin/settings'
     | '/$lang/admin/users'
     | '/$lang/admin/'
+    | '/$lang/admin/businesses/$id'
+    | '/$lang/admin/imports/$id'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -171,8 +303,20 @@ export interface FileRouteTypes {
     | '/$lang/account'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
+    | '/$lang/admin/audit-logs'
+    | '/$lang/admin/businesses'
+    | '/$lang/admin/categories'
+    | '/$lang/admin/category-mappings'
+    | '/$lang/admin/cities'
+    | '/$lang/admin/imports'
+    | '/$lang/admin/ownership-claims'
+    | '/$lang/admin/reports'
+    | '/$lang/admin/reviews'
+    | '/$lang/admin/settings'
     | '/$lang/admin/users'
     | '/$lang/admin'
+    | '/$lang/admin/businesses/$id'
+    | '/$lang/admin/imports/$id'
   id:
     | '__root__'
     | '/'
@@ -187,8 +331,20 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin'
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
+    | '/$lang/_authenticated/admin/audit-logs'
+    | '/$lang/_authenticated/admin/businesses'
+    | '/$lang/_authenticated/admin/categories'
+    | '/$lang/_authenticated/admin/category-mappings'
+    | '/$lang/_authenticated/admin/cities'
+    | '/$lang/_authenticated/admin/imports'
+    | '/$lang/_authenticated/admin/ownership-claims'
+    | '/$lang/_authenticated/admin/reports'
+    | '/$lang/_authenticated/admin/reviews'
+    | '/$lang/_authenticated/admin/settings'
     | '/$lang/_authenticated/admin/users'
     | '/$lang/_authenticated/admin/'
+    | '/$lang/_authenticated/admin/businesses/$id'
+    | '/$lang/_authenticated/admin/imports/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -289,6 +445,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminUsersRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
+    '/$lang/_authenticated/admin/settings': {
+      id: '/$lang/_authenticated/admin/settings'
+      path: '/settings'
+      fullPath: '/$lang/admin/settings'
+      preLoaderRoute: typeof LangAuthenticatedAdminSettingsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/reviews': {
+      id: '/$lang/_authenticated/admin/reviews'
+      path: '/reviews'
+      fullPath: '/$lang/admin/reviews'
+      preLoaderRoute: typeof LangAuthenticatedAdminReviewsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/reports': {
+      id: '/$lang/_authenticated/admin/reports'
+      path: '/reports'
+      fullPath: '/$lang/admin/reports'
+      preLoaderRoute: typeof LangAuthenticatedAdminReportsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/ownership-claims': {
+      id: '/$lang/_authenticated/admin/ownership-claims'
+      path: '/ownership-claims'
+      fullPath: '/$lang/admin/ownership-claims'
+      preLoaderRoute: typeof LangAuthenticatedAdminOwnershipClaimsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/imports': {
+      id: '/$lang/_authenticated/admin/imports'
+      path: '/imports'
+      fullPath: '/$lang/admin/imports'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/cities': {
+      id: '/$lang/_authenticated/admin/cities'
+      path: '/cities'
+      fullPath: '/$lang/admin/cities'
+      preLoaderRoute: typeof LangAuthenticatedAdminCitiesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/category-mappings': {
+      id: '/$lang/_authenticated/admin/category-mappings'
+      path: '/category-mappings'
+      fullPath: '/$lang/admin/category-mappings'
+      preLoaderRoute: typeof LangAuthenticatedAdminCategoryMappingsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/categories': {
+      id: '/$lang/_authenticated/admin/categories'
+      path: '/categories'
+      fullPath: '/$lang/admin/categories'
+      preLoaderRoute: typeof LangAuthenticatedAdminCategoriesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/businesses': {
+      id: '/$lang/_authenticated/admin/businesses'
+      path: '/businesses'
+      fullPath: '/$lang/admin/businesses'
+      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/audit-logs': {
+      id: '/$lang/_authenticated/admin/audit-logs'
+      path: '/audit-logs'
+      fullPath: '/$lang/admin/audit-logs'
+      preLoaderRoute: typeof LangAuthenticatedAdminAuditLogsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
     '/$lang/$citySlug/$districtSlug/$categorySlug': {
       id: '/$lang/$citySlug/$districtSlug/$categorySlug'
       path: '/$citySlug/$districtSlug/$categorySlug'
@@ -296,16 +522,84 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangCitySlugDistrictSlugCategorySlugRouteImport
       parentRoute: typeof LangRoute
     }
+    '/$lang/_authenticated/admin/imports/$id': {
+      id: '/$lang/_authenticated/admin/imports/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/imports/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminImportsRoute
+    }
+    '/$lang/_authenticated/admin/businesses/$id': {
+      id: '/$lang/_authenticated/admin/businesses/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/businesses/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminBusinessesRoute
+    }
   }
 }
 
+interface LangAuthenticatedAdminBusinessesRouteChildren {
+  LangAuthenticatedAdminBusinessesIdRoute: typeof LangAuthenticatedAdminBusinessesIdRoute
+}
+
+const LangAuthenticatedAdminBusinessesRouteChildren: LangAuthenticatedAdminBusinessesRouteChildren =
+  {
+    LangAuthenticatedAdminBusinessesIdRoute:
+      LangAuthenticatedAdminBusinessesIdRoute,
+  }
+
+const LangAuthenticatedAdminBusinessesRouteWithChildren =
+  LangAuthenticatedAdminBusinessesRoute._addFileChildren(
+    LangAuthenticatedAdminBusinessesRouteChildren,
+  )
+
+interface LangAuthenticatedAdminImportsRouteChildren {
+  LangAuthenticatedAdminImportsIdRoute: typeof LangAuthenticatedAdminImportsIdRoute
+}
+
+const LangAuthenticatedAdminImportsRouteChildren: LangAuthenticatedAdminImportsRouteChildren =
+  {
+    LangAuthenticatedAdminImportsIdRoute: LangAuthenticatedAdminImportsIdRoute,
+  }
+
+const LangAuthenticatedAdminImportsRouteWithChildren =
+  LangAuthenticatedAdminImportsRoute._addFileChildren(
+    LangAuthenticatedAdminImportsRouteChildren,
+  )
+
 interface LangAuthenticatedAdminRouteChildren {
+  LangAuthenticatedAdminAuditLogsRoute: typeof LangAuthenticatedAdminAuditLogsRoute
+  LangAuthenticatedAdminBusinessesRoute: typeof LangAuthenticatedAdminBusinessesRouteWithChildren
+  LangAuthenticatedAdminCategoriesRoute: typeof LangAuthenticatedAdminCategoriesRoute
+  LangAuthenticatedAdminCategoryMappingsRoute: typeof LangAuthenticatedAdminCategoryMappingsRoute
+  LangAuthenticatedAdminCitiesRoute: typeof LangAuthenticatedAdminCitiesRoute
+  LangAuthenticatedAdminImportsRoute: typeof LangAuthenticatedAdminImportsRouteWithChildren
+  LangAuthenticatedAdminOwnershipClaimsRoute: typeof LangAuthenticatedAdminOwnershipClaimsRoute
+  LangAuthenticatedAdminReportsRoute: typeof LangAuthenticatedAdminReportsRoute
+  LangAuthenticatedAdminReviewsRoute: typeof LangAuthenticatedAdminReviewsRoute
+  LangAuthenticatedAdminSettingsRoute: typeof LangAuthenticatedAdminSettingsRoute
   LangAuthenticatedAdminUsersRoute: typeof LangAuthenticatedAdminUsersRoute
   LangAuthenticatedAdminIndexRoute: typeof LangAuthenticatedAdminIndexRoute
 }
 
 const LangAuthenticatedAdminRouteChildren: LangAuthenticatedAdminRouteChildren =
   {
+    LangAuthenticatedAdminAuditLogsRoute: LangAuthenticatedAdminAuditLogsRoute,
+    LangAuthenticatedAdminBusinessesRoute:
+      LangAuthenticatedAdminBusinessesRouteWithChildren,
+    LangAuthenticatedAdminCategoriesRoute:
+      LangAuthenticatedAdminCategoriesRoute,
+    LangAuthenticatedAdminCategoryMappingsRoute:
+      LangAuthenticatedAdminCategoryMappingsRoute,
+    LangAuthenticatedAdminCitiesRoute: LangAuthenticatedAdminCitiesRoute,
+    LangAuthenticatedAdminImportsRoute:
+      LangAuthenticatedAdminImportsRouteWithChildren,
+    LangAuthenticatedAdminOwnershipClaimsRoute:
+      LangAuthenticatedAdminOwnershipClaimsRoute,
+    LangAuthenticatedAdminReportsRoute: LangAuthenticatedAdminReportsRoute,
+    LangAuthenticatedAdminReviewsRoute: LangAuthenticatedAdminReviewsRoute,
+    LangAuthenticatedAdminSettingsRoute: LangAuthenticatedAdminSettingsRoute,
     LangAuthenticatedAdminUsersRoute: LangAuthenticatedAdminUsersRoute,
     LangAuthenticatedAdminIndexRoute: LangAuthenticatedAdminIndexRoute,
   }
