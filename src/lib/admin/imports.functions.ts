@@ -490,16 +490,22 @@ export const getImportBatch = createServerFn({ method: "GET" })
         if (normalized.primaryCategorySource) catLabels.add(normalized.primaryCategorySource);
       }
     });
-    type MappingRow = { source_category: string; category_id: string | null; mapping_status: string };
-    let mappingRows: MappingRow[] = [];
+    type CatMappingRow = { source_category: string; category_id: string | null; mapping_status: string };
+    let mappingRows: CatMappingRow[] = [];
     if (catLabels.size > 0) {
       const { data: m } = await supabase
         .from("category_mappings")
         .select("source_category, category_id, mapping_status")
         .eq("source_provider", "google")
         .in("source_category", Array.from(catLabels));
-      mappingRows = (m ?? []) as MappingRow[];
+      mappingRows = (m ?? []) as CatMappingRow[];
     }
+
+    const { data: approvals } = await supabase
+      .from("import_approvals")
+      .select("id, approval_kind, artifact_hash, approved_at, approved_by, invalidated_at, invalidation_reason, payload")
+      .eq("batch_id", data.id)
+      .order("approved_at", { ascending: false });
 
     return {
       batch,
@@ -507,6 +513,7 @@ export const getImportBatch = createServerFn({ method: "GET" })
       provenance: provenance ?? [],
       mappings: mappingRows,
       storageExists,
+      approvals: approvals ?? [],
     };
   });
 
