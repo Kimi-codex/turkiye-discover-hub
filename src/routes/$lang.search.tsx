@@ -1,26 +1,32 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
-import { useState } from "react";
-import { SlidersHorizontal } from "lucide-react";
-import {
-  Sheet,
-  SheetContent,
-  SheetHeader,
-  SheetTitle,
-  SheetTrigger,
-} from "@/components/ui/sheet";
-import { Button } from "@/components/ui/button";
+import { useMemo, useState } from "react";
 import { services } from "@/lib/repos";
-import { SearchBar } from "@/components/search/SearchBar";
-import { FiltersPanel } from "@/components/search/FiltersPanel";
-import { SortSelect } from "@/components/search/SortSelect";
-import { BusinessCard, BusinessCardSkeleton } from "@/components/business/BusinessCard";
-import { Breadcrumbs } from "@/components/site/Breadcrumbs";
+import { BusinessCard } from "@/components/business/BusinessCard";
+import { ClarificationCard } from "@/components/search/ClarificationCard";
+import { InterpretationChips } from "@/components/search/InterpretationChips";
 import { buildHreflang, canonicalFor } from "@/lib/seo/hreflang";
-import { translate, type Locale } from "@/lib/i18n";
+import { translate, useLocale, useT, type Locale } from "@/lib/i18n";
+import {
+  parseDirectorySearchIntent,
+  pickClarifyingQuestion,
+  type InterpretationChip,
+} from "@/lib/search/parseIntent";
 import type { SearchFilters, SortOption } from "@/types/domain";
 
-type SearchParams = SearchFilters;
+interface SearchParams {
+  q: string;
+  category: string | null;
+  city: string | null;
+  district: string | null;
+  rating: number | null;
+  priceLevel: number | null;
+  audience: string | null;
+  intent: string | null;
+  clarify: string | null;
+  sort: SortOption;
+  page: number;
+}
 
 const VALID_SORTS: SortOption[] = [
   "recommended",
@@ -43,19 +49,52 @@ function validateSearch(raw: Record<string, unknown>): SearchParams {
     ? (sortRaw as SortOption)
     : "recommended";
   return {
-    query: asStr(raw.q),
+    q: asStr(raw.q),
     category: asStr(raw.category) || null,
     city: asStr(raw.city) || null,
     district: asStr(raw.district) || null,
     rating: asNum(raw.rating),
-    openNow: raw.openNow === true || raw.openNow === "true" || raw.openNow === "1",
     priceLevel: asNum(raw.priceLevel),
+    audience: asStr(raw.audience) || null,
+    intent: asStr(raw.intent) || null,
+    clarify: asStr(raw.clarify) || null,
     sort,
     page: Math.max(1, asNum(raw.page) ?? 1),
   };
 }
 
-const searchQuery = (filters: SearchParams) =>
+const searchDictQuery = () =>
+  queryOptions({
+    queryKey: ["search", "dict"],
+    queryFn: async () => {
+      const [categories, cities] = await Promise.all([
+        services.categories.list(),
+        services.cities.list(),
+      ]);
+      // Load districts for matched cities lazily - here we fetch for the top featured cities.
+      const districtLists = await Promise.all(
+        cities.map((c) => services.cities.listDistricts(c.id)),
+      );
+      return { categories, cities, districts: districtLists.flat() };
+    },
+    staleTime: 5 * 60_000,
+  });
+
+function toFilters(params: SearchParams): SearchFilters {
+  return {
+    query: params.q,
+    category: params.category,
+    city: params.city,
+    district: params.district,
+    rating: params.rating,
+    openNow: false,
+    priceLevel: params.priceLevel as SearchFilters["priceLevel"],
+    sort: params.sort,
+    page: params.page,
+  };
+}
+
+const searchQuery = (filters: SearchFilters) =>
   queryOptions({
     queryKey: ["search", filters],
     queryFn: () => services.businesses.list(filters),
@@ -63,13 +102,17 @@ const searchQuery = (filters: SearchParams) =>
 
 export const Route = createFileRoute("/$lang/search")({
   validateSearch,
-  loaderDeps: ({ search }) => search,
-  loader: ({ context, deps }) =>
-    context.queryClient.ensureQueryData(searchQuery(deps)),
+  loaderDeps: ({ search }) => ({ filters: toFilters(search) }),
+  loader: async ({ context, deps }) => {
+    await Promise.all([
+      context.queryClient.ensureQueryData(searchDictQuery()),
+      context.queryClient.ensureQueryData(searchQuery(deps.filters)),
+    ]);
+  },
   head: ({ params }) => {
     const locale = params.lang as Locale;
-    const title = `${translate(locale, "breadcrumb.search")} — ${translate(locale, "brand.name")}`;
-    const desc = translate(locale, "hero.subtitle");
+    const title = `${translate(locale, "search.your_results")} — ${translate(locale, "home.badge")}`;
+    const desc = translate(locale, "home.subtitle");
     return {
       meta: [
         { title },
@@ -89,82 +132,125 @@ export const Route = createFileRoute("/$lang/search")({
 });
 
 function SearchPage() {
-  const filters = Route.useSearch();
-  const { data } = useSuspenseQuery(searchQuery(filters));
-  const [mobileFiltersOpen, setMobileFiltersOpen] = useState(false);
-  const { lang } = Route.useParams();
-  const t = (k: Parameters<typeof translate>[1]) => translate(lang as Locale, k);
+  const params = Route.useSearch();
+  const navigate = useNavigate();
+  const locale = useLocale();
+  const t = useT();
+  const [dismissedClarify, setDismissedClarify] = useState(false);
+
+  const { data: dict } = useSuspenseQuery(searchDictQuery());
+  const intent = useMemo(
+    () => parseDirectorySearchIntent(params.q, locale, dict),
+    [params.q, locale, dict],
+  );
+
+  // Merge URL params with parsed intent (URL wins if user explicitly set anything).
+  const effectiveFilters: SearchFilters = useMemo(() => {
+    return {
+      query: params.q,
+      category: params.category ?? intent.matchedCategorySlug,
+      city: params.city ?? intent.matchedCitySlug,
+      district: params.district ?? intent.matchedDistrictSlug,
+      rating: params.rating ?? (intent.ratingIntent === "top" ? 4.3 : null),
+      openNow: false,
+      priceLevel: (params.priceLevel ??
+        intent.priceLevel) as SearchFilters["priceLevel"],
+      sort: params.sort,
+      page: params.page,
+    };
+  }, [params, intent]);
+
+  const { data } = useSuspenseQuery(searchQuery(effectiveFilters));
+
+  // If zero results but intent has narrowing chips, relax by dropping district+price.
+  const relaxedFilters = useMemo(() => {
+    if (data.total > 0) return null;
+    if (!effectiveFilters.district && !effectiveFilters.priceLevel) return null;
+    return { ...effectiveFilters, district: null, priceLevel: null };
+  }, [data.total, effectiveFilters]);
+  const { data: relaxedData } = useSuspenseQuery({
+    ...searchQuery(relaxedFilters ?? effectiveFilters),
+    enabled: !!relaxedFilters,
+  });
+  const showRelaxed = !!relaxedFilters && relaxedData && relaxedData.total > 0;
+  const displayed = showRelaxed ? relaxedData : data;
+
+  const chips: InterpretationChip[] = intent.interpretation;
+  const clarifyQuestion = pickClarifyingQuestion(intent);
+  const showClarify =
+    !dismissedClarify &&
+    !params.clarify &&
+    displayed.items.length > 0 &&
+    intent.confidence !== "high";
+
+  function removeChip(chip: InterpretationChip) {
+    navigate({
+      to: "/$lang/search",
+      params: { lang: locale },
+      search: (prev) => ({ ...prev, [chip.urlParam]: null, page: 1 }),
+    });
+  }
+
+  function handleClarify(answer: string) {
+    setDismissedClarify(true);
+    navigate({
+      to: "/$lang/search",
+      params: { lang: locale },
+      search: (prev) => ({ ...prev, clarify: answer, page: 1 }),
+    });
+  }
 
   return (
-    <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
-      <Breadcrumbs
-        items={[
-          { label: t("breadcrumb.home"), to: "/" },
-          { label: t("breadcrumb.search") },
-        ]}
-      />
+    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
+      <div className="flex flex-col gap-2">
+        <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          {t("search.your_results")}
+        </p>
+        <h1 className="font-display text-2xl font-bold text-primary sm:text-3xl">
+          {params.q || t("search.button")}
+        </h1>
+        {chips.length > 0 && (
+          <InterpretationChips
+            chips={chips}
+            onRemove={removeChip}
+            className="mt-2"
+          />
+        )}
+      </div>
 
-      <div className="mt-4">
-        <SearchBar
-          variant="compact"
-          initialQuery={filters.query}
-          initialLocation={filters.city ?? ""}
+      {showClarify && (
+        <ClarificationCard
+          className="mt-6"
+          query={params.q}
+          questionKey={clarifyQuestion}
+          onAnswer={handleClarify}
+          onSkip={() => setDismissedClarify(true)}
         />
-      </div>
+      )}
 
-      <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
-        <div>
-          <h1 className="text-lg font-bold sm:text-xl">
-            {data.total.toLocaleString()} {t("common.results")}
-          </h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Sheet open={mobileFiltersOpen} onOpenChange={setMobileFiltersOpen}>
-            <SheetTrigger asChild>
-              <Button variant="outline" size="sm" className="gap-2 lg:hidden">
-                <SlidersHorizontal className="h-4 w-4" aria-hidden="true" />
-                {t("filters.title")}
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-[92vw] max-w-sm overflow-y-auto p-4">
-              <SheetHeader className="mb-2">
-                <SheetTitle>{t("filters.title")}</SheetTitle>
-              </SheetHeader>
-              <FiltersPanel
-                filters={filters}
-                onClose={() => setMobileFiltersOpen(false)}
-              />
-            </SheetContent>
-          </Sheet>
-          <SortSelect value={filters.sort} />
-        </div>
-      </div>
+      {showRelaxed && (
+        <p className="mt-6 text-sm text-muted-foreground">{t("search.relaxed")}</p>
+      )}
 
-      <div className="mt-6 grid grid-cols-1 gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
-        <div className="hidden lg:block">
-          <FiltersPanel filters={filters} />
-        </div>
-        <div>
-          {data.items.length === 0 ? (
-            <EmptyState />
-          ) : (
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-              {data.items.map((b, i) => (
-                <BusinessCard key={b.id} business={b} eager={i < 3} />
-              ))}
-            </div>
-          )}
-        </div>
+      <div className="mt-8">
+        {displayed.items.length === 0 ? (
+          <EmptyState />
+        ) : (
+          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+            {displayed.items.map((b, i) => (
+              <BusinessCard key={b.id} business={b} eager={i < 2} />
+            ))}
+          </div>
+        )}
       </div>
     </div>
   );
 }
 
 function EmptyState() {
-  const { lang } = Route.useParams();
-  const t = (k: Parameters<typeof translate>[1]) => translate(lang as Locale, k);
+  const t = useT();
   return (
-    <div className="rounded-2xl border border-dashed border-border bg-card p-10 text-center">
+    <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
       <h2 className="text-lg font-semibold">{t("search.no_results.title")}</h2>
       <p className="mt-2 text-sm text-muted-foreground">
         {t("search.no_results.desc")}
@@ -172,6 +258,3 @@ function EmptyState() {
     </div>
   );
 }
-
-// keep the skeleton import used at least once (types/tree-shaking)
-export const _skeletonRef = BusinessCardSkeleton;
