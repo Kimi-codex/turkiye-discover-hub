@@ -322,6 +322,10 @@ function ImportCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  const schemaReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
+  const mappingReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
+
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -348,16 +352,33 @@ function ImportCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
-          {nextSpec && (
-            <Button size="sm" onClick={() => nextMut.mutate()} disabled={nextMut.isPending}>
-              {nextMut.isPending ? `${nextSpec.label}…` : `Next: ${nextSpec.label}`}
-            </Button>
-          )}
           <Button asChild size="sm" variant="outline">
             <Link to="/$lang/_authenticated/admin/imports/$id" params={{ lang, id: batch.id }}>
               Open
             </Link>
           </Button>
+          {schemaReached && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to="/$lang/_authenticated/admin/imports/$id"
+                params={{ lang, id: batch.id }}
+                search={{ tab: "schema" }}
+              >
+                Schema
+              </Link>
+            </Button>
+          )}
+          {mappingReached && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to="/$lang/_authenticated/admin/imports/$id"
+                params={{ lang, id: batch.id }}
+                search={{ tab: "field_mapping" }}
+              >
+                Field map
+              </Link>
+            </Button>
+          )}
           {["uploaded", "analyzing", "ready", "importing"].includes(status) && (
             <Button size="sm" variant="destructive" onClick={onCancel}>
               Cancel
@@ -375,6 +396,24 @@ function ImportCard({
           )}
         </div>
       </div>
+
+      {nextSpec && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-primary/50 bg-primary/5 p-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+              Next step · {STAGE_LABEL[stage] ?? stage}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold text-foreground">{nextSpec.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{nextSpec.description}</div>
+          </div>
+          <Button onClick={() => nextMut.mutate()} disabled={nextMut.isPending}>
+            {nextMut.isPending ? `${nextSpec.label}…` : `Next: ${nextSpec.label}`}
+          </Button>
+        </div>
+      )}
+
+      <StageStepper stage={stage} />
+
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-6">
         <Metric label="Total" value={total} />
         <Metric label="Inserted" value={inserted} tone="success" />
@@ -398,6 +437,49 @@ function ImportCard({
           {String(batch.error_message)}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function StageStepper({ stage }: { stage: string }) {
+  const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <ol className="flex min-w-full items-center gap-1">
+        {STAGE_ORDER.map((s, i) => {
+          const done = i < currentIdx;
+          const active = i === currentIdx;
+          const dotCls = done
+            ? "bg-primary text-primary-foreground border-primary"
+            : active
+              ? "bg-primary/15 text-primary border-primary"
+              : "bg-muted text-muted-foreground border-border";
+          const labelCls = active
+            ? "text-primary font-semibold"
+            : done
+              ? "text-foreground"
+              : "text-muted-foreground";
+          return (
+            <li key={s} className="flex min-w-0 flex-1 items-center gap-1">
+              <div className="flex flex-col items-center gap-1 min-w-0">
+                <div
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold ${dotCls}`}
+                >
+                  {done ? "✓" : i + 1}
+                </div>
+                <div className={`text-[9px] leading-tight text-center truncate max-w-[70px] ${labelCls}`}>
+                  {STAGE_SHORT[s] ?? s}
+                </div>
+              </div>
+              {i < STAGE_ORDER.length - 1 && (
+                <div
+                  className={`h-px flex-1 ${i < currentIdx ? "bg-primary" : "bg-border"}`}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
