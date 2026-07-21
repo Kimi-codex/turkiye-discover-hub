@@ -28,12 +28,22 @@ describe("hash + key", () => {
     expect(a).toBe(b);
     expect(a).toMatch(/^[0-9a-f]{64}$/);
   });
-  it("builds deterministic key with content prefix directory", () => {
+  it("builds canonical key businesses/{id}/{place_id}/{sha256}.{ext}", () => {
     const k = buildImageKey({
       businessId: "biz-1",
+      placeId: "ChIJ_ABC-xyz.123",
       contentHash: "abcdef0123",
       ext: "webp",
     });
-    expect(k).toBe("businesses/biz-1/orig/ab/abcdef0123.webp");
+    expect(k).toBe("businesses/biz-1/chij-abc-xyz-123/abcdef0123.webp");
+  });
+  it("uses owner-{uid} fallback shape via sanitizer", () => {
+    const k = buildImageKey({
+      businessId: "biz-1",
+      placeId: "owner-uid-123",
+      contentHash: "deadbeef",
+      ext: "jpg",
+    });
+    expect(k).toBe("businesses/biz-1/owner-uid-123/deadbeef.jpg");
   });
 });
