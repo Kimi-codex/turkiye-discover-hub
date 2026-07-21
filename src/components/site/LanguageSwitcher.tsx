@@ -75,7 +75,7 @@ export function LanguageSwitcher({
               onClick={() => handleSelect(loc)}
               className="flex cursor-pointer items-center justify-between"
             >
-              <span>{t(`lang.${loc}` as const)}</span>
+              <span>{t(`lang.${loc}` as import("@/lib/i18n").MessageKey)}</span>
               {loc === current && (
                 <Check className="h-4 w-4 text-brand" aria-hidden="true" />
               )}
