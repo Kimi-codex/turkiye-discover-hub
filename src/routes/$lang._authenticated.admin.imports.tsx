@@ -33,17 +33,49 @@ type BatchRow = Record<string, unknown> & {
   stage: string;
 };
 
+const STAGE_ORDER = [
+  "upload",
+  "detect_schema",
+  "field_mapping",
+  "analyze",
+  "mapping",
+  "validation",
+  "preview",
+  "execute",
+  "translations",
+  "images",
+  "publish",
+  "completed",
+] as const;
+
 const STAGE_LABEL: Record<string, string> = {
   upload: "1. Upload",
-  analyze: "2. Analyze",
-  mapping: "3. Mapping",
-  validation: "4. Validation",
-  preview: "5. Preview",
-  execute: "6. Execute",
-  translations: "7. Translations",
-  images: "8. Images",
-  publish: "9. Publish",
-  completed: "10. Completed",
+  detect_schema: "2. Detect schema",
+  field_mapping: "3. Field mapping",
+  analyze: "4. Analyze",
+  mapping: "5. Category mapping",
+  validation: "6. Validation",
+  preview: "7. Preview",
+  execute: "8. Execute",
+  translations: "9. Translations",
+  images: "10. Images",
+  publish: "11. Publish",
+  completed: "12. Completed",
+};
+
+const STAGE_SHORT: Record<string, string> = {
+  upload: "Upload",
+  detect_schema: "Schema",
+  field_mapping: "Field map",
+  analyze: "Analyze",
+  mapping: "Categories",
+  validation: "Validate",
+  preview: "Preview",
+  execute: "Execute",
+  translations: "Translate",
+  images: "Images",
+  publish: "Publish",
+  completed: "Done",
 };
 
 function ImportsPage() {
@@ -192,28 +224,63 @@ function ImportsPage() {
   );
 }
 
-type NextActionSpec = { label: string; run: (id: string) => Promise<unknown> };
+type NextActionSpec = {
+  label: string;
+  description: string;
+  run: (id: string) => Promise<unknown>;
+};
 
 const NEXT_ACTIONS: Record<string, NextActionSpec> = {
-  detect_schema: { label: "Detect schema", run: (id) => detectImportSchema({ data: { id } }) },
+  detect_schema: {
+    label: "Detect schema",
+    description: "Scan the uploaded JSON and build the field inventory.",
+    run: (id) => detectImportSchema({ data: { id } }),
+  },
   field_mapping: {
     label: "Approve field mapping",
+    description: "Lock in the source → target field mapping and unlock analysis.",
     run: (id) => approveImportFieldMapping({ data: { id } }),
   },
-  analyze: { label: "Run analysis", run: (id) => analyzeImportBatch({ data: { id } }) },
+  analyze: {
+    label: "Run analysis",
+    description: "Normalize every record and count valid / invalid rows.",
+    run: (id) => analyzeImportBatch({ data: { id } }),
+  },
   mapping: {
     label: "Confirm category mappings",
+    description: "Approve how source categories map to catalog categories.",
     run: (id) => confirmImportMappings({ data: { id } }),
   },
-  validation: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
-  preview: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
-  execute: { label: "Run next chunk", run: (id) => runImportChunk({ data: { id } }) },
+  validation: {
+    label: "Compute preview",
+    description: "Diff every record against the database (inserts / updates / noops).",
+    run: (id) => computeImportPreview({ data: { id } }),
+  },
+  preview: {
+    label: "Compute preview",
+    description: "Diff every record against the database (inserts / updates / noops).",
+    run: (id) => computeImportPreview({ data: { id } }),
+  },
+  execute: {
+    label: "Run next chunk",
+    description: "Write the next batch of approved records to the database.",
+    run: (id) => runImportChunk({ data: { id } }),
+  },
   translations: {
     label: "Enqueue translations",
+    description: "Queue TR/EN/AR translation jobs for imported businesses.",
     run: (id) => enqueueBatchTranslations({ data: { id } }),
   },
-  images: { label: "Mark images done", run: (id) => markImagesStageDone({ data: { id } }) },
-  publish: { label: "Publish", run: (id) => publishImportBatch({ data: { id } }) },
+  images: {
+    label: "Mark images done",
+    description: "Image pipeline is blocked; advance past this stage to publish.",
+    run: (id) => markImagesStageDone({ data: { id } }),
+  },
+  publish: {
+    label: "Publish",
+    description: "Flip imported businesses from pending review to published.",
+    run: (id) => publishImportBatch({ data: { id } }),
+  },
 };
 
 function ImportCard({
@@ -255,6 +322,10 @@ function ImportCard({
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  const schemaReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
+  const mappingReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
+
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -281,16 +352,33 @@ function ImportCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
-          {nextSpec && (
-            <Button size="sm" onClick={() => nextMut.mutate()} disabled={nextMut.isPending}>
-              {nextMut.isPending ? `${nextSpec.label}…` : `Next: ${nextSpec.label}`}
-            </Button>
-          )}
           <Button asChild size="sm" variant="outline">
             <Link to="/$lang/_authenticated/admin/imports/$id" params={{ lang, id: batch.id }}>
               Open
             </Link>
           </Button>
+          {schemaReached && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to="/$lang/_authenticated/admin/imports/$id"
+                params={{ lang, id: batch.id }}
+                search={{ tab: "schema" }}
+              >
+                Schema
+              </Link>
+            </Button>
+          )}
+          {mappingReached && (
+            <Button asChild size="sm" variant="outline">
+              <Link
+                to="/$lang/_authenticated/admin/imports/$id"
+                params={{ lang, id: batch.id }}
+                search={{ tab: "field_mapping" }}
+              >
+                Field map
+              </Link>
+            </Button>
+          )}
           {["uploaded", "analyzing", "ready", "importing"].includes(status) && (
             <Button size="sm" variant="destructive" onClick={onCancel}>
               Cancel
@@ -308,6 +396,24 @@ function ImportCard({
           )}
         </div>
       </div>
+
+      {nextSpec && (
+        <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border-2 border-primary/50 bg-primary/5 p-3">
+          <div className="min-w-0 flex-1">
+            <div className="text-[10px] font-semibold uppercase tracking-wide text-primary">
+              Next step · {STAGE_LABEL[stage] ?? stage}
+            </div>
+            <div className="mt-0.5 text-sm font-semibold text-foreground">{nextSpec.label}</div>
+            <div className="mt-0.5 text-xs text-muted-foreground">{nextSpec.description}</div>
+          </div>
+          <Button onClick={() => nextMut.mutate()} disabled={nextMut.isPending}>
+            {nextMut.isPending ? `${nextSpec.label}…` : `Next: ${nextSpec.label}`}
+          </Button>
+        </div>
+      )}
+
+      <StageStepper stage={stage} />
+
       <div className="mt-3 grid grid-cols-2 gap-2 text-xs md:grid-cols-6">
         <Metric label="Total" value={total} />
         <Metric label="Inserted" value={inserted} tone="success" />
@@ -331,6 +437,49 @@ function ImportCard({
           {String(batch.error_message)}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function StageStepper({ stage }: { stage: string }) {
+  const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
+  return (
+    <div className="mt-3 overflow-x-auto">
+      <ol className="flex min-w-full items-center gap-1">
+        {STAGE_ORDER.map((s, i) => {
+          const done = i < currentIdx;
+          const active = i === currentIdx;
+          const dotCls = done
+            ? "bg-primary text-primary-foreground border-primary"
+            : active
+              ? "bg-primary/15 text-primary border-primary"
+              : "bg-muted text-muted-foreground border-border";
+          const labelCls = active
+            ? "text-primary font-semibold"
+            : done
+              ? "text-foreground"
+              : "text-muted-foreground";
+          return (
+            <li key={s} className="flex min-w-0 flex-1 items-center gap-1">
+              <div className="flex flex-col items-center gap-1 min-w-0">
+                <div
+                  className={`flex h-5 w-5 items-center justify-center rounded-full border text-[10px] font-semibold ${dotCls}`}
+                >
+                  {done ? "✓" : i + 1}
+                </div>
+                <div className={`text-[9px] leading-tight text-center truncate max-w-[70px] ${labelCls}`}>
+                  {STAGE_SHORT[s] ?? s}
+                </div>
+              </div>
+              {i < STAGE_ORDER.length - 1 && (
+                <div
+                  className={`h-px flex-1 ${i < currentIdx ? "bg-primary" : "bg-border"}`}
+                />
+              )}
+            </li>
+          );
+        })}
+      </ol>
     </div>
   );
 }
