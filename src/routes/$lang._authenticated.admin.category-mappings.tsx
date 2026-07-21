@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCategoriesAdmin,
@@ -55,15 +55,18 @@ function MappingsPage() {
     onSuccess: () => {
       toast.success("Updated");
       setChecked(new Set());
+      setBulkCategoryId("");
       qc.invalidateQueries({ queryKey: ["admin", "mappings"] });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
-  const rows = q.data?.rows ?? [];
-  const visibleIds = rows.map((r: Record<string, unknown>) => String(r.id));
+  const rows = ((q.data as { rows?: Array<Record<string, unknown>> } | undefined)?.rows ?? []) as Array<
+    Record<string, unknown>
+  >;
+  const visibleIds: string[] = rows.map((r) => String(r.id));
   const allVisibleChecked = visibleIds.length > 0 && visibleIds.every((id) => checked.has(id));
-  const selectedIds = Array.from(checked);
+  const selectedIds: string[] = Array.from(checked);
   const applyBulkCategory = () => {
     if (!bulkCategoryId) return;
     setSelection((prev) => {
@@ -87,7 +90,7 @@ function MappingsPage() {
         <div className="flex items-center gap-2">
           {search.returnTo && (
             <Button asChild size="sm" variant="outline">
-              <Link to={search.returnTo}>Return to import batch</Link>
+              <a href={search.returnTo}>Return to import batch</a>
             </Button>
           )}
           <select
