@@ -517,7 +517,7 @@ export const computeImportPreview = createServerFn({ method: "POST" })
       .order("item_index");
     const placeIds = (items ?? [])
       .map((it: Record<string, unknown>) => it.place_id as string | null)
-      .filter((x): x is string => !!x);
+      .filter((x: string | null): x is string => !!x);
     const existingByPlaceId = new Map<string, Record<string, unknown>>();
     if (placeIds.length > 0) {
       const { data: exs } = await supabase
@@ -1055,7 +1055,7 @@ export const enqueueBatchTranslations = createServerFn({ method: "POST" })
     let failed = 0;
     try {
       const { enqueueMissingTranslations } = await import("@/lib/translations/service.server");
-      for (const bid of businessIds) {
+      for (const bid of businessIds as string[]) {
         try {
           await enqueueMissingTranslations(bid);
           enqueued++;
