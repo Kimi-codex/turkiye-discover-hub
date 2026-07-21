@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   listCategoriesAdmin,
@@ -13,14 +13,16 @@ const STATUSES = ["pending", "approved", "ignored"] as const;
 
 export const Route = createFileRoute("/$lang/_authenticated/admin/category-mappings")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>): { returnTo?: string } => {
+  validateSearch: (s: Record<string, unknown>): { returnTo?: string; batchId?: string } => {
     const returnTo = typeof s.returnTo === "string" && s.returnTo.startsWith("/") ? s.returnTo : undefined;
-    return { returnTo };
+    const batchId = typeof s.batchId === "string" && s.batchId.length > 0 ? s.batchId : undefined;
+    return { returnTo, batchId };
   },
   component: MappingsPage,
 });
 
 function MappingsPage() {
+  const { lang } = Route.useParams();
   const search = Route.useSearch();
   const qc = useQueryClient();
   const [status, setStatus] = useState<(typeof STATUSES)[number]>("pending");
@@ -33,8 +35,8 @@ function MappingsPage() {
     queryFn: () => listCategoriesAdmin(),
   });
   const q = useQuery({
-    queryKey: ["admin", "mappings", status],
-    queryFn: () => listCategoryMappingsAdmin({ data: { status } }),
+    queryKey: ["admin", "mappings", status, search.batchId ?? null],
+    queryFn: () => listCategoryMappingsAdmin({ data: { status, batchId: search.batchId } }),
   });
 
   const catOptions = useMemo(
@@ -67,6 +69,8 @@ function MappingsPage() {
   const visibleIds: string[] = rows.map((r) => String(r.id));
   const allVisibleChecked = visibleIds.length > 0 && visibleIds.every((id) => checked.has(id));
   const selectedIds: string[] = Array.from(checked);
+  const batchScoped = Boolean((q.data as { batchScoped?: boolean } | undefined)?.batchScoped);
+  const labelCount = (q.data as { labelCount?: number | null } | undefined)?.labelCount ?? null;
   const applyBulkCategory = () => {
     if (!bulkCategoryId) return;
     setSelection((prev) => {
@@ -84,13 +88,33 @@ function MappingsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Category mappings</h1>
           <p className="text-xs text-muted-foreground">
-            Map source labels to catalog categories, then return to the import batch and continue validation.
+            {batchScoped
+              ? "Showing only the category labels discovered in this import batch."
+              : "Map source labels to catalog categories, then return to the import batch and continue validation."}
           </p>
+          {batchScoped && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Batch filter active · {labelCount ?? 0} discovered label{labelCount === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
         <div className="flex items-center gap-2">
-          {search.returnTo && (
+          {search.batchId && (
             <Button asChild size="sm" variant="outline">
-              <a href={search.returnTo}>Return to import batch</a>
+              <Link
+                to="/$lang/admin/imports/$id"
+                params={{ lang, id: search.batchId }}
+                search={{ tab: "categories" }}
+              >
+                Return to import batch
+              </Link>
+            </Button>
+          )}
+          {search.batchId && (
+            <Button asChild size="sm" variant="outline">
+              <Link to="/$lang/admin/category-mappings" params={{ lang }} search={{ returnTo: search.returnTo }}>
+                Show global queue
+              </Link>
             </Button>
           )}
           <select
@@ -109,9 +133,26 @@ function MappingsPage() {
           </select>
         </div>
       </div>
-      {checked.size > 0 && (
-        <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 text-sm">
-          <span>{checked.size} selected</span>
+      {batchScoped && labelCount === 0 && (
+        <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
+          No category labels have been extracted for this batch yet. Return to the import batch, run analysis, then come back here.
+        </div>
+      )}
+      <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 text-sm">
+          <span className="font-medium">
+            {checked.size} selected · {visibleIds.length} visible · {status}
+          </span>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={visibleIds.length === 0 || allVisibleChecked}
+            onClick={() => setChecked(new Set(visibleIds))}
+          >
+            Select all visible
+          </Button>
+          <Button size="sm" variant="ghost" disabled={checked.size === 0} onClick={() => setChecked(new Set())}>
+            Clear selection
+          </Button>
           <select
             className="rounded-md border bg-background px-2 py-1 text-sm"
             value={bulkCategoryId}
@@ -129,7 +170,8 @@ function MappingsPage() {
           </Button>
           <Button
             size="sm"
-            disabled={!bulkCategoryId || mut.isPending}
+            disabled={checked.size === 0 || !bulkCategoryId || mut.isPending}
+            title={!bulkCategoryId ? "Choose a category before approving selected rows." : undefined}
             onClick={() => mut.mutate({ ids: selectedIds, status: "approved", categoryId: bulkCategoryId })}
           >
             Approve selected
@@ -137,15 +179,15 @@ function MappingsPage() {
           <Button
             size="sm"
             variant="outline"
+            disabled={checked.size === 0 || mut.isPending}
             onClick={() => mut.mutate({ ids: selectedIds, status: "ignored" })}
           >
             Ignore selected
           </Button>
-          <Button size="sm" variant="ghost" onClick={() => setChecked(new Set())}>
-            Clear
-          </Button>
-        </div>
-      )}
+          {checked.size > 0 && !bulkCategoryId && (
+            <span className="text-xs text-muted-foreground">Choose a category before approving; or use Ignore selected.</span>
+          )}
+      </div>
       <div className="overflow-x-auto rounded-xl border bg-card">
         <table className="w-full text-sm">
           <thead className="bg-muted/50 text-left text-xs uppercase tracking-wide text-muted-foreground">
@@ -232,7 +274,13 @@ function MappingsPage() {
             {rows.length === 0 && (
               <tr>
                 <td colSpan={5} className="px-3 py-8 text-center text-muted-foreground">
-                  Nothing to review
+                  {q.isLoading
+                    ? "Loading mappings…"
+                    : batchScoped
+                      ? status === "pending"
+                        ? "No pending labels for this batch. Return to the import batch and continue."
+                        : `No ${status} labels for this batch.`
+                      : "Nothing to review"}
                 </td>
               </tr>
             )}

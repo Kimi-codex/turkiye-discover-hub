@@ -82,6 +82,7 @@ function ImportDetailPage() {
   const currentTab: TabId = search.tab ?? "overview";
   const qc = useQueryClient();
   const [autoRun, setAutoRun] = useState(false);
+  const returnToCategories = `/${lang}/admin/imports/${id}?tab=categories`;
 
   const q = useQuery({
     queryKey: ["admin", "import", id],
@@ -90,41 +91,51 @@ function ImportDetailPage() {
   });
 
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "import", id] });
+  const setTab = (tab: TabId) =>
+    navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
 
   const analyzeMut = useMutation({
     mutationFn: () => analyzeImportBatch({ data: { id } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       toast.success(`Analyzed: ${r.valid} valid / ${r.invalid} invalid (${r.format})`);
-      invalidate();
+      await invalidate();
+      navigate({
+        to: "/$lang/admin/category-mappings",
+        params: { lang },
+        search: { batchId: id, returnTo: returnToCategories },
+      });
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const confirmMappingMut = useMutation({
     mutationFn: () => confirmImportMappings({ data: { id } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       toast.success(`Mapping confirmed: ${r.approvedMappings} approved / ${r.pendingMappings} still pending`);
-      invalidate();
+      await invalidate();
+      setTab("validation");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const previewMut = useMutation({
     mutationFn: () => computeImportPreview({ data: { id } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       toast.success(`Preview: ${r.inserts} inserts, ${r.updates} updates, ${r.noops} noops`);
-      invalidate();
+      await invalidate();
+      setTab("import");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const runMut = useMutation({
     mutationFn: () => runImportChunk({ data: { id } }),
-    onSuccess: (res) => {
-      invalidate();
+    onSuccess: async (res) => {
+      await invalidate();
       if (res.needsRepreview) {
         setAutoRun(false);
         toast.warning("Stale preview — re-run preview.");
+        setTab("import");
         return;
       }
       if (autoRun && !res.done) {
@@ -132,6 +143,9 @@ function ImportDetailPage() {
       } else if (res.done) {
         setAutoRun(false);
         toast.success("Execute stage complete");
+        setTab("translations");
+      } else {
+        setTab("import");
       }
     },
     onError: (e: Error) => {
@@ -142,27 +156,30 @@ function ImportDetailPage() {
 
   const translationsMut = useMutation({
     mutationFn: () => enqueueBatchTranslations({ data: { id } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       toast.success(`Enqueued translations for ${r.businesses} businesses (${r.enqueued} ok, ${r.failed} failed)`);
-      invalidate();
+      await invalidate();
+      setTab("images");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const imagesDoneMut = useMutation({
     mutationFn: () => markImagesStageDone({ data: { id } }),
-    onSuccess: () => {
+    onSuccess: async () => {
       toast.info("Image pipeline is Blocked by configuration; advanced to publish.");
-      invalidate();
+      await invalidate();
+      setTab("overview");
     },
     onError: (e: Error) => toast.error(e.message),
   });
 
   const publishMut = useMutation({
     mutationFn: () => publishImportBatch({ data: { id } }),
-    onSuccess: (r) => {
+    onSuccess: async (r) => {
       toast.success(`Published ${r.published} of ${r.businesses} businesses`);
-      invalidate();
+      await invalidate();
+      setTab("overview");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -176,6 +193,39 @@ function ImportDetailPage() {
     mutationFn: (v: { itemId: string; approvedFields: string[] }) =>
       setImportItemApproval({ data: v }),
     onSuccess: invalidate,
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const detectMut = useMutation({
+    mutationFn: () => detectImportSchema({ data: { id } }),
+    onSuccess: async (r) => {
+      toast.success(`Detected ${r.fieldCount} fields across ${r.totalItems} items`);
+      await invalidate();
+      setTab("field_mapping");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const approveMappingMut = useMutation({
+    mutationFn: () => approveImportFieldMapping({ data: { id } }),
+    onSuccess: async () => {
+      toast.success("Field mapping approved — analysis unlocked");
+      await invalidate();
+      setTab("analysis");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const restoreMappingMut = useMutation({
+    mutationFn: () => restoreSuggestedFieldMapping({ data: { id } }),
+    onSuccess: async () => {
+      toast.success("Restored suggested mapping");
+      await invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const editMappingMut = useMutation({
+    mutationFn: (edits: Array<Partial<MappingRow> & { sourcePath: string }>) =>
+      updateImportFieldMapping({ data: { id, edits } }),
+    onSuccess: () => invalidate(),
     onError: (e: Error) => toast.error(e.message),
   });
 
@@ -197,42 +247,6 @@ function ImportDetailPage() {
   );
   const isFmApproved =
     !!activeFmApproval && activeFmApproval.artifact_hash === fieldMappingHash;
-
-  const setTab = (tab: TabId) =>
-    navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
-
-  const detectMut = useMutation({
-    mutationFn: () => detectImportSchema({ data: { id } }),
-    onSuccess: (r) => {
-      toast.success(`Detected ${r.fieldCount} fields across ${r.totalItems} items`);
-      invalidate();
-      setTab("field_mapping");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const approveMappingMut = useMutation({
-    mutationFn: () => approveImportFieldMapping({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Field mapping approved — analysis unlocked");
-      invalidate();
-      setTab("analysis");
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const restoreMappingMut = useMutation({
-    mutationFn: () => restoreSuggestedFieldMapping({ data: { id } }),
-    onSuccess: () => {
-      toast.success("Restored suggested mapping");
-      invalidate();
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-  const editMappingMut = useMutation({
-    mutationFn: (edits: Array<Partial<MappingRow> & { sourcePath: string }>) =>
-      updateImportFieldMapping({ data: { id, edits } }),
-    onSuccess: () => invalidate(),
-    onError: (e: Error) => toast.error(e.message),
-  });
 
   const lockedReason: Partial<Record<TabId, string>> = {
     schema: stage === "upload" ? "Upload the file first." : "",
@@ -744,7 +758,7 @@ function MappingTab({
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-medium">Discovered categories ({discovered.length})</div>
           <Button asChild size="sm" variant="outline">
-            <Link to="/$lang/admin/category-mappings" params={{ lang }} search={{ returnTo }}>
+            <Link to="/$lang/admin/category-mappings" params={{ lang }} search={{ batchId, returnTo }}>
               Open mappings admin
             </Link>
           </Button>

@@ -399,22 +399,93 @@ export const deleteCategoryAdmin = createServerFn({ method: "POST" })
 
 // ─────────────────────────── CATEGORY MAPPINGS ─────────────────────
 
-export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
+export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator(
-    (i: { status?: "pending" | "approved" | "ignored" } | undefined) => ({
+    (i: { status?: "pending" | "approved" | "ignored"; batchId?: string } | undefined) => ({
       status: i?.status ?? "pending",
+      batchId: typeof i?.batchId === "string" && i.batchId.length > 0 ? i.batchId : null,
     }),
   )
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as AdminSb)
+    const supabase = context.supabase as AdminSb;
+    let labels: string[] | null = null;
+    if (data.batchId) {
+      const { data: items, error: itemError } = await supabase
+        .from("import_batch_items")
+        .select("raw_payload")
+        .eq("import_batch_id", data.batchId)
+        .limit(5000);
+      if (itemError) throw new Response(itemError.message, { status: 500 });
+      const seen = new Set<string>();
+      (items ?? []).forEach((it: Record<string, unknown>) => {
+        const rawPayload = (it.raw_payload as Record<string, unknown> | null) ?? {};
+        const normalized = rawPayload.normalized as {
+          categoriesSource?: unknown;
+          primaryCategorySource?: unknown;
+        } | null;
+        if (!normalized) return;
+        if (Array.isArray(normalized.categoriesSource)) {
+          normalized.categoriesSource.forEach((label) => {
+            if (typeof label === "string" && label.trim()) seen.add(label);
+          });
+        }
+        if (typeof normalized.primaryCategorySource === "string" && normalized.primaryCategorySource.trim()) {
+          seen.add(normalized.primaryCategorySource);
+        }
+      });
+      labels = Array.from(seen).sort();
+      if (labels.length === 0) return { rows: [], batchScoped: true, labelCount: 0 };
+
+      const normalizedLabels = labels.map((label) => label.toLowerCase().trim()).filter(Boolean);
+      const { data: existingMappings, error: existingError } = await supabase
+        .from("category_mappings")
+        .select("normalized_source_category")
+        .eq("source_provider", "google")
+        .in("normalized_source_category", normalizedLabels);
+      if (existingError) throw new Response(existingError.message, { status: 500 });
+
+      const existingSet = new Set(
+        (existingMappings ?? []).map((row: { normalized_source_category: string }) => row.normalized_source_category),
+      );
+      const missingRows = labels
+        .map((label) => ({ label, normalized: label.toLowerCase().trim() }))
+        .filter(({ normalized }) => normalized && !existingSet.has(normalized))
+        .map(({ label, normalized }) => ({
+          source_provider: "google",
+          source_category: label,
+          normalized_source_category: normalized,
+          mapping_status: "pending",
+          usage_count: 1,
+        }));
+
+      if (missingRows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("category_mappings")
+          .upsert(missingRows, {
+            onConflict: "source_provider,normalized_source_category",
+            ignoreDuplicates: true,
+          });
+        if (insertError) throw new Response(insertError.message, { status: 500 });
+      }
+    }
+
+    let query = supabase
       .from("category_mappings")
       .select("*")
       .eq("mapping_status", data.status)
-      .order("usage_count", { ascending: false })
-      .limit(500);
+      .order("usage_count", { ascending: false });
+    if (labels) {
+      query = query
+        .eq("source_provider", "google")
+        .in(
+          "normalized_source_category",
+          labels.map((label) => label.toLowerCase().trim()).filter(Boolean),
+        );
+    }
+    const { data: rows, error } = await query.limit(500);
     if (error) throw new Response(error.message, { status: 500 });
-    return { rows: rows ?? [] };
+    return { rows: rows ?? [], batchScoped: !!data.batchId, labelCount: labels?.length ?? null };
   });
 
 export const setCategoryMappingAdmin = createServerFn({ method: "POST" })

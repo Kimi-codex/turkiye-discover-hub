@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createImportBatch,
@@ -228,57 +228,93 @@ type NextActionSpec = {
   label: string;
   description: string;
   run: (id: string) => Promise<unknown>;
+  successMessage: string;
+  next?:
+    | {
+        kind: "detail";
+        tab:
+          | "schema"
+          | "field_mapping"
+          | "analysis"
+          | "categories"
+          | "validation"
+          | "import"
+          | "translations"
+          | "images"
+          | "overview";
+      }
+    | { kind: "categoryMappings" };
 };
 
 const NEXT_ACTIONS: Record<string, NextActionSpec> = {
   detect_schema: {
     label: "Detect schema",
     description: "Scan the uploaded JSON and build the field inventory.",
+    successMessage: "Schema detected — opening Field map.",
+    next: { kind: "detail", tab: "field_mapping" },
     run: (id) => detectImportSchema({ data: { id } }),
   },
   field_mapping: {
     label: "Approve field mapping",
     description: "Lock in the source → target field mapping and unlock analysis.",
+    successMessage: "Field mapping approved — opening Analysis.",
+    next: { kind: "detail", tab: "analysis" },
     run: (id) => approveImportFieldMapping({ data: { id } }),
   },
   analyze: {
     label: "Run analysis",
     description: "Normalize records, then review discovered category labels in the next stage.",
+    successMessage: "Analysis complete — opening Category mappings for this batch.",
+    next: { kind: "categoryMappings" },
     run: (id) => analyzeImportBatch({ data: { id } }),
   },
   mapping: {
     label: "Continue after category mapping",
     description: "Approve or ignore source category labels first, then continue to validation.",
+    successMessage: "Category mappings confirmed — opening Validation.",
+    next: { kind: "detail", tab: "validation" },
     run: (id) => confirmImportMappings({ data: { id } }),
   },
   validation: {
     label: "Compute preview",
     description: "Diff every record against the database (inserts / updates / noops).",
+    successMessage: "Preview computed — opening Import Preview.",
+    next: { kind: "detail", tab: "import" },
     run: (id) => computeImportPreview({ data: { id } }),
   },
   preview: {
     label: "Compute preview",
     description: "Diff every record against the database (inserts / updates / noops).",
+    successMessage: "Preview computed — opening Import Preview.",
+    next: { kind: "detail", tab: "import" },
     run: (id) => computeImportPreview({ data: { id } }),
   },
   execute: {
     label: "Run next chunk",
     description: "Write the next batch of approved records to the database.",
+    successMessage: "Import chunk finished — opening execution details.",
+    next: { kind: "detail", tab: "import" },
     run: (id) => runImportChunk({ data: { id } }),
   },
   translations: {
     label: "Enqueue translations",
     description: "Queue TR/EN/AR translation jobs for imported businesses.",
+    successMessage: "Translations queued — opening Images.",
+    next: { kind: "detail", tab: "images" },
     run: (id) => enqueueBatchTranslations({ data: { id } }),
   },
   images: {
     label: "Mark images done",
     description: "Image pipeline is blocked; advance past this stage to publish.",
+    successMessage: "Images stage advanced — opening Publish step.",
+    next: { kind: "detail", tab: "overview" },
     run: (id) => markImagesStageDone({ data: { id } }),
   },
   publish: {
     label: "Publish",
     description: "Flip imported businesses from pending review to published.",
+    successMessage: "Import published — completed.",
+    next: { kind: "detail", tab: "overview" },
     run: (id) => publishImportBatch({ data: { id } }),
   },
 };
@@ -297,6 +333,7 @@ function ImportCard({
   onArchive: () => void;
 }) {
   const qc = useQueryClient();
+  const navigate = useNavigate();
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "pending");
   const total = Number(batch.total_items ?? 0);
@@ -315,9 +352,22 @@ function ImportCard({
   const nextSpec = NEXT_ACTIONS[stage];
   const nextMut = useMutation({
     mutationFn: () => nextSpec!.run(batch.id),
-    onSuccess: () => {
-      toast.success(`${nextSpec!.label} — done`);
-      qc.invalidateQueries({ queryKey: ["admin", "imports"] });
+    onSuccess: async () => {
+      toast.success(nextSpec!.successMessage);
+      await qc.invalidateQueries({ queryKey: ["admin", "imports"] });
+      if (nextSpec!.next?.kind === "categoryMappings") {
+        navigate({
+          to: "/$lang/admin/category-mappings",
+          params: { lang },
+          search: { batchId: batch.id, returnTo },
+        });
+      } else if (nextSpec!.next?.kind === "detail") {
+        navigate({
+          to: "/$lang/admin/imports/$id",
+          params: { lang, id: batch.id },
+          search: { tab: nextSpec!.next.tab },
+        });
+      }
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -386,7 +436,7 @@ function ImportCard({
               <Link
                 to="/$lang/admin/category-mappings"
                 params={{ lang }}
-                search={{ returnTo }}
+                search={{ batchId: batch.id, returnTo }}
               >
                 Category mappings
               </Link>
