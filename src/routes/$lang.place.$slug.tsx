@@ -152,10 +152,14 @@ function BusinessDetailsPage() {
             label: pickLocalized(b.primaryCategory.name, locale),
             to: `/${b.primaryCategory.slug}`,
           },
-          {
-            label: pickLocalized(b.city.name, locale),
-            to: `/${b.city.slug}`,
-          },
+          ...(b.city?.slug
+            ? [
+                {
+                  label: pickLocalized(b.city.name, locale),
+                  to: `/${b.city.slug}`,
+                },
+              ]
+            : []),
           { label: b.name },
         ]}
       />
