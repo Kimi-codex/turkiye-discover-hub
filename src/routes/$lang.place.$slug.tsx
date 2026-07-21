@@ -333,15 +333,22 @@ function BusinessDetailsPage() {
               <h2 id="section-reviews" className="text-lg font-bold sm:text-xl">
                 {t("biz.reviews")}
               </h2>
-              <Button variant="outline" size="sm">
-                {t("biz.write_review")}
-              </Button>
+              <WriteReviewDialog businessId={b.id} locale={locale} lang={lang} />
             </div>
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              {reviews.map((r) => (
-                <ReviewCard key={r.id} review={r} />
-              ))}
-            </div>
+            {reviews.length === 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <p className="text-sm font-medium">{t("review.empty.title")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("review.empty.desc")}
+                </p>
+              </div>
+            ) : (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                {reviews.map((r) => (
+                  <ReviewCard key={r.id} review={r} />
+                ))}
+              </div>
+            )}
           </section>
         </div>
 
