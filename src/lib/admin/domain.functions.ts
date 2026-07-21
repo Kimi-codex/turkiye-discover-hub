@@ -402,19 +402,51 @@ export const deleteCategoryAdmin = createServerFn({ method: "POST" })
 export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .inputValidator(
-    (i: { status?: "pending" | "approved" | "ignored" } | undefined) => ({
+    (i: { status?: "pending" | "approved" | "ignored"; batchId?: string } | undefined) => ({
       status: i?.status ?? "pending",
+      batchId: typeof i?.batchId === "string" && i.batchId.length > 0 ? i.batchId : null,
     }),
   )
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await (context.supabase as AdminSb)
+    const supabase = context.supabase as AdminSb;
+    let labels: string[] | null = null;
+    if (data.batchId) {
+      const { data: items, error: itemError } = await supabase
+        .from("import_batch_items")
+        .select("raw_payload")
+        .eq("import_batch_id", data.batchId)
+        .limit(5000);
+      if (itemError) throw new Response(itemError.message, { status: 500 });
+      const seen = new Set<string>();
+      (items ?? []).forEach((it: Record<string, unknown>) => {
+        const rawPayload = (it.raw_payload as Record<string, unknown> | null) ?? {};
+        const normalized = rawPayload.normalized as {
+          categoriesSource?: unknown;
+          primaryCategorySource?: unknown;
+        } | null;
+        if (!normalized) return;
+        if (Array.isArray(normalized.categoriesSource)) {
+          normalized.categoriesSource.forEach((label) => {
+            if (typeof label === "string" && label.trim()) seen.add(label);
+          });
+        }
+        if (typeof normalized.primaryCategorySource === "string" && normalized.primaryCategorySource.trim()) {
+          seen.add(normalized.primaryCategorySource);
+        }
+      });
+      labels = Array.from(seen).sort();
+      if (labels.length === 0) return { rows: [], batchScoped: true, labelCount: 0 };
+    }
+
+    let query = supabase
       .from("category_mappings")
       .select("*")
       .eq("mapping_status", data.status)
-      .order("usage_count", { ascending: false })
-      .limit(500);
+      .order("usage_count", { ascending: false });
+    if (labels) query = query.eq("source_provider", "google").in("source_category", labels);
+    const { data: rows, error } = await query.limit(500);
     if (error) throw new Response(error.message, { status: 500 });
-    return { rows: rows ?? [] };
+    return { rows: rows ?? [], batchScoped: !!data.batchId, labelCount: labels?.length ?? null };
   });
 
 export const setCategoryMappingAdmin = createServerFn({ method: "POST" })
