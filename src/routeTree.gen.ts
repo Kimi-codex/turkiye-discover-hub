@@ -28,6 +28,7 @@ import { Route as LangAuthenticatedOwnerNotificationsRouteImport } from './route
 import { Route as LangAuthenticatedOwnerClaimRouteImport } from './routes/$lang._authenticated.owner.claim'
 import { Route as LangAuthenticatedOwnerBusinessIdRouteImport } from './routes/$lang._authenticated.owner.$businessId'
 import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
+import { Route as LangAuthenticatedAdminTranslationsRouteImport } from './routes/$lang._authenticated.admin.translations'
 import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
 import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
 import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
@@ -154,6 +155,12 @@ const LangAuthenticatedAdminUsersRoute =
   LangAuthenticatedAdminUsersRouteImport.update({
     id: '/users',
     path: '/users',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminTranslationsRoute =
+  LangAuthenticatedAdminTranslationsRouteImport.update({
+    id: '/translations',
+    path: '/translations',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
 const LangAuthenticatedAdminSettingsRoute =
@@ -333,6 +340,7 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
+  '/$lang/admin/translations': typeof LangAuthenticatedAdminTranslationsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
@@ -375,6 +383,7 @@ export interface FileRoutesByTo {
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
+  '/$lang/admin/translations': typeof LangAuthenticatedAdminTranslationsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
   '/$lang/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
@@ -421,6 +430,7 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/_authenticated/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/_authenticated/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
+  '/$lang/_authenticated/admin/translations': typeof LangAuthenticatedAdminTranslationsRoute
   '/$lang/_authenticated/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/_authenticated/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/_authenticated/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
@@ -468,6 +478,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
+    | '/$lang/admin/translations'
     | '/$lang/admin/users'
     | '/$lang/owner/$businessId'
     | '/$lang/owner/claim'
@@ -510,6 +521,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
+    | '/$lang/admin/translations'
     | '/$lang/admin/users'
     | '/$lang/owner/claim'
     | '/$lang/owner/notifications'
@@ -555,6 +567,7 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/reports'
     | '/$lang/_authenticated/admin/reviews'
     | '/$lang/_authenticated/admin/settings'
+    | '/$lang/_authenticated/admin/translations'
     | '/$lang/_authenticated/admin/users'
     | '/$lang/_authenticated/owner/$businessId'
     | '/$lang/_authenticated/owner/claim'
@@ -714,6 +727,13 @@ declare module '@tanstack/react-router' {
       path: '/users'
       fullPath: '/$lang/admin/users'
       preLoaderRoute: typeof LangAuthenticatedAdminUsersRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/translations': {
+      id: '/$lang/_authenticated/admin/translations'
+      path: '/translations'
+      fullPath: '/$lang/admin/translations'
+      preLoaderRoute: typeof LangAuthenticatedAdminTranslationsRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
     '/$lang/_authenticated/admin/settings': {
@@ -952,6 +972,7 @@ interface LangAuthenticatedAdminRouteChildren {
   LangAuthenticatedAdminReportsRoute: typeof LangAuthenticatedAdminReportsRoute
   LangAuthenticatedAdminReviewsRoute: typeof LangAuthenticatedAdminReviewsRoute
   LangAuthenticatedAdminSettingsRoute: typeof LangAuthenticatedAdminSettingsRoute
+  LangAuthenticatedAdminTranslationsRoute: typeof LangAuthenticatedAdminTranslationsRoute
   LangAuthenticatedAdminUsersRoute: typeof LangAuthenticatedAdminUsersRoute
   LangAuthenticatedAdminIndexRoute: typeof LangAuthenticatedAdminIndexRoute
 }
@@ -978,6 +999,8 @@ const LangAuthenticatedAdminRouteChildren: LangAuthenticatedAdminRouteChildren =
     LangAuthenticatedAdminReportsRoute: LangAuthenticatedAdminReportsRoute,
     LangAuthenticatedAdminReviewsRoute: LangAuthenticatedAdminReviewsRoute,
     LangAuthenticatedAdminSettingsRoute: LangAuthenticatedAdminSettingsRoute,
+    LangAuthenticatedAdminTranslationsRoute:
+      LangAuthenticatedAdminTranslationsRoute,
     LangAuthenticatedAdminUsersRoute: LangAuthenticatedAdminUsersRoute,
     LangAuthenticatedAdminIndexRoute: LangAuthenticatedAdminIndexRoute,
   }
