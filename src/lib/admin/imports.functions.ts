@@ -408,6 +408,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
     let failed = 0;
     let reviewsWritten = 0;
     let imagesWritten = 0;
+    const touchedBusinessIds = new Set<string>();
 
     for (const item of items) {
       const rp = (item.raw_payload as Record<string, unknown> | null) ?? {};
@@ -486,6 +487,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           if (uErr) throw uErr;
           businessId = existing.id;
           updated++;
+          touchedBusinessIds.add(businessId);
           await markItem(supabase, item.id, "updated", "update", null, businessId);
         } else {
           patch.field_sources = fieldSources;
@@ -498,6 +500,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           if (iErr) throw iErr;
           businessId = ins.id;
           inserted++;
+          touchedBusinessIds.add(businessId);
           await markItem(supabase, item.id, "inserted", "insert", null, businessId);
         }
 
@@ -583,6 +586,23 @@ export const runImportChunk = createServerFn({ method: "POST" })
       } catch (e) {
         failed++;
         await markItem(supabase, item.id, "failed", null, (e as Error).message?.slice(0, 400) ?? "error");
+      }
+    }
+
+    // Enqueue translation jobs for every business touched this chunk.
+    // Isolated from item loop so a translation failure never fails an item.
+    if (touchedBusinessIds.size > 0) {
+      try {
+        const { enqueueMissingTranslations } = await import(
+          "@/lib/translations/service.server"
+        );
+        for (const bid of touchedBusinessIds) {
+          await enqueueMissingTranslations(bid).catch((err) => {
+            console.warn("[import] enqueueMissingTranslations failed", bid, err);
+          });
+        }
+      } catch (err) {
+        console.warn("[import] translation enqueue module failed", err);
       }
     }
 

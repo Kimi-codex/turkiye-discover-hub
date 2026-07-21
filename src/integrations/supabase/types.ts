@@ -1558,34 +1558,55 @@ export type Database = {
       }
       translation_jobs: {
         Row: {
+          attempts: number
           business_id: string | null
           completed_at: string | null
           created_at: string
           error_message: string | null
           id: string
+          last_error: string | null
+          model: string | null
           provider: string | null
+          source_content_hash: string | null
+          source_field: string | null
+          source_language: string | null
+          started_at: string | null
           status: string
           target_language: string
           updated_at: string
         }
         Insert: {
+          attempts?: number
           business_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          last_error?: string | null
+          model?: string | null
           provider?: string | null
+          source_content_hash?: string | null
+          source_field?: string | null
+          source_language?: string | null
+          started_at?: string | null
           status?: string
           target_language: string
           updated_at?: string
         }
         Update: {
+          attempts?: number
           business_id?: string | null
           completed_at?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
+          last_error?: string | null
+          model?: string | null
           provider?: string | null
+          source_content_hash?: string | null
+          source_field?: string | null
+          source_language?: string | null
+          started_at?: string | null
           status?: string
           target_language?: string
           updated_at?: string
