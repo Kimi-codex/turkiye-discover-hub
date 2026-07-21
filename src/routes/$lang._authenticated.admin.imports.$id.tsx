@@ -271,7 +271,7 @@ function ImportDetailPage() {
           </div>
         </div>
         <Button asChild variant="outline">
-          <Link to="/$lang/_authenticated/admin/imports" params={{ lang }}>
+          <Link to="/$lang/admin/imports" params={{ lang }}>
             ← Back
           </Link>
         </Button>
@@ -382,7 +382,7 @@ function ImportDetailPage() {
         isLocked("categories") ? (
           <LockedPanel reason={lockedReason.categories!} />
         ) : (
-          <MappingTab lang={lang} mappings={mappings} items={items} />
+          <MappingTab lang={lang} batchId={id} mappings={mappings} items={items} />
         )
       )}
       {currentTab === "validation" && (
