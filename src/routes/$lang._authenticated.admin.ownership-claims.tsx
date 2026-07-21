@@ -69,7 +69,7 @@ function ClaimsPage() {
                 <div className="mt-2 text-sm">
                   <strong>Evidence:</strong> {String(c.evidence_notes ?? "—")}
                 </div>
-                {c.contact_email && (
+                {Boolean(c.contact_email) && (
                   <div className="text-xs text-muted-foreground">Email: {String(c.contact_email)}</div>
                 )}
               </div>
