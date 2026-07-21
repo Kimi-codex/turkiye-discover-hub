@@ -325,6 +325,8 @@ function ImportCard({
   const currentIdx = STAGE_ORDER.indexOf(stage as (typeof STAGE_ORDER)[number]);
   const schemaReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
   const mappingReached = currentIdx >= STAGE_ORDER.indexOf("field_mapping");
+  const categoryMappingReached = currentIdx >= STAGE_ORDER.indexOf("mapping");
+  const returnTo = `/${lang}/admin/imports/${batch.id}?tab=categories`;
 
   return (
     <div className="rounded-xl border bg-card p-4">
@@ -332,7 +334,7 @@ function ImportCard({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <Link
-              to="/$lang/_authenticated/admin/imports/$id"
+              to="/$lang/admin/imports/$id"
               params={{ lang, id: batch.id }}
               className="text-lg font-semibold hover:underline"
             >
@@ -353,14 +355,14 @@ function ImportCard({
         </div>
         <div className="flex flex-wrap gap-1">
           <Button asChild size="sm" variant="outline">
-            <Link to="/$lang/_authenticated/admin/imports/$id" params={{ lang, id: batch.id }}>
+            <Link to="/$lang/admin/imports/$id" params={{ lang, id: batch.id }}>
               Open
             </Link>
           </Button>
           {schemaReached && (
             <Button asChild size="sm" variant="outline">
               <Link
-                to="/$lang/_authenticated/admin/imports/$id"
+                to="/$lang/admin/imports/$id"
                 params={{ lang, id: batch.id }}
                 search={{ tab: "schema" }}
               >
@@ -371,7 +373,7 @@ function ImportCard({
           {mappingReached && (
             <Button asChild size="sm" variant="outline">
               <Link
-                to="/$lang/_authenticated/admin/imports/$id"
+                to="/$lang/admin/imports/$id"
                 params={{ lang, id: batch.id }}
                 search={{ tab: "field_mapping" }}
               >
