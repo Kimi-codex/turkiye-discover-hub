@@ -127,6 +127,12 @@ export const messages = {
     "account.title": "Hesabım",
     "account.no_favorites": "Henüz favoriniz yok.",
     "account.remove": "Kaldır",
+    "owner.portal": "İşletme paneli",
+    "owner.dashboard": "Panel",
+    "owner.claim": "İşletme talep et",
+    "owner.notifications": "Bildirimler",
+    "owner.submit_review": "İncelemeye gönder",
+    "owner.pending_review": "İnceleme bekliyor",
   },
   en: {
     "brand.name": "Discover Türkiye",
