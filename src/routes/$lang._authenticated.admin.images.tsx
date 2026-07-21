@@ -3,6 +3,8 @@ import { queryOptions, useSuspenseQuery, useMutation, useQueryClient } from "@ta
 import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import {
+  deleteImageRecord,
+  deleteImageRecords,
   getImagePipelineStatus,
   listImageJobs,
   listImageRecords,
@@ -12,6 +14,7 @@ import {
 import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { toast } from "sonner";
 
 type JobStatus = "pending" | "processing" | "retry" | "uploaded" | "failed" | "cancelled";
 
@@ -65,12 +68,15 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/images")({
 function AdminImagesPage() {
   const [tab, setTab] = useState<"records" | "jobs">("records");
   const [jobFilter, setJobFilter] = useState<JobStatus | undefined>(undefined);
+  const [selectedRecords, setSelectedRecords] = useState<string[]>([]);
   const { data: status } = useSuspenseQuery(statusQuery);
   const { data: records } = useSuspenseQuery(recordsQuery());
   const { data: jobs } = useSuspenseQuery(jobsQuery(jobFilter));
   const qc = useQueryClient();
   const retryFn = useServerFn(retryImageJob);
   const cancelFn = useServerFn(cancelImageJob);
+  const deleteRecordFn = useServerFn(deleteImageRecord);
+  const deleteRecordsFn = useServerFn(deleteImageRecords);
 
   const retry = useMutation({
     mutationFn: (id: string) => retryFn({ data: { imageId: id } }),
@@ -80,9 +86,33 @@ function AdminImagesPage() {
     mutationFn: (id: string) => cancelFn({ data: { imageId: id } }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ["admin", "images"] }),
   });
+  const deleteOne = useMutation({
+    mutationFn: (id: string) => deleteRecordFn({ data: { imageId: id } }),
+    onSuccess: async (r) => {
+      setSelectedRecords((prev) => prev.filter((id) => id !== String((r as { imageId?: string }).imageId ?? "")));
+      toast.success(`Deleted ${r.deleted} image record`);
+      await qc.invalidateQueries({ queryKey: ["admin", "images"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const deleteMany = useMutation({
+    mutationFn: (ids: string[]) => deleteRecordsFn({ data: { imageIds: ids } }),
+    onSuccess: async (r) => {
+      toast.success(`Deleted ${r.deleted} image records`);
+      setSelectedRecords([]);
+      await qc.invalidateQueries({ queryKey: ["admin", "images"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
 
   const r = status.records;
   const j = status.jobs;
+  const allVisibleSelected = records.length > 0 && records.every((row) => selectedRecords.includes(row.id));
+  const toggleRecord = (id: string, checked: boolean) => {
+    setSelectedRecords((prev) =>
+      checked ? Array.from(new Set([...prev, id])) : prev.filter((recordId) => recordId !== id),
+    );
+  };
 
   return (
     <div className="space-y-6">
@@ -172,10 +202,43 @@ function AdminImagesPage() {
 
       {tab === "records" ? (
         <Card className="overflow-hidden">
+          <div className="flex flex-wrap items-center justify-between gap-2 border-b p-3">
+            <div className="text-sm text-muted-foreground">
+              {selectedRecords.length} selected · deleting a record also cancels its active image jobs.
+            </div>
+            <div className="flex flex-wrap gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setSelectedRecords(allVisibleSelected ? [] : records.map((row) => row.id))}
+                disabled={records.length === 0}
+              >
+                {allVisibleSelected ? "Clear selection" : "Select all visible"}
+              </Button>
+              <Button
+                size="sm"
+                variant="destructive"
+                onClick={() => deleteMany.mutate(selectedRecords)}
+                disabled={selectedRecords.length === 0 || deleteMany.isPending}
+              >
+                Delete selected
+              </Button>
+            </div>
+          </div>
           <div className="max-h-[600px] overflow-auto">
             <table className="w-full text-sm">
               <thead className="sticky top-0 bg-muted text-left">
                 <tr>
+                  <th className="px-3 py-2">
+                    <input
+                      type="checkbox"
+                      aria-label="Select all visible image records"
+                      checked={allVisibleSelected}
+                      onChange={(e) =>
+                        setSelectedRecords(e.currentTarget.checked ? records.map((row) => row.id) : [])
+                      }
+                    />
+                  </th>
                   <th className="px-3 py-2">Business</th>
                   <th className="px-3 py-2">src_url</th>
                   <th className="px-3 py-2">r2_key</th>
@@ -183,11 +246,20 @@ function AdminImagesPage() {
                   <th className="px-3 py-2">source_type</th>
                   <th className="px-3 py-2">import_batch_id</th>
                   <th className="px-3 py-2">created_at</th>
+                  <th className="px-3 py-2 text-right">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {records.map((row: Awaited<ReturnType<typeof listImageRecords>>[number]) => (
                   <tr key={row.id} className="border-t">
+                    <td className="px-3 py-2">
+                      <input
+                        type="checkbox"
+                        aria-label={`Select image record ${row.id}`}
+                        checked={selectedRecords.includes(row.id)}
+                        onChange={(e) => toggleRecord(row.id, e.currentTarget.checked)}
+                      />
+                    </td>
                     <td className="px-3 py-2">
                       <div className="font-medium">{row.business_name}</div>
                       <div className="text-xs text-muted-foreground">
@@ -210,11 +282,21 @@ function AdminImagesPage() {
                     <td className="px-3 py-2 text-xs text-muted-foreground">
                       {new Date(row.created_at).toLocaleString()}
                     </td>
+                    <td className="px-3 py-2 text-right">
+                      <Button
+                        size="sm"
+                        variant="destructive"
+                        onClick={() => deleteOne.mutate(row.id)}
+                        disabled={deleteOne.isPending}
+                      >
+                        Delete
+                      </Button>
+                    </td>
                   </tr>
                 ))}
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={7} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted-foreground">
                       No image records.
                     </td>
                   </tr>

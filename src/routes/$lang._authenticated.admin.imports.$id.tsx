@@ -1000,6 +1000,7 @@ function TranslationsTab({ provenance }: { provenance: Array<Record<string, unkn
 }
 
 function ImagesTab({ provenance }: { provenance: Array<Record<string, unknown>> }) {
+  const { lang } = Route.useParams();
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
@@ -1014,7 +1015,7 @@ function ImagesTab({ provenance }: { provenance: Array<Record<string, unknown>> 
       <div className="rounded-xl border bg-card p-4 text-sm">
         <div className="mb-1 font-medium">Touched businesses: {provenance.length}</div>
         <p className="text-xs text-muted-foreground">
-          See <Link to="." className="underline">Images admin</Link> for record vs job counts.
+          See <Link to="/$lang/admin/images" params={{ lang }} className="underline">Images admin</Link> for record vs job counts and safe deletion.
         </p>
       </div>
     </div>
