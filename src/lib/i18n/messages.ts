@@ -256,6 +256,12 @@ export const messages = {
     "account.title": "My account",
     "account.no_favorites": "You don't have any favorites yet.",
     "account.remove": "Remove",
+    "owner.portal": "Business portal",
+    "owner.dashboard": "Dashboard",
+    "owner.claim": "Claim business",
+    "owner.notifications": "Notifications",
+    "owner.submit_review": "Submit for review",
+    "owner.pending_review": "Pending review",
   },
   ar: {
     "brand.name": "اكتشف تركيا",
@@ -379,6 +385,12 @@ export const messages = {
     "account.title": "حسابي",
     "account.no_favorites": "لا توجد لديك مفضلة بعد.",
     "account.remove": "إزالة",
+    "owner.portal": "بوابة الأعمال",
+    "owner.dashboard": "لوحة التحكم",
+    "owner.claim": "المطالبة بالعمل",
+    "owner.notifications": "الإشعارات",
+    "owner.submit_review": "إرسال للمراجعة",
+    "owner.pending_review": "قيد المراجعة",
   },
 } as const satisfies Record<Locale, Record<string, string>>;
 
