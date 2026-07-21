@@ -16,6 +16,7 @@ const nav = [
   { to: "/ownership-claims", label: "Ownership Claims", icon: FileCheck },
   { to: "/imports", label: "Imports", icon: Upload },
   { to: "/images", label: "Images", icon: ImageIcon },
+  { to: "/translations", label: "Translations", icon: Languages },
   { to: "/users", label: "Users", icon: Users },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },
