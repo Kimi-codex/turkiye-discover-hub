@@ -3,12 +3,32 @@
  *
  * Files are stored in the private `imports` storage bucket; only admins can
  * read/write. No base64 payload is ever sent over an RPC.
+ *
+ * Column names, statuses, and actions here match the LIVE database schema:
+ *
+ *   import_batches
+ *     source, source_provider, status, original_filename, file_size,
+ *     storage_bucket, storage_object_path, total_items, valid_items,
+ *     invalid_items, inserted_items, updated_items, duplicate_items,
+ *     skipped_items, needs_mapping_items, processed_items, failed_items,
+ *     started_at, completed_at, error_message, created_by
+ *   Statuses: pending | uploaded | analyzing | ready | importing |
+ *             completed | partially_completed | failed | cancelled
+ *
+ *   import_batch_items
+ *     import_batch_id, item_index, place_id, status, action,
+ *     error_message, raw_payload (source+normalized+errors+warnings),
+ *     business_id, processed_at
+ *   Statuses: pending | processing | inserted | updated | duplicate |
+ *             skipped | invalid | needs_mapping | failed
+ *   Actions:  insert | update | skip | duplicate | invalid | needs_mapping
  */
 import { createServerFn } from "@tanstack/react-start";
 import { requireAdmin } from "./require-admin.middleware";
 import {
   detectImportFormat,
   extractImportItems,
+  unwrapRecord,
 } from "@/lib/import/format";
 import {
   normalizeGooglePlace,
@@ -20,8 +40,9 @@ import {
 type Sb = any;
 
 const CHUNK_SIZE = 50;
+const IMPORTS_BUCKET = "imports";
 
-/** Create an import batch row and return an upload token (signed URL). */
+/** Create an import batch row first, THEN return a signed upload URL. */
 export const createImportBatch = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((i: { fileName: string; fileSize: number; contentType: string }) => {
@@ -37,33 +58,91 @@ export const createImportBatch = createServerFn({ method: "POST" })
     const { data: batch, error } = await supabase
       .from("import_batches")
       .insert({
-        source_format: "google_places",
-        status: "uploading",
-        file_name: data.fileName,
-        file_size_bytes: data.fileSize,
+        source: "google_places",
+        source_provider: "google",
+        status: "pending",
+        original_filename: data.fileName,
+        file_size: data.fileSize,
         created_by: context.userId,
+        started_at: new Date().toISOString(),
       })
       .select()
       .single();
     if (error) throw new Response(error.message, { status: 400 });
 
-    const storagePath = `imports/${batch.id}/${data.fileName}`;
+    const storagePath = `${batch.id}/${data.fileName}`;
     const { data: signed, error: signErr } = await supabase.storage
-      .from("imports")
+      .from(IMPORTS_BUCKET)
       .createSignedUploadUrl(storagePath);
-    if (signErr) throw new Response(signErr.message, { status: 500 });
+    if (signErr) {
+      // Preserve the batch row; mark it failed with the reason.
+      await supabase
+        .from("import_batches")
+        .update({
+          status: "failed",
+          error_message: `signed_url_failed: ${signErr.message}`,
+        })
+        .eq("id", batch.id);
+      throw new Response(signErr.message, { status: 500 });
+    }
 
     await supabase
       .from("import_batches")
-      .update({ storage_path: storagePath })
+      .update({
+        storage_bucket: IMPORTS_BUCKET,
+        storage_object_path: storagePath,
+      })
       .eq("id", batch.id);
 
     return {
       batchId: batch.id as string,
       uploadUrl: signed.signedUrl as string,
       storagePath,
+      bucket: IMPORTS_BUCKET,
       token: signed.token as string,
     };
+  });
+
+/** Mark a pre-created batch as `uploaded` once the browser confirms PUT succeeded. */
+export const markImportBatchUploaded = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { error } = await supabase
+      .from("import_batches")
+      .update({ status: "uploaded", error_message: null })
+      .eq("id", data.id)
+      .in("status", ["pending", "failed"]);
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
+  });
+
+/** Mark a batch as failed with a safe step + message. Preserves the row. */
+export const markImportBatchFailed = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string; step: string; message: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return {
+      id: i.id,
+      step: String(i.step ?? "unknown").slice(0, 40),
+      message: String(i.message ?? "").slice(0, 500),
+    };
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { error } = await supabase
+      .from("import_batches")
+      .update({
+        status: "failed",
+        error_message: `${data.step}: ${data.message}`,
+      })
+      .eq("id", data.id);
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
   });
 
 export const listImportBatches = createServerFn({ method: "GET" })
@@ -91,14 +170,30 @@ export const getImportBatch = createServerFn({ method: "GET" })
       supabase.from("import_batches").select("*").eq("id", data.id).maybeSingle(),
       supabase
         .from("import_batch_items")
-        .select("*")
-        .eq("batch_id", data.id)
+        .select("id, item_index, place_id, status, action, error_message, business_id, processed_at, raw_payload")
+        .eq("import_batch_id", data.id)
         .order("item_index", { ascending: true })
         .limit(500),
     ]);
     if (error) throw new Response(error.message, { status: 500 });
     if (!batch) throw new Response("Not found", { status: 404 });
-    return { batch, items: items ?? [] };
+
+    // Check storage object existence (defensive; ignore errors).
+    let storageExists = false;
+    if (batch.storage_object_path) {
+      try {
+        const parts = String(batch.storage_object_path).split("/");
+        const filename = parts.pop() as string;
+        const prefix = parts.join("/");
+        const { data: list } = await supabase.storage
+          .from(batch.storage_bucket ?? IMPORTS_BUCKET)
+          .list(prefix, { search: filename, limit: 1 });
+        storageExists = !!(list && list.length > 0);
+      } catch {
+        storageExists = false;
+      }
+    }
+    return { batch, items: items ?? [], storageExists };
   });
 
 /** Download the uploaded file, parse, normalize items into batch_items. */
@@ -117,20 +212,21 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
       .maybeSingle();
     if (error) throw new Response(error.message, { status: 500 });
     if (!batch) throw new Response("Not found", { status: 404 });
-    if (!batch.storage_path) throw new Response("Batch has no file", { status: 400 });
+    if (!batch.storage_object_path) throw new Response("Batch has no file", { status: 400 });
 
     await supabase
       .from("import_batches")
-      .update({ status: "analyzing", analyze_started_at: new Date().toISOString() })
+      .update({ status: "analyzing", error_message: null })
       .eq("id", data.id);
 
+    const bucket = batch.storage_bucket ?? IMPORTS_BUCKET;
     const { data: blob, error: dlErr } = await supabase.storage
-      .from("imports")
-      .download(batch.storage_path);
+      .from(bucket)
+      .download(batch.storage_object_path);
     if (dlErr) {
       await supabase
         .from("import_batches")
-        .update({ status: "failed", error_message: dlErr.message })
+        .update({ status: "failed", error_message: `download_failed: ${dlErr.message}` })
         .eq("id", data.id);
       throw new Response(dlErr.message, { status: 500 });
     }
@@ -142,48 +238,57 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     } catch (e) {
       await supabase
         .from("import_batches")
-        .update({ status: "failed", error_message: `Invalid JSON: ${(e as Error).message}` })
+        .update({ status: "failed", error_message: `invalid_json: ${(e as Error).message}` })
         .eq("id", data.id);
       throw new Response("Invalid JSON", { status: 400 });
     }
     const format = detectImportFormat(payload);
-    const items = extractImportItems(payload);
+    const rawItems = extractImportItems(payload);
 
     // Wipe any previous items for this batch (in case of re-analysis)
-    await supabase.from("import_batch_items").delete().eq("batch_id", data.id);
+    await supabase.from("import_batch_items").delete().eq("import_batch_id", data.id);
 
-    // Build normalized rows and category suggestions
     const rows: Record<string, unknown>[] = [];
     const categorySuggestions = new Set<string>();
     let valid = 0;
     let invalid = 0;
-    items.forEach((raw, idx) => {
-      const normalized = normalizeGooglePlace(raw);
+    rawItems.forEach((rawRecord, idx) => {
+      const unwrapped = unwrapRecord(rawRecord);
+      const normalized = normalizeGooglePlace(unwrapped);
       const validation = validateNormalizedBusiness(normalized);
       if (normalized) {
         normalized.categoriesSource.forEach((c) => categorySuggestions.add(c));
         if (normalized.primaryCategorySource) categorySuggestions.add(normalized.primaryCategorySource);
       }
-      if (validation.ok) valid++;
+      const isValid = validation.ok;
+      if (isValid) valid++;
       else invalid++;
       rows.push({
-        batch_id: data.id,
+        import_batch_id: data.id,
         item_index: idx,
         place_id: normalized?.placeId ?? null,
-        action: normalized ? "pending" : "skipped",
-        normalized_data: normalized as unknown,
-        source_data: raw,
-        errors: validation.errors,
-        warnings: validation.warnings,
-        status: normalized ? "pending" : "invalid",
+        status: isValid ? "pending" : "invalid",
+        action: isValid ? null : "invalid",
+        error_message: isValid ? null : (validation.errors[0] ?? "invalid"),
+        raw_payload: {
+          source: rawRecord,
+          normalized: normalized as unknown,
+          errors: validation.errors,
+          warnings: validation.warnings,
+        },
       });
     });
 
-    // Insert in chunks (avoid over-large single inserts)
     for (let i = 0; i < rows.length; i += 200) {
       const slice = rows.slice(i, i + 200);
       const { error: insErr } = await supabase.from("import_batch_items").insert(slice);
-      if (insErr) throw new Response(insErr.message, { status: 500 });
+      if (insErr) {
+        await supabase
+          .from("import_batches")
+          .update({ status: "failed", error_message: `items_insert_failed: ${insErr.message}` })
+          .eq("id", data.id);
+        throw new Response(insErr.message, { status: 500 });
+      }
     }
 
     // Register category mappings as pending for any unknown labels
@@ -193,7 +298,9 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
         .from("category_mappings")
         .select("source_category")
         .in("source_category", labels);
-      const existingSet = new Set((existing ?? []).map((r: { source_category: string }) => r.source_category));
+      const existingSet = new Set(
+        (existing ?? []).map((r: { source_category: string }) => r.source_category),
+      );
       const inserts = labels
         .filter((l) => !existingSet.has(l))
         .map((l) => ({
@@ -211,22 +318,21 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     await supabase
       .from("import_batches")
       .update({
-        status: "analyzed",
-        analyze_completed_at: new Date().toISOString(),
-        source_format: format,
-        total_items: items.length,
+        status: "ready",
+        source: format,
+        total_items: rawItems.length,
         valid_items: valid,
         invalid_items: invalid,
+        error_message: null,
       })
       .eq("id", data.id);
 
-    return { ok: true, total: items.length, valid, invalid };
+    return { ok: true, total: rawItems.length, valid, invalid, format };
   });
 
 /**
- * Run a single chunk of items. Idempotent: uses (batch_id, item_index) index
- * on import_batch_items and place_id upsert on businesses. Callers loop
- * until getImportBatch reports status='completed'.
+ * Run a single chunk of items. Idempotent: UPSERT businesses by place_id.
+ * Callers loop until getImportBatch reports status='completed' or 'partially_completed'.
  */
 export const runImportChunk = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
@@ -242,30 +348,27 @@ export const runImportChunk = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .maybeSingle();
     if (!batch) throw new Response("Not found", { status: 404 });
-    if (!["analyzed", "running", "paused"].includes(batch.status))
+    if (!["ready", "importing"].includes(batch.status))
       throw new Response(`Batch is ${batch.status}, cannot run`, { status: 400 });
 
     // Load next chunk of pending items
     const { data: items } = await supabase
       .from("import_batch_items")
       .select("*")
-      .eq("batch_id", data.id)
+      .eq("import_batch_id", data.id)
       .eq("status", "pending")
       .order("item_index")
       .limit(CHUNK_SIZE);
 
     if (!items || items.length === 0) {
-      await supabase
-        .from("import_batches")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", data.id);
+      await finalizeBatch(supabase, data.id);
       return { ok: true, processed: 0, done: true };
     }
 
-    if (batch.status !== "running") {
+    if (batch.status !== "importing") {
       await supabase
         .from("import_batches")
-        .update({ status: "running", started_at: new Date().toISOString() })
+        .update({ status: "importing", started_at: batch.started_at ?? new Date().toISOString() })
         .eq("id", data.id);
     }
 
@@ -275,7 +378,6 @@ export const runImportChunk = createServerFn({ method: "POST" })
       "import.preserve_curated_fields",
       "import.require_known_city",
       "import.require_category_mapping",
-      "images.queue_after_import",
     ];
     const { data: settingRows } = await supabase
       .from("site_settings")
@@ -300,37 +402,38 @@ export const runImportChunk = createServerFn({ method: "POST" })
       mappingIndex.set(m.source_category, m.category_id);
     });
 
-    let created = 0;
+    let inserted = 0;
     let updated = 0;
     let skipped = 0;
     let failed = 0;
+    let reviewsWritten = 0;
+    let imagesWritten = 0;
 
     for (const item of items) {
-      const normalized = item.normalized_data as NormalizedBusiness | null;
+      const rp = (item.raw_payload as Record<string, unknown> | null) ?? {};
+      const normalized = (rp.normalized as NormalizedBusiness | null) ?? null;
       try {
         if (!normalized) {
-          await markItem(supabase, item.id, "skipped", "invalid_normalized");
+          await markItem(supabase, item.id, "skipped", "skip", "invalid_normalized");
           skipped++;
           continue;
         }
-        // Resolve city
         const cityId = await resolveCity(supabase, normalized.cityHint);
         if (requireKnownCity && !cityId) {
-          await markItem(supabase, item.id, "skipped", "unknown_city");
+          await markItem(supabase, item.id, "skipped", "skip", "unknown_city");
           skipped++;
           continue;
         }
-        // Resolve category
         const primaryCatId = normalized.primaryCategorySource
           ? mappingIndex.get(normalized.primaryCategorySource) ?? null
           : null;
         if (requireCategoryMapping && !primaryCatId) {
-          await markItem(supabase, item.id, "skipped", "unmapped_category");
+          await markItem(supabase, item.id, "skipped", "skip", "unmapped_category");
           skipped++;
           continue;
         }
 
-        // Find existing business by place_id
+        // UPSERT identity strictly by place_id
         const { data: existing } = await supabase
           .from("businesses")
           .select("id, name, slug, field_sources, status")
@@ -344,7 +447,6 @@ export const runImportChunk = createServerFn({ method: "POST" })
           { source: string; updated_at: string }
         >;
 
-        // Build patch honoring precedence: admin/owner curated fields stay
         const wanted: Record<string, unknown> = {
           name: normalized.name,
           description: normalized.description,
@@ -352,6 +454,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           latitude: normalized.latitude,
           longitude: normalized.longitude,
           phone: normalized.phone,
+          international_phone: normalized.internationalPhone,
           website: normalized.website,
           google_maps_url: normalized.googleMapsUrl,
           rating: normalized.rating,
@@ -383,7 +486,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           if (uErr) throw uErr;
           businessId = existing.id;
           updated++;
-          await markItem(supabase, item.id, "updated", null, businessId);
+          await markItem(supabase, item.id, "updated", "update", null, businessId);
         } else {
           patch.field_sources = fieldSources;
           patch.status = defaultStatus;
@@ -394,8 +497,8 @@ export const runImportChunk = createServerFn({ method: "POST" })
             .single();
           if (iErr) throw iErr;
           businessId = ins.id;
-          created++;
-          await markItem(supabase, item.id, "created", null, businessId);
+          inserted++;
+          await markItem(supabase, item.id, "inserted", "insert", null, businessId);
         }
 
         // Opening hours: replace
@@ -411,13 +514,17 @@ export const runImportChunk = createServerFn({ method: "POST" })
           await supabase.from("business_opening_hours").insert(hoursRows);
         }
 
-        // Images: upsert by source_url; queue for R2 in Phase 4
+        // Images: upsert by (business_id, source_url) — Google source URL only.
+        // storage_status stays 'pending' until the R2 worker (Blocked by
+        // configuration) processes them. BusinessImage falls back to source_url.
         if (normalized.images.length > 0) {
           for (const img of normalized.images) {
-            await supabase.from("business_images").upsert(
+            const { error: imgErr } = await supabase.from("business_images").upsert(
               {
                 business_id: businessId,
                 source_url: img.sourceUrl,
+                source_provider: "google",
+                source_type: "google_places",
                 sort_order: img.sortOrder,
                 is_cover: img.isCover,
                 google_photo_category: img.googleCategory,
@@ -429,13 +536,14 @@ export const runImportChunk = createServerFn({ method: "POST" })
               },
               { onConflict: "business_id,source_url" },
             );
+            if (!imgErr) imagesWritten++;
           }
         }
 
         // Reviews (Google source): upsert by source_fingerprint
         if (normalized.reviews.length > 0) {
           for (const r of normalized.reviews) {
-            await supabase.from("reviews").upsert(
+            const { error: revErr } = await supabase.from("reviews").upsert(
               {
                 business_id: businessId,
                 source: "google",
@@ -449,8 +557,9 @@ export const runImportChunk = createServerFn({ method: "POST" })
                 review_date: r.reviewDate,
                 status: "published",
               },
-              { onConflict: "business_id,source_fingerprint" },
+              { onConflict: "business_id,source,source_fingerprint" },
             );
+            if (!revErr) reviewsWritten++;
           }
         }
 
@@ -473,36 +582,73 @@ export const runImportChunk = createServerFn({ method: "POST" })
         }
       } catch (e) {
         failed++;
-        await markItem(supabase, item.id, "failed", (e as Error).message ?? "error");
+        await markItem(supabase, item.id, "failed", null, (e as Error).message?.slice(0, 400) ?? "error");
       }
     }
 
-    // Update batch counters
+    // Increment counters on the batch row
     await supabase.rpc("record_audit", {
       _action: "import.chunk",
       _entity_type: "import_batch",
       _entity_id: data.id,
       _before: null,
       _after: null,
-      _metadata: { created, updated, skipped, failed, chunk_size: items.length },
+      _metadata: { inserted, updated, skipped, failed, chunk_size: items.length },
     });
 
-    const { data: remaining } = await supabase
+    // Update counters (fetch current, add delta — no dedicated RPC to increment)
+    const { data: cur } = await supabase
+      .from("import_batches")
+      .select("inserted_items, updated_items, skipped_items, failed_items, processed_items")
+      .eq("id", data.id)
+      .maybeSingle();
+    await supabase
+      .from("import_batches")
+      .update({
+        inserted_items: (cur?.inserted_items ?? 0) + inserted,
+        updated_items: (cur?.updated_items ?? 0) + updated,
+        skipped_items: (cur?.skipped_items ?? 0) + skipped,
+        failed_items: (cur?.failed_items ?? 0) + failed,
+        processed_items: (cur?.processed_items ?? 0) + items.length,
+      })
+      .eq("id", data.id);
+
+    const { count: remaining } = await supabase
       .from("import_batch_items")
       .select("id", { count: "exact", head: true })
-      .eq("batch_id", data.id)
+      .eq("import_batch_id", data.id)
       .eq("status", "pending");
 
-    const done = !remaining || (remaining as unknown as { count?: number }).count === 0;
-    if (done) {
-      await supabase
-        .from("import_batches")
-        .update({ status: "completed", completed_at: new Date().toISOString() })
-        .eq("id", data.id);
-    }
+    const done = !remaining || remaining === 0;
+    if (done) await finalizeBatch(supabase, data.id);
 
-    return { ok: true, processed: items.length, created, updated, skipped, failed, done };
+    return {
+      ok: true,
+      processed: items.length,
+      inserted,
+      updated,
+      skipped,
+      failed,
+      reviewsWritten,
+      imagesWritten,
+      done,
+    };
   });
+
+async function finalizeBatch(supabase: Sb, id: string) {
+  const { data: b } = await supabase
+    .from("import_batches")
+    .select("failed_items, invalid_items, inserted_items, updated_items")
+    .eq("id", id)
+    .maybeSingle();
+  const anyFailure = (b?.failed_items ?? 0) > 0 || (b?.invalid_items ?? 0) > 0;
+  const anySuccess = (b?.inserted_items ?? 0) > 0 || (b?.updated_items ?? 0) > 0;
+  const finalStatus = anyFailure && anySuccess ? "partially_completed" : anyFailure && !anySuccess ? "failed" : "completed";
+  await supabase
+    .from("import_batches")
+    .update({ status: finalStatus, completed_at: new Date().toISOString() })
+    .eq("id", id);
+}
 
 export const cancelImportBatch = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
@@ -531,11 +677,13 @@ export const cancelImportBatch = createServerFn({ method: "POST" })
 async function markItem(
   supabase: Sb,
   id: string,
-  status: "created" | "updated" | "skipped" | "failed",
+  status: "inserted" | "updated" | "skipped" | "failed" | "invalid" | "duplicate" | "needs_mapping",
+  action: "insert" | "update" | "skip" | "duplicate" | "invalid" | "needs_mapping" | null,
   reason: string | null,
   businessId?: string,
 ) {
-  const patch: Record<string, unknown> = { status, action: status };
+  const patch: Record<string, unknown> = { status };
+  if (action) patch.action = action;
   if (reason) patch.error_message = reason;
   if (businessId) patch.business_id = businessId;
   patch.processed_at = new Date().toISOString();
@@ -545,7 +693,6 @@ async function markItem(
 async function resolveCity(supabase: Sb, hint: string | null): Promise<string | null> {
   if (!hint) return null;
   const normalized = hint.trim().toLowerCase();
-  // Try translations first
   const { data: t } = await supabase
     .from("city_translations")
     .select("city_id, name")
