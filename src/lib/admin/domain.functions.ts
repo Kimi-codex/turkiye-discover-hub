@@ -410,6 +410,7 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as AdminSb;
     let labels: string[] | null = null;
+    let statusCounts: Record<string, number> | null = null;
     if (data.batchId) {
       const { data: items, error: itemError } = await supabase
         .from("import_batch_items")
@@ -435,7 +436,7 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
         }
       });
       labels = Array.from(seen).sort();
-      if (labels.length === 0) return { rows: [], batchScoped: true, labelCount: 0 };
+      if (labels.length === 0) return { rows: [], batchScoped: true, labelCount: 0, statusCounts: {} };
 
       const normalizedLabels = labels.map((label) => label.toLowerCase().trim()).filter(Boolean);
       const { data: existingMappings, error: existingError } = await supabase
@@ -468,6 +469,18 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
           });
         if (insertError) throw new Response(insertError.message, { status: 500 });
       }
+
+      const { data: allBatchMappings, error: countsError } = await supabase
+        .from("category_mappings")
+        .select("mapping_status")
+        .eq("source_provider", "google")
+        .in("normalized_source_category", normalizedLabels);
+      if (countsError) throw new Response(countsError.message, { status: 500 });
+      statusCounts = { pending: 0, approved: 0, ignored: 0, missing: 0 };
+      (allBatchMappings ?? []).forEach((row: { mapping_status: string }) => {
+        statusCounts![row.mapping_status] = (statusCounts![row.mapping_status] ?? 0) + 1;
+      });
+      statusCounts.missing = Math.max(0, labels.length - (allBatchMappings?.length ?? 0));
     }
 
     let query = supabase
@@ -485,7 +498,7 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
     }
     const { data: rows, error } = await query.limit(500);
     if (error) throw new Response(error.message, { status: 500 });
-    return { rows: rows ?? [], batchScoped: !!data.batchId, labelCount: labels?.length ?? null };
+    return { rows: rows ?? [], batchScoped: !!data.batchId, labelCount: labels?.length ?? null, statusCounts };
   });
 
 export const setCategoryMappingAdmin = createServerFn({ method: "POST" })
