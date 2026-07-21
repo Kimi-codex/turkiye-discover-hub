@@ -239,6 +239,7 @@ function ImportDetailPage() {
   const approvals = (q.data as { approvals?: Array<Record<string, unknown>> }).approvals ?? [];
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "");
+  const hasAnalyzedItems = items.length > 0 && Number(batch.valid_items ?? 0) + Number(batch.invalid_items ?? 0) > 0;
   const detectedSchema = (batch.detected_schema as import("@/lib/import/schema-detector").DetectedSchema | null) ?? null;
   const fieldMapping = (batch.field_mapping as MappingRow[] | null) ?? [];
   const fieldMappingHash = String(batch.field_mapping_hash ?? "");
@@ -259,7 +260,8 @@ function ImportDetailPage() {
       : "",
     categories:
       STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
-      STAGE_ORDER.indexOf("mapping")
+        STAGE_ORDER.indexOf("mapping") &&
+      !hasAnalyzedItems
         ? "Run analysis first."
         : "",
     validation:
@@ -293,6 +295,7 @@ function ImportDetailPage() {
 
       <NextAction
         stage={stage}
+        hasAnalyzedItems={hasAnalyzedItems}
         storageExists={storageExists}
         isFmApproved={isFmApproved}
         onDetect={() => detectMut.mutate()}
