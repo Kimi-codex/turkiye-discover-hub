@@ -24,6 +24,7 @@ import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$ci
 import { Route as LangAuthenticatedOwnerIndexRouteImport } from './routes/$lang._authenticated.owner.index'
 import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
 import { Route as ApiPublicHooksImageTickRouteImport } from './routes/api/public/hooks/image-tick'
+import { Route as LangAuthenticatedOwnerNotificationsRouteImport } from './routes/$lang._authenticated.owner.notifications'
 import { Route as LangAuthenticatedOwnerClaimRouteImport } from './routes/$lang._authenticated.owner.claim'
 import { Route as LangAuthenticatedOwnerBusinessIdRouteImport } from './routes/$lang._authenticated.owner.$businessId'
 import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
@@ -40,6 +41,13 @@ import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$
 import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
 import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 import { Route as LangAuthenticatedOwnerBusinessIdIndexRouteImport } from './routes/$lang._authenticated.owner.$businessId.index'
+import { Route as LangAuthenticatedOwnerBusinessIdTranslationsRouteImport } from './routes/$lang._authenticated.owner.$businessId.translations'
+import { Route as LangAuthenticatedOwnerBusinessIdServicesRouteImport } from './routes/$lang._authenticated.owner.$businessId.services'
+import { Route as LangAuthenticatedOwnerBusinessIdReviewsRouteImport } from './routes/$lang._authenticated.owner.$businessId.reviews'
+import { Route as LangAuthenticatedOwnerBusinessIdProfileRouteImport } from './routes/$lang._authenticated.owner.$businessId.profile'
+import { Route as LangAuthenticatedOwnerBusinessIdImagesRouteImport } from './routes/$lang._authenticated.owner.$businessId.images'
+import { Route as LangAuthenticatedOwnerBusinessIdHoursRouteImport } from './routes/$lang._authenticated.owner.$businessId.hours'
+import { Route as LangAuthenticatedOwnerBusinessIdAttributesRouteImport } from './routes/$lang._authenticated.owner.$businessId.attributes'
 import { Route as LangAuthenticatedAdminImportsIdRouteImport } from './routes/$lang._authenticated.admin.imports.$id'
 import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
 
@@ -121,6 +129,12 @@ const ApiPublicHooksImageTickRoute = ApiPublicHooksImageTickRouteImport.update({
   path: '/api/public/hooks/image-tick',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LangAuthenticatedOwnerNotificationsRoute =
+  LangAuthenticatedOwnerNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => LangAuthenticatedOwnerRoute,
+  } as any)
 const LangAuthenticatedOwnerClaimRoute =
   LangAuthenticatedOwnerClaimRouteImport.update({
     id: '/claim',
@@ -217,6 +231,48 @@ const LangAuthenticatedOwnerBusinessIdIndexRoute =
     path: '/',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
+const LangAuthenticatedOwnerBusinessIdTranslationsRoute =
+  LangAuthenticatedOwnerBusinessIdTranslationsRouteImport.update({
+    id: '/translations',
+    path: '/translations',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdServicesRoute =
+  LangAuthenticatedOwnerBusinessIdServicesRouteImport.update({
+    id: '/services',
+    path: '/services',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdReviewsRoute =
+  LangAuthenticatedOwnerBusinessIdReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdProfileRoute =
+  LangAuthenticatedOwnerBusinessIdProfileRouteImport.update({
+    id: '/profile',
+    path: '/profile',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdImagesRoute =
+  LangAuthenticatedOwnerBusinessIdImagesRouteImport.update({
+    id: '/images',
+    path: '/images',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdHoursRoute =
+  LangAuthenticatedOwnerBusinessIdHoursRouteImport.update({
+    id: '/hours',
+    path: '/hours',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdAttributesRoute =
+  LangAuthenticatedOwnerBusinessIdAttributesRouteImport.update({
+    id: '/attributes',
+    path: '/attributes',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
 const LangAuthenticatedAdminImportsIdRoute =
   LangAuthenticatedAdminImportsIdRouteImport.update({
     id: '/$id',
@@ -257,11 +313,19 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
+  '/$lang/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner/': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
+  '/$lang/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
+  '/$lang/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
+  '/$lang/owner/$businessId/images': typeof LangAuthenticatedOwnerBusinessIdImagesRoute
+  '/$lang/owner/$businessId/profile': typeof LangAuthenticatedOwnerBusinessIdProfileRoute
+  '/$lang/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
+  '/$lang/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
+  '/$lang/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
   '/$lang/owner/$businessId/': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRoutesByTo {
@@ -287,11 +351,19 @@ export interface FileRoutesByTo {
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
+  '/$lang/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
+  '/$lang/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
+  '/$lang/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
+  '/$lang/owner/$businessId/images': typeof LangAuthenticatedOwnerBusinessIdImagesRoute
+  '/$lang/owner/$businessId/profile': typeof LangAuthenticatedOwnerBusinessIdProfileRoute
+  '/$lang/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
+  '/$lang/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
+  '/$lang/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
   '/$lang/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRoutesById {
@@ -323,11 +395,19 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/_authenticated/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/_authenticated/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
+  '/$lang/_authenticated/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/_authenticated/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/_authenticated/owner/': typeof LangAuthenticatedOwnerIndexRoute
   '/$lang/_authenticated/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/_authenticated/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
+  '/$lang/_authenticated/owner/$businessId/attributes': typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
+  '/$lang/_authenticated/owner/$businessId/hours': typeof LangAuthenticatedOwnerBusinessIdHoursRoute
+  '/$lang/_authenticated/owner/$businessId/images': typeof LangAuthenticatedOwnerBusinessIdImagesRoute
+  '/$lang/_authenticated/owner/$businessId/profile': typeof LangAuthenticatedOwnerBusinessIdProfileRoute
+  '/$lang/_authenticated/owner/$businessId/reviews': typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
+  '/$lang/_authenticated/owner/$businessId/services': typeof LangAuthenticatedOwnerBusinessIdServicesRoute
+  '/$lang/_authenticated/owner/$businessId/translations': typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
   '/$lang/_authenticated/owner/$businessId/': typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 export interface FileRouteTypes {
@@ -359,11 +439,19 @@ export interface FileRouteTypes {
     | '/$lang/admin/users'
     | '/$lang/owner/$businessId'
     | '/$lang/owner/claim'
+    | '/$lang/owner/notifications'
     | '/api/public/hooks/image-tick'
     | '/$lang/admin/'
     | '/$lang/owner/'
     | '/$lang/admin/businesses/$id'
     | '/$lang/admin/imports/$id'
+    | '/$lang/owner/$businessId/attributes'
+    | '/$lang/owner/$businessId/hours'
+    | '/$lang/owner/$businessId/images'
+    | '/$lang/owner/$businessId/profile'
+    | '/$lang/owner/$businessId/reviews'
+    | '/$lang/owner/$businessId/services'
+    | '/$lang/owner/$businessId/translations'
     | '/$lang/owner/$businessId/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -389,11 +477,19 @@ export interface FileRouteTypes {
     | '/$lang/admin/settings'
     | '/$lang/admin/users'
     | '/$lang/owner/claim'
+    | '/$lang/owner/notifications'
     | '/api/public/hooks/image-tick'
     | '/$lang/admin'
     | '/$lang/owner'
     | '/$lang/admin/businesses/$id'
     | '/$lang/admin/imports/$id'
+    | '/$lang/owner/$businessId/attributes'
+    | '/$lang/owner/$businessId/hours'
+    | '/$lang/owner/$businessId/images'
+    | '/$lang/owner/$businessId/profile'
+    | '/$lang/owner/$businessId/reviews'
+    | '/$lang/owner/$businessId/services'
+    | '/$lang/owner/$businessId/translations'
     | '/$lang/owner/$businessId'
   id:
     | '__root__'
@@ -424,11 +520,19 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/users'
     | '/$lang/_authenticated/owner/$businessId'
     | '/$lang/_authenticated/owner/claim'
+    | '/$lang/_authenticated/owner/notifications'
     | '/api/public/hooks/image-tick'
     | '/$lang/_authenticated/admin/'
     | '/$lang/_authenticated/owner/'
     | '/$lang/_authenticated/admin/businesses/$id'
     | '/$lang/_authenticated/admin/imports/$id'
+    | '/$lang/_authenticated/owner/$businessId/attributes'
+    | '/$lang/_authenticated/owner/$businessId/hours'
+    | '/$lang/_authenticated/owner/$businessId/images'
+    | '/$lang/_authenticated/owner/$businessId/profile'
+    | '/$lang/_authenticated/owner/$businessId/reviews'
+    | '/$lang/_authenticated/owner/$businessId/services'
+    | '/$lang/_authenticated/owner/$businessId/translations'
     | '/$lang/_authenticated/owner/$businessId/'
   fileRoutesById: FileRoutesById
 }
@@ -545,6 +649,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHooksImageTickRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$lang/_authenticated/owner/notifications': {
+      id: '/$lang/_authenticated/owner/notifications'
+      path: '/notifications'
+      fullPath: '/$lang/owner/notifications'
+      preLoaderRoute: typeof LangAuthenticatedOwnerNotificationsRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerRoute
+    }
     '/$lang/_authenticated/owner/claim': {
       id: '/$lang/_authenticated/owner/claim'
       path: '/claim'
@@ -657,6 +768,55 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdIndexRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
+    '/$lang/_authenticated/owner/$businessId/translations': {
+      id: '/$lang/_authenticated/owner/$businessId/translations'
+      path: '/translations'
+      fullPath: '/$lang/owner/$businessId/translations'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdTranslationsRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/services': {
+      id: '/$lang/_authenticated/owner/$businessId/services'
+      path: '/services'
+      fullPath: '/$lang/owner/$businessId/services'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdServicesRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/reviews': {
+      id: '/$lang/_authenticated/owner/$businessId/reviews'
+      path: '/reviews'
+      fullPath: '/$lang/owner/$businessId/reviews'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdReviewsRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/profile': {
+      id: '/$lang/_authenticated/owner/$businessId/profile'
+      path: '/profile'
+      fullPath: '/$lang/owner/$businessId/profile'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdProfileRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/images': {
+      id: '/$lang/_authenticated/owner/$businessId/images'
+      path: '/images'
+      fullPath: '/$lang/owner/$businessId/images'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdImagesRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/hours': {
+      id: '/$lang/_authenticated/owner/$businessId/hours'
+      path: '/hours'
+      fullPath: '/$lang/owner/$businessId/hours'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdHoursRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/attributes': {
+      id: '/$lang/_authenticated/owner/$businessId/attributes'
+      path: '/attributes'
+      fullPath: '/$lang/owner/$businessId/attributes'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdAttributesRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
     '/$lang/_authenticated/admin/imports/$id': {
       id: '/$lang/_authenticated/admin/imports/$id'
       path: '/$id'
@@ -747,11 +907,32 @@ const LangAuthenticatedAdminRouteWithChildren =
   )
 
 interface LangAuthenticatedOwnerBusinessIdRouteChildren {
+  LangAuthenticatedOwnerBusinessIdAttributesRoute: typeof LangAuthenticatedOwnerBusinessIdAttributesRoute
+  LangAuthenticatedOwnerBusinessIdHoursRoute: typeof LangAuthenticatedOwnerBusinessIdHoursRoute
+  LangAuthenticatedOwnerBusinessIdImagesRoute: typeof LangAuthenticatedOwnerBusinessIdImagesRoute
+  LangAuthenticatedOwnerBusinessIdProfileRoute: typeof LangAuthenticatedOwnerBusinessIdProfileRoute
+  LangAuthenticatedOwnerBusinessIdReviewsRoute: typeof LangAuthenticatedOwnerBusinessIdReviewsRoute
+  LangAuthenticatedOwnerBusinessIdServicesRoute: typeof LangAuthenticatedOwnerBusinessIdServicesRoute
+  LangAuthenticatedOwnerBusinessIdTranslationsRoute: typeof LangAuthenticatedOwnerBusinessIdTranslationsRoute
   LangAuthenticatedOwnerBusinessIdIndexRoute: typeof LangAuthenticatedOwnerBusinessIdIndexRoute
 }
 
 const LangAuthenticatedOwnerBusinessIdRouteChildren: LangAuthenticatedOwnerBusinessIdRouteChildren =
   {
+    LangAuthenticatedOwnerBusinessIdAttributesRoute:
+      LangAuthenticatedOwnerBusinessIdAttributesRoute,
+    LangAuthenticatedOwnerBusinessIdHoursRoute:
+      LangAuthenticatedOwnerBusinessIdHoursRoute,
+    LangAuthenticatedOwnerBusinessIdImagesRoute:
+      LangAuthenticatedOwnerBusinessIdImagesRoute,
+    LangAuthenticatedOwnerBusinessIdProfileRoute:
+      LangAuthenticatedOwnerBusinessIdProfileRoute,
+    LangAuthenticatedOwnerBusinessIdReviewsRoute:
+      LangAuthenticatedOwnerBusinessIdReviewsRoute,
+    LangAuthenticatedOwnerBusinessIdServicesRoute:
+      LangAuthenticatedOwnerBusinessIdServicesRoute,
+    LangAuthenticatedOwnerBusinessIdTranslationsRoute:
+      LangAuthenticatedOwnerBusinessIdTranslationsRoute,
     LangAuthenticatedOwnerBusinessIdIndexRoute:
       LangAuthenticatedOwnerBusinessIdIndexRoute,
   }
@@ -764,6 +945,7 @@ const LangAuthenticatedOwnerBusinessIdRouteWithChildren =
 interface LangAuthenticatedOwnerRouteChildren {
   LangAuthenticatedOwnerBusinessIdRoute: typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   LangAuthenticatedOwnerClaimRoute: typeof LangAuthenticatedOwnerClaimRoute
+  LangAuthenticatedOwnerNotificationsRoute: typeof LangAuthenticatedOwnerNotificationsRoute
   LangAuthenticatedOwnerIndexRoute: typeof LangAuthenticatedOwnerIndexRoute
 }
 
@@ -772,6 +954,8 @@ const LangAuthenticatedOwnerRouteChildren: LangAuthenticatedOwnerRouteChildren =
     LangAuthenticatedOwnerBusinessIdRoute:
       LangAuthenticatedOwnerBusinessIdRouteWithChildren,
     LangAuthenticatedOwnerClaimRoute: LangAuthenticatedOwnerClaimRoute,
+    LangAuthenticatedOwnerNotificationsRoute:
+      LangAuthenticatedOwnerNotificationsRoute,
     LangAuthenticatedOwnerIndexRoute: LangAuthenticatedOwnerIndexRoute,
   }
 
