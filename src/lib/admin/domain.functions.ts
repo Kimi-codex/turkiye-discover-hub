@@ -399,7 +399,7 @@ export const deleteCategoryAdmin = createServerFn({ method: "POST" })
 
 // ─────────────────────────── CATEGORY MAPPINGS ─────────────────────
 
-export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
+export const listCategoryMappingsAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator(
     (i: { status?: "pending" | "approved" | "ignored"; batchId?: string } | undefined) => ({
