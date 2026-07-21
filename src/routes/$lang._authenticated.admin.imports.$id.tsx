@@ -711,10 +711,12 @@ function AnalysisTab({
 
 function MappingTab({
   lang,
+  batchId,
   mappings,
   items,
 }: {
   lang: string;
+  batchId: string;
   mappings: Array<{ source_category: string; category_id: string | null; mapping_status: string }>;
   items: Array<Record<string, unknown>>;
 }) {
@@ -731,25 +733,30 @@ function MappingTab({
     return Array.from(seen).sort();
   }, [items]);
   const byLabel = new Map(mappings.map((m) => [m.source_category, m]));
-  const pending = discovered.filter((l) => (byLabel.get(l)?.mapping_status ?? "pending") !== "approved");
+  const pending = discovered.filter((l) => {
+    const status = byLabel.get(l)?.mapping_status ?? "pending";
+    return status !== "approved" && status !== "ignored";
+  });
+  const returnTo = `/${lang}/admin/imports/${batchId}?tab=categories`;
   return (
     <div className="space-y-3">
       <div className="rounded-xl border bg-card p-4">
         <div className="mb-2 flex items-center justify-between">
           <div className="text-sm font-medium">Discovered categories ({discovered.length})</div>
           <Button asChild size="sm" variant="outline">
-            <Link to="/$lang/_authenticated/admin/category-mappings" params={{ lang }}>
+            <Link to="/$lang/admin/category-mappings" params={{ lang }} search={{ returnTo }}>
               Open mappings admin
             </Link>
           </Button>
         </div>
         <p className="mb-3 text-xs text-muted-foreground">
-          Confirm each label maps to a real category. Unmapped labels stay <em>pending</em>;
-          items requiring them may be skipped (respecting <code>import.require_category_mapping</code>).
+          Approve each label with a real category, or ignore labels you do not want to import.
+          The workflow cannot continue while any label remains <em>pending</em>.
         </p>
         {pending.length > 0 && (
           <div className="mb-3 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-800">
-            {pending.length} of {discovered.length} labels still unmapped.
+            {pending.length} of {discovered.length} labels still pending. Open Category mappings,
+            resolve them, then click Confirm category mappings again.
           </div>
         )}
         <div className="overflow-x-auto">
@@ -773,6 +780,8 @@ function MappingTab({
                         className={
                           st === "approved"
                             ? "rounded bg-emerald-100 px-1.5 py-0.5 text-emerald-700"
+                            : st === "ignored"
+                              ? "rounded bg-muted px-1.5 py-0.5 text-muted-foreground"
                             : "rounded bg-amber-100 px-1.5 py-0.5 text-amber-800"
                         }
                       >
