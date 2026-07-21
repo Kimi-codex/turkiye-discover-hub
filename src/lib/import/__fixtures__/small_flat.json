@@ -1,0 +1,61 @@
+[
+  {
+    "place_id": "FIXTURE_INSERT_001",
+    "name": "Deniz Restoranı Kadıköy",
+    "formatted_address": "Moda Cd. 1, Kadıköy, İstanbul, Türkiye",
+    "geometry": { "location": { "lat": 40.9836, "lng": 29.0286 } },
+    "types": ["restaurant", "seafood_restaurant"],
+    "primary_category": "restaurant",
+    "rating": 4.6,
+    "user_ratings_total": 812,
+    "price_level": 3,
+    "formatted_phone_number": "0216 555 12 34",
+    "international_phone_number": "+90 216 555 12 34",
+    "website": "denizrestoran.example.com",
+    "url": "https://google.com/maps/place/deniz-restoran",
+    "editorial_summary": { "overview": "Seaside seafood restaurant on the Kadıköy shore." },
+    "opening_hours": {
+      "periods": [
+        { "open": { "day": 1, "time": "1100" }, "close": { "day": 1, "time": "2300" } },
+        { "open": { "day": 2, "time": "1100" }, "close": { "day": 2, "time": "2300" } }
+      ]
+    },
+    "address_components": [
+      { "long_name": "İstanbul", "short_name": "İstanbul", "types": ["administrative_area_level_1"] },
+      { "long_name": "Kadıköy", "short_name": "Kadıköy", "types": ["administrative_area_level_2"] }
+    ],
+    "photos": [
+      { "url": "https://lh3.googleusercontent.com/fixture-exterior-1", "width": 1600, "height": 1200, "categories": ["exterior"] },
+      { "url": "https://lh3.googleusercontent.com/fixture-interior-1", "width": 1600, "height": 1200, "categories": ["interior"] },
+      { "url": "https://lh3.googleusercontent.com/fixture-food-1", "width": 1600, "height": 1200, "categories": ["food"] }
+    ],
+    "reviews": [
+      {
+        "author_name": "Ayşe Y.",
+        "rating": 5,
+        "text": "Harika manzara ve taze balık.",
+        "time": 1700000000,
+        "language": "tr"
+      }
+    ]
+  },
+  {
+    "place_id": "FIXTURE_MAPPING_002",
+    "name": "Şifa Kliniği Beşiktaş",
+    "formatted_address": "Barbaros Blv. 12, Beşiktaş, İstanbul, Türkiye",
+    "geometry": { "location": { "lat": 41.0421, "lng": 29.0075 } },
+    "types": ["medical_clinic", "dental_clinic"],
+    "primary_category": "medical_clinic",
+    "rating": 4.2,
+    "user_ratings_total": 138,
+    "formatted_phone_number": "0212 555 90 90",
+    "address_components": [
+      { "long_name": "İstanbul", "short_name": "İstanbul", "types": ["administrative_area_level_1"] },
+      { "long_name": "Beşiktaş", "short_name": "Beşiktaş", "types": ["administrative_area_level_2"] }
+    ]
+  },
+  {
+    "name": "Bu kayıt geçersiz - place_id yok",
+    "formatted_address": "Somewhere, Turkey"
+  }
+]

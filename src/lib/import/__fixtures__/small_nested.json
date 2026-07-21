@@ -1,0 +1,35 @@
+{
+  "places": [
+    {
+      "business": {
+        "placeId": "FIXTURE_NESTED_010",
+        "name": "Bosphorus Boutique Hotel",
+        "formattedAddress": "Sultanahmet, Fatih, İstanbul",
+        "primaryCategory": "hotel",
+        "rating": 4.8,
+        "userRatingsTotal": 302,
+        "priceLevel": 4,
+        "phoneNumber": "+90 212 555 40 40",
+        "openingHours": {
+          "periods": [{ "open": { "day": 0, "time": "0000" } }]
+        }
+      },
+      "images": [
+        { "url": "https://lh3.googleusercontent.com/fixture-hotel-cover", "categories": ["cover"], "width": 2000, "height": 1300 }
+      ],
+      "reviews": [
+        { "author_name": "John S.", "rating": 5, "text": "Beautiful view of the Bosphorus.", "time": 1710000000, "language": "en" }
+      ]
+    },
+    {
+      "business": {
+        "placeId": "FIXTURE_NESTED_011",
+        "name": "Kahve Dünyası Beyoğlu",
+        "formattedAddress": "İstiklal Cd., Beyoğlu, İstanbul",
+        "primaryCategory": "cafe",
+        "rating": 4.3,
+        "userRatingsTotal": 1200
+      }
+    }
+  ]
+}
