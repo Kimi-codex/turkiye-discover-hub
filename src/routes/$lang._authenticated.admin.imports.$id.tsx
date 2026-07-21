@@ -1115,3 +1115,323 @@ function formatVal(v: unknown): string {
     return "?";
   }
 }
+
+// ---------- Schema tab ----------
+import type { DetectedSchema, MappingRow as MR } from "@/lib/import/schema-detector";
+
+function SchemaTab({
+  schema,
+  onDetect,
+  detecting,
+}: {
+  schema: DetectedSchema | null;
+  onDetect: () => void;
+  detecting: boolean;
+}) {
+  if (!schema) {
+    return (
+      <div className="rounded-xl border bg-card p-6 text-center text-sm">
+        <div className="mb-2 font-medium">No schema detected yet</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Walk the uploaded JSON and build a complete field inventory.
+        </p>
+        <Button onClick={onDetect} disabled={detecting}>
+          {detecting ? "Detecting…" : "Detect schema"}
+        </Button>
+      </div>
+    );
+  }
+  const rows = schema.fields;
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card label="Items scanned">{schema.totalItems}</Card>
+        <Card label="Fields detected">{rows.length}</Card>
+        <Card label="Generated at">
+          <span className="text-xs">{new Date(schema.generatedAt).toLocaleString()}</span>
+        </Card>
+      </div>
+      <div className="rounded-xl border bg-card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left uppercase text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1">Path</th>
+              <th className="px-2 py-1">Type</th>
+              <th className="px-2 py-1">Occ.</th>
+              <th className="px-2 py-1">Null</th>
+              <th className="px-2 py-1">Missing</th>
+              <th className="px-2 py-1">Null+Miss %</th>
+              <th className="px-2 py-1">Confidence</th>
+              <th className="px-2 py-1">Samples</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((f) => (
+              <tr key={f.sourcePath} className="border-t align-top">
+                <td className="px-2 py-1 font-mono">{f.sourcePath}</td>
+                <td className="px-2 py-1">{f.detectedType}</td>
+                <td className="px-2 py-1">{f.occurrenceCount}/{f.parentCount}</td>
+                <td className="px-2 py-1">{f.nullCount}</td>
+                <td className="px-2 py-1">{f.missingCount}</td>
+                <td className="px-2 py-1">{f.nullMissingPct}%</td>
+                <td className="px-2 py-1">{f.confidence}</td>
+                <td className="px-2 py-1 max-w-[280px] truncate text-muted-foreground">
+                  {f.sampleValues.map((s) => formatVal(s)).join(" · ") || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Field mapping tab ----------
+
+const TARGET_TABLES = [
+  "",
+  "businesses",
+  "business_opening_hours",
+  "business_category_links",
+  "business_images",
+  "reviews",
+];
+
+function FieldMappingTab({
+  mapping,
+  schema,
+  isApproved,
+  activeApproval,
+  fieldMappingHash,
+  onEdit,
+  onRestore,
+  onApprove,
+  saving,
+  restoring,
+  approving,
+}: {
+  mapping: MR[];
+  schema: DetectedSchema | null;
+  isApproved: boolean;
+  activeApproval: Record<string, unknown> | undefined;
+  fieldMappingHash: string;
+  onEdit: (edits: Array<Partial<MR> & { sourcePath: string }>) => void;
+  onRestore: () => void;
+  onApprove: () => void;
+  saving: boolean;
+  restoring: boolean;
+  approving: boolean;
+}) {
+  const samplesByPath = new Map(
+    (schema?.fields ?? []).map((f) => [f.sourcePath, f.sampleValues]),
+  );
+  const [openSamples, setOpenSamples] = useState<string | null>(null);
+
+  if (mapping.length === 0) {
+    return (
+      <div className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
+        No field mapping — detect schema first.
+      </div>
+    );
+  }
+  const required = mapping.filter((r) => r.required);
+  const unresolvedRequired = required.filter(
+    (r) => r.status !== "mapped" || !r.targetTable || !r.targetColumn,
+  );
+  const canApprove = unresolvedRequired.length === 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Card label="Mapping rows">{mapping.length}</Card>
+        <Card label="Required">{required.length}</Card>
+        <Card label="Unresolved required" tone={unresolvedRequired.length ? "danger" : undefined}>
+          {unresolvedRequired.length}
+        </Card>
+        <Card label="Approval status" tone={isApproved ? "success" : "warning"}>
+          {isApproved ? "approved" : "pending"}
+        </Card>
+      </div>
+      <div className="rounded-xl border bg-card p-3 text-xs">
+        <div>
+          <span className="text-muted-foreground">field_mapping_hash:</span>{" "}
+          <span className="font-mono break-all">{fieldMappingHash.slice(0, 32)}…</span>
+        </div>
+        {activeApproval && (
+          <div className="mt-1">
+            <span className="text-muted-foreground">approved artifact_hash:</span>{" "}
+            <span className="font-mono break-all">
+              {String(activeApproval.artifact_hash).slice(0, 32)}…
+            </span>
+            {activeApproval.artifact_hash !== fieldMappingHash && (
+              <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">
+                stale
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onApprove} disabled={!canApprove || approving}>
+          {approving ? "Approving…" : isApproved ? "Re-approve mapping" : "Approve mapping"}
+        </Button>
+        <Button variant="outline" onClick={onRestore} disabled={restoring}>
+          {restoring ? "Restoring…" : "Restore suggested"}
+        </Button>
+      </div>
+      {!canApprove && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+          Required fields must be resolved before approval:{" "}
+          {unresolvedRequired.map((r) => r.sourcePath).join(", ")}
+        </div>
+      )}
+      <div className="rounded-xl border bg-card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left uppercase text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1">Source path</th>
+              <th className="px-2 py-1">Target table</th>
+              <th className="px-2 py-1">Target column</th>
+              <th className="px-2 py-1">Transform</th>
+              <th className="px-2 py-1">Status</th>
+              <th className="px-2 py-1">Required</th>
+              <th className="px-2 py-1">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mapping.map((r) => {
+              const samples = samplesByPath.get(r.sourcePath) ?? [];
+              return (
+                <>
+                  <tr key={r.sourcePath} className="border-t align-top">
+                    <td className="px-2 py-1 font-mono">{r.sourcePath}</td>
+                    <td className="px-2 py-1">
+                      <select
+                        className="rounded border bg-background px-1 py-0.5 text-xs disabled:opacity-50"
+                        value={r.targetTable ?? ""}
+                        disabled={saving}
+                        onChange={(e) =>
+                          onEdit([
+                            {
+                              sourcePath: r.sourcePath,
+                              targetTable: e.target.value || null,
+                              status: e.target.value ? "mapped" : "ignored",
+                            },
+                          ])
+                        }
+                      >
+                        {TARGET_TABLES.map((t) => (
+                          <option key={t} value={t}>{t || "(none)"}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        className="w-32 rounded border bg-background px-1 py-0.5 text-xs font-mono disabled:opacity-50"
+                        value={r.targetColumn ?? ""}
+                        disabled={saving}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim() || null;
+                          if (v === (r.targetColumn ?? null)) return;
+                          onEdit([{ sourcePath: r.sourcePath, targetColumn: v }]);
+                        }}
+                        defaultValue={r.targetColumn ?? ""}
+                        placeholder="column"
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        className="w-28 rounded border bg-background px-1 py-0.5 text-xs font-mono disabled:opacity-50"
+                        defaultValue={r.transform ?? ""}
+                        disabled={saving}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim() || null;
+                          if (v === (r.transform ?? null)) return;
+                          onEdit([{ sourcePath: r.sourcePath, transform: v }]);
+                        }}
+                        placeholder="identity"
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <MappingStatusChip status={r.status} />
+                      {r.reason && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">{r.reason}</div>
+                      )}
+                    </td>
+                    <td className="px-2 py-1">{r.required ? "yes" : "no"}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex gap-1">
+                        {!r.required && r.status !== "ignored" && (
+                          <button
+                            className="rounded border px-1.5 py-0.5 text-[11px] hover:bg-muted"
+                            disabled={saving}
+                            onClick={() =>
+                              onEdit([
+                                {
+                                  sourcePath: r.sourcePath,
+                                  status: "ignored",
+                                  targetTable: null,
+                                  targetColumn: null,
+                                },
+                              ])
+                            }
+                          >
+                            ignore
+                          </button>
+                        )}
+                        {r.required && (
+                          <span
+                            className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800"
+                            title="Required — cannot be ignored"
+                          >
+                            required
+                          </span>
+                        )}
+                        <button
+                          className="rounded border px-1.5 py-0.5 text-[11px] hover:bg-muted"
+                          onClick={() =>
+                            setOpenSamples(openSamples === r.sourcePath ? null : r.sourcePath)
+                          }
+                        >
+                          samples
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {openSamples === r.sourcePath && (
+                    <tr key={r.sourcePath + "-s"} className="border-t bg-muted/30">
+                      <td colSpan={7} className="px-2 py-2 text-[11px]">
+                        <div className="font-medium">Sample values ({samples.length})</div>
+                        <ul className="mt-1 list-disc pl-4">
+                          {samples.map((s, i) => (
+                            <li key={i} className="font-mono">
+                              {formatVal(s)}
+                            </li>
+                          ))}
+                          {samples.length === 0 && <li className="text-muted-foreground">—</li>}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MappingStatusChip({ status }: { status: MR["status"] }) {
+  const tones: Record<MR["status"], string> = {
+    mapped: "bg-emerald-100 text-emerald-700",
+    ignored: "bg-muted text-muted-foreground",
+    unsupported: "bg-amber-100 text-amber-800",
+    required_missing: "bg-destructive/10 text-destructive",
+    store: "bg-blue-100 text-blue-700",
+  };
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] ${tones[status]}`}>{status}</span>;
+}
+
