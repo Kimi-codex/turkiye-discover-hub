@@ -142,8 +142,8 @@ function ImportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Imports</h1>
           <p className="text-sm text-muted-foreground">
-            10-stage workflow: upload → analyze → mapping → validation → preview →
-            execute → translations → images → publish → completed.
+            10-stage workflow — each stage waits for you. Click{" "}
+            <span className="font-medium text-foreground">Next: …</span> on a card to advance one step.
           </p>
         </div>
         <div>
