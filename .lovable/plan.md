@@ -1,38 +1,28 @@
-## خطة الإصلاح الكامل
+## سبب المشكلة
 
-### 1. إصلاح أزرار Open / Schema / Field map
-المشكلة مؤكدة: ملف قائمة الاستيراد `admin.imports.tsx` صار route أب للصفحة التفصيلية `admin.imports.$id.tsx` لكنه لا يحتوي `<Outlet />`، لذلك الرابط يتغير فقط ولا تظهر صفحة التفاصيل.
+1. **صفحة View فارغة ("Business not found")** — زر View في `src/routes/$lang._authenticated.admin.businesses.tsx` يستخدم مسار غير موجود `/$lang/$businessSlug`. المسار الصحيح لصفحة العمل هو `/$lang/place/$slug` (ملف `src/routes/$lang.place.$slug.tsx`). لذلك يذهب الرابط إلى `/en/<slug>` ويسقط على route الفئات/المدن الذي يرمي `notFound()`.
 
-سأصلحها بتحويل القائمة إلى صفحة index حقيقية:
-- نقل `src/routes/$lang._authenticated.admin.imports.tsx` إلى `src/routes/$lang._authenticated.admin.imports.index.tsx`.
-- تعديل `createFileRoute` ليطابق route index.
-- التأكد أن `/admin/imports` يعرض القائمة، و`/admin/imports/$id?tab=schema|field_mapping` يعرض صفحة التفاصيل والتبويب المطلوب.
+2. **الصور لا تظهر** — قاعدة البيانات فيها 16 صف في `business_images` كلها `deleted_at IS NOT NULL` (تم حذفها جميعًا من لوحة Images سابقًا). لا توجد صور فعّالة، فيتحول `getBusinessImageUrl` إلى placeholder.
 
-### 2. إصلاح توقف workflow عند الصور عندما R2 غير مربوط
-حسب كلامك، خطوة الصور هي الوحيدة التي ممكن توقف لأن R2 غير مربوط، وباقي الخطوات لازم تعدّي طبيعي.
+3. **لا توجد تقييمات (reviews = 0)** — على الأرجح ملف الاستيراد كان بصيغة `single_places_wrapper` أو `flat` لا تحمل مصفوفة reviews، أو تم استيراد businesses قبل تعديل خطوة الـexecute. لن تُحلّ هذه بمجرد تصليح الرابط.
 
-سأعدّل منطق import detail بحيث:
-- إذا R2 غير مفعّل تظهر رسالة واضحة: “الصور متوقفة لأن R2 غير مربوط، يمكنك تخطيها الآن”.
-- زر الصور يصبح **Skip images / Continue to publish** بدل ما يوحي أن المعالجة ستشتغل.
-- الضغط عليه ينقل الدفعة إلى publish بدون انتظار image worker.
-- لا يتم تعطيل باقي workflow بسبب الصور.
+## الخطة
 
-### 3. إضافة حذف للصور القديمة من Images Admin
-سأضيف خيار حذف آمن في صفحة Images admin:
-- زر Delete لكل image record قديم/غير مرغوب.
-- الحذف يكون soft-delete بتحديث `deleted_at` بدل حذف فعلي مباشر، حتى لا ينكسر الربط أو السجلات.
-- إلغاء jobs النشطة المرتبطة بالصورة المحذوفة.
-- تحديث العدادات والقائمة مباشرة بعد الحذف.
+### 1) إصلاح رابط View في الأدمن
+- `src/routes/$lang._authenticated.admin.businesses.tsx`: تغيير `<Link to="/$lang/$businessSlug" params={{ lang, businessSlug: b.slug }}>` إلى `<Link to="/$lang/place/$slug" params={{ lang, slug: b.slug }}>`.
+- مسح أي استخدامات أخرى لـ `$businessSlug` في المشروع بـ ripgrep وتصحيحها.
 
-### 4. تحسين وضوح صفحة الصور
-سأجعل الصفحة تفرّق بوضوح بين:
-- Records = صور/روابط موجودة في `business_images`.
-- Jobs = مهام معالجة في `image_processing_jobs`.
-- حالة R2 = مفعّل أو غير مفعّل.
+### 2) استعادة الصور المحذوفة
+- تنفيذ migration بسيطة: `UPDATE business_images SET deleted_at = NULL WHERE deleted_at IS NOT NULL;` لإعادة تفعيل الـ16 سجلًا الحاليين. الصور ستُعرض عبر `source_url` (Google) لأن R2 غير مُعدّ — وهذا هو fallback المصمم في `getBusinessImageUrl`.
+- ملاحظة: بعض روابط Google Places قد تكون host-restricted وقد لا تظهر في المتصفح. إن حصل ذلك بعد الفحص، نضيف placeholder graceful عند فشل التحميل في `<BusinessImage>` (فحص لاحق فقط إذا لم تُعرض فعلًا).
 
-### 5. التحقق النهائي
-بعد التنفيذ سأتحقق من:
-- أزرار Open / Schema / Field map تفتح صفحة التفاصيل فعليًا.
-- `tab=schema` و`tab=field_mapping` يعرضان المحتوى وليس فقط يغيران الرابط.
-- workflow لا يتوقف عند الصور إذا R2 غير مربوط.
-- حذف الصور القديمة يعمل ويحدّث الصفحة.
+### 3) التحقق من محتوى صفحة التفاصيل
+- بعد فتح `/en/place/bogazici-bufe-burger-wedujy` نتأكد أن `BusinessGallery`, `OpeningHoursBlock`, header, وأزرار الاتصال تظهر بشكل سليم. التصميم موجود بالفعل في `$lang.place.$slug.tsx` — لا حاجة لإعادة تصميم؛ فقط نتحقق من الظهور بعد إصلاح الرابط والصور.
+
+### 4) (اختياري لهذا الدور) إعادة استيراد التقييمات
+لا يتم في هذا الدور لأنه يتطلب إعادة تشغيل خط الاستيراد؛ سأذكر ذلك كخطوة تالية إن أردت.
+
+## Technical notes
+- ملف مُعدَّل واحد فقط في الكود: `admin.businesses.tsx` (سطر واحد).
+- Migration واحدة قصيرة لاستعادة صفوف `business_images`.
+- التحقق: زيارة `/en/place/bogazici-bufe-burger-wedujy` بعد التغيير.
