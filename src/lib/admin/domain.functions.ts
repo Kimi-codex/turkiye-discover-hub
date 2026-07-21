@@ -10,11 +10,14 @@ import { createServerFn } from "@tanstack/react-start";
 import { requireAdmin } from "./require-admin.middleware";
 
 type AppRole = "admin" | "moderator" | "business_owner" | "user";
+// Admin handlers use dynamic queries across many tables; the generated
+// Supabase types over-constrain the shape. Alias to `any` for these handlers.
+// Safety comes from RLS + `requireAdmin` middleware, not from client typing.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type AdminSb = any;
 
 async function audit(
-  supabase: {
-    rpc: (name: string, args: unknown) => Promise<{ data: unknown; error: unknown }>;
-  },
+  supabase: AdminSb,
   action: string,
   entityType: string,
   entityId: string,
