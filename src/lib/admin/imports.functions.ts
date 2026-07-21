@@ -757,22 +757,38 @@ export const confirmImportMappings = createServerFn({ method: "POST" })
         if (n.primaryCategorySource) labels.add(n.primaryCategorySource);
       }
     });
-    // Report what's still pending; do NOT auto-approve.
+    // Require every touched source label to be explicitly resolved. The importer must
+    // never auto-approve category labels, and it must not advance while the admin still
+    // has unresolved labels in the global category mapping queue.
     let pending = 0;
     let approved = 0;
+    let ignored = 0;
     if (labels.size > 0) {
       const { data: rows } = await supabase
         .from("category_mappings")
         .select("source_category, mapping_status, category_id")
         .in("source_category", Array.from(labels))
         .eq("source_provider", "google");
-      (rows ?? []).forEach((r: { mapping_status: string; category_id: string | null }) => {
-        if (r.mapping_status === "approved" && r.category_id) approved++;
+      const byLabel = new Map<string, { source_category: string; mapping_status: string; category_id: string | null }>(
+        (rows ?? []).map((r: { source_category: string; mapping_status: string; category_id: string | null }) =>
+          [r.source_category, r] as [string, { source_category: string; mapping_status: string; category_id: string | null }],
+        ),
+      );
+      labels.forEach((label) => {
+        const r = byLabel.get(label);
+        if (r?.mapping_status === "approved" && r.category_id) approved++;
+        else if (r?.mapping_status === "ignored") ignored++;
         else pending++;
       });
     }
+    if (pending > 0) {
+      throw new Response(
+        `${pending} category label${pending === 1 ? " is" : "s are"} still pending. Resolve them in Category mappings before continuing.`,
+        { status: 409 },
+      );
+    }
     await advanceStage(supabase, data.id, "validation", { preview_hash: null, previewed_at: null, mapping_confirmed_at: new Date().toISOString() });
-    return { ok: true, approvedMappings: approved, pendingMappings: pending };
+    return { ok: true, approvedMappings: approved, ignoredMappings: ignored, pendingMappings: pending };
   });
 
 // ---------- Preview ----------

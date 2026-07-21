@@ -1,50 +1,85 @@
-## Problem
+## التشخيص بالعربي
 
-The 10-stage import pipeline is manual by design, but the UI hides that fact. On the **Imports list page** (`/admin/imports`) each batch card only shows the current stage/status pill and an **Open** button — there's no hint that the user must click through per-stage buttons inside the detail page. That's why `final.json` looks frozen at `detect_schema / uploaded`: the pipeline is waiting for you to click **Detect schema**, but nothing on the list surfaces that.
+المشكلة ليست في خطوة واحدة؛ عندنا التباس بين نوعين من الـMapping:
 
-Inside the detail page the `NextAction` panel already exists, but it's below the stepper and easy to miss, and its label ("Detect schema", "Approve field mapping → analysis", etc.) doesn't read as "this is the button that moves the pipeline forward".
+1. **Field Mapping**
+   - هذا داخل Batch الاستيراد نفسه.
+   - معناه: ربط حقول ملف JSON مثل `business.name` / `reviews[].rating` مع حقول النظام مثل `name`, `rating`, `phone`.
+   - مكانه الصحيح: صفحة الاستيراد نفسها، تبويب **Field mapping**.
 
-## Fix — make the manual next-step obvious (no auto-run)
+2. **Category Mapping**
+   - هذا شاشة عامة في الأدمن.
+   - معناه: ربط تصنيفات المصدر مثل `restoran`, `bistro`, `kafe` مع كاتالوج التصنيفات عندنا مثل `Restaurants`.
+   - مكانه الحالي: **Admin → Category Mappings**.
 
-### 1. Imports list card (`src/routes/$lang._authenticated.admin.imports.tsx`)
+سبب الوقوف عند مرحلة التحليل/التصنيفات: بعد الضغط على **Run analysis** النظام يكتشف تصنيفات المصدر وينقل الـBatch إلى مرحلة **Category mapping**. بعدها لازم توافق على التصنيفات، ثم ترجع إلى Batch الاستيراد وتضغط **Confirm category mappings** للانتقال إلى Validation/Preview. الواجهة الحالية لا تشرح هذا بوضوح، لذلك يظهر وكأنه واقف.
 
-For each batch, compute the next manual action from `stage` (same mapping as detail page):
+سبب 404 في زر **Field map**: في الكود أزرار `Open / Schema / Field map` تستخدم route داخلي فيه `_authenticated`. هذا Route ID داخلي وليس URL المستخدم النهائي. سأثبت الروابط على مسارات الأدمن العامة مثل:
 
-| Stage | Button label |
-|---|---|
-| `detect_schema` | Detect schema |
-| `field_mapping` | Approve field mapping |
-| `analyze` | Run analysis |
-| `mapping` | Confirm category mappings |
-| `validation` / `preview` | Compute preview |
-| `execute` | Run next chunk |
-| `translations` | Enqueue translations |
-| `images` | Mark images done |
-| `publish` | Publish |
-| `completed` | — (no button) |
+```text
+/:lang/admin/imports/:id?tab=field_mapping
+```
 
-Render it as a primary `Next: <label>` button on the card, next to **Open / Cancel / Delete**. Clicking it navigates to the batch detail page with the correct tab pre-selected (via `?tab=…`) and triggers that mutation — reusing the existing server functions (`detectImportSchema`, `approveImportFieldMapping`, `analyzeImportBatch`, `confirmImportMappings`, `computeImportPreview`, `runImportChunk`, `enqueueBatchTranslations`, `markImagesStageDone`, `publishImportBatch`). No new server logic.
+بدل الاعتماد على المسار الداخلي، حتى لا يفتح 404 في النسخة المنشورة.
 
-Also add a small "Waiting for you" chip next to the stage pill whenever `status ∈ {uploaded, ready, previewed, awaiting_approval}` or the stage is in the list above and not currently `analyzing/importing/publishing`, so it's visually clear the batch is idle-by-design.
+## خطة الإصلاح الجذري
 
-### 2. Batch detail page (`src/routes/$lang._authenticated.admin.imports.$id.tsx`)
+### 1. إصلاح روابط Import quick links
+- تعديل روابط **Open / Schema / Field map** في بطاقة الاستيراد لاستخدام مسارات URL العامة.
+- إصلاح روابط داخل صفحة Batch مثل روابط **Images admin** و **Translations admin** التي تستخدم حاليًا `.` وتبقى على نفس الصفحة.
+- التأكد أن زر **Field map** يفتح نفس الـBatch مباشرة على تبويب Field mapping بدون 404.
 
-- Move the existing `NextAction` panel **above** `StageProgress` so it's the first thing you see when opening a batch.
-- Restyle it as a full-width call-to-action card (larger button, "Next step" heading, one-line description of what will happen).
-- Keep the current stepper, tabs, and all existing per-tab buttons — no behavior change, only ordering + emphasis.
+### 2. توضيح Workflow في مرحلة Analyze وCategory Mapping
+- تغيير نص مرحلة `mapping` من مجرد **Categories** إلى **Category mapping**.
+- في بطاقة الاستيراد، إذا الـBatch وصل مرحلة Category mapping:
+  - لا يكون الزر مضللًا كأنه سيكمل كل شيء تلقائيًا.
+  - يظهر بوضوح: **Review category mappings**.
+  - يظهر شرح: “Approve or ignore source category labels, then return here to continue.”
+- في صفحة تفاصيل الاستيراد، تبويب Categories سيعرض:
+  - عدد التصنيفات المكتشفة.
+  - عدد الموافق عليها.
+  - عدد التي ما زالت pending.
+  - زر واضح: **Open Category Mappings**.
+  - زر واضح بعد الانتهاء: **Continue to validation**.
 
-### 3. Short hint on the Imports page header
+### 3. منع التقدم الخاطئ إذا التصنيفات ما زالت Pending
+- تعديل guard في `confirmImportMappings` حتى لا ينقل الـBatch إلى Validation إذا ما زالت هناك category mappings معلقة.
+- اعتبر الحالات كالتالي:
+  - `approved` = جاهزة.
+  - `ignored` = قرار إداري مقصود، ليست pending.
+  - `pending` أو missing = تمنع التقدم وتظهر رسالة واضحة.
+- لا يوجد تغيير Database أو Migration؛ فقط منطق server function الحالي.
 
-Change the subtitle from the current stage list to:
-> "10-stage workflow — each stage waits for you. Click **Next: …** on a card to advance one step."
+### 4. إضافة Bulk actions لصفحة Category Mappings
+- إضافة checkbox في رأس الجدول لاختيار كل الصفوف الظاهرة.
+- إضافة toolbar عند الاختيار يحتوي:
+  - عدد العناصر المختارة.
+  - Dropdown لاختيار Category واحدة للكل.
+  - زر **Apply category to selected**.
+  - زر **Approve selected**.
+  - زر **Ignore selected**.
+  - زر **Clear selection**.
+- استخدام نفس server function الحالية `setCategoryMappingAdmin`؛ لا نحتاج DB جديد.
 
-## Out of scope
+### 5. Return flow بعد Category Mapping
+- عندما تفتح Category Mappings من داخل Batch، أضيف `returnTo` في الرابط.
+- بعد تنفيذ bulk approve أو approve عادي، تظهر زر واضح: **Return to import batch**.
+- هذا يحل مشكلة: “وافقت على الكاتيجوري، أرجع وين وأسوي إيش؟”.
 
-- No auto-run of stages (per your choice).
-- No server-side changes, no migrations, no changes to `imports.functions.ts` or `preview.ts`.
-- No changes to translation/image workers.
+### 6. تحسين رسائل Next Action بدون إعادة تصميم
+- أزرار Next تبقى موجودة كما هي، لكن الوصف تحتها يشرح المطلوب فعليًا.
+- في مرحلة `analyze`: النص يوضح أن الخطوة التالية ستكون مراجعة Category mappings.
+- في مرحلة `mapping`: النص يوضح أن التقدم يعتمد على إنهاء Category mappings أولًا.
 
-## Verification
+## خارج النطاق
+- لا تغيير في قاعدة البيانات.
+- لا تغيير في R2 أو الصور.
+- لا إعادة تصميم كاملة.
+- لا تشغيل تلقائي للمراحل؛ سيبقى workflow يدوي كما طلبت.
 
-- Upload `small_flat.json` fixture; card shows `Next: Detect schema`. Click it → stage advances to `field_mapping`, card now shows `Next: Approve field mapping`. Continue through to `completed`, confirming each label matches the current stage.
-- Existing `final.json` batch (stuck at `detect_schema`) will immediately show `Next: Detect schema` on the list, resolving the reported confusion.
+## التحقق بعد التنفيذ
+- الضغط على **Field map** من بطاقة `final.json` يفتح صفحة Batch على تبويب Field mapping بدون 404.
+- اختيار كل Category mappings الظاهرة وتحديد `Restaurants` ثم **Approve selected** يعمل دفعة واحدة.
+- الرجوع إلى Batch يظهر أن التصنيفات صارت جاهزة.
+- الضغط على **Continue / Confirm category mappings** ينقل المرحلة إلى Validation فقط إذا لا توجد pending mappings.
+- إذا بقيت pending mappings، تظهر رسالة واضحة بدل أن يتقدم النظام بصمت.
