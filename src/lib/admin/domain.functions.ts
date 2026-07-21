@@ -436,6 +436,38 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
       });
       labels = Array.from(seen).sort();
       if (labels.length === 0) return { rows: [], batchScoped: true, labelCount: 0 };
+
+      const normalizedLabels = labels.map((label) => label.toLowerCase().trim()).filter(Boolean);
+      const { data: existingMappings, error: existingError } = await supabase
+        .from("category_mappings")
+        .select("normalized_source_category")
+        .eq("source_provider", "google")
+        .in("normalized_source_category", normalizedLabels);
+      if (existingError) throw new Response(existingError.message, { status: 500 });
+
+      const existingSet = new Set(
+        (existingMappings ?? []).map((row: { normalized_source_category: string }) => row.normalized_source_category),
+      );
+      const missingRows = labels
+        .map((label) => ({ label, normalized: label.toLowerCase().trim() }))
+        .filter(({ normalized }) => normalized && !existingSet.has(normalized))
+        .map(({ label, normalized }) => ({
+          source_provider: "google",
+          source_category: label,
+          normalized_source_category: normalized,
+          mapping_status: "pending",
+          usage_count: 1,
+        }));
+
+      if (missingRows.length > 0) {
+        const { error: insertError } = await supabase
+          .from("category_mappings")
+          .upsert(missingRows, {
+            onConflict: "source_provider,normalized_source_category",
+            ignoreDuplicates: true,
+          });
+        if (insertError) throw new Response(insertError.message, { status: 500 });
+      }
     }
 
     let query = supabase
@@ -443,7 +475,14 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
       .select("*")
       .eq("mapping_status", data.status)
       .order("usage_count", { ascending: false });
-    if (labels) query = query.eq("source_provider", "google").in("source_category", labels);
+    if (labels) {
+      query = query
+        .eq("source_provider", "google")
+        .in(
+          "normalized_source_category",
+          labels.map((label) => label.toLowerCase().trim()).filter(Boolean),
+        );
+    }
     const { data: rows, error } = await query.limit(500);
     if (error) throw new Response(error.message, { status: 500 });
     return { rows: rows ?? [], batchScoped: !!data.batchId, labelCount: labels?.length ?? null };
