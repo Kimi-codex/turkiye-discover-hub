@@ -433,14 +433,14 @@ class SupabaseBusinessRepository implements BusinessRepository {
   }
 
   async getSimilar(business: Business, limit = 4): Promise<Business[]> {
+    const orParts = [`primary_category_id.eq.${business.primaryCategory.id}`];
+    if (business.city?.id) orParts.push(`city_id.eq.${business.city.id}`);
     const { data, error } = await supabase
       .from("businesses")
       .select(BUSINESS_SELECT)
       .eq("status", "published")
       .neq("id", business.id)
-      .or(
-        `primary_category_id.eq.${business.primaryCategory.id},city_id.eq.${business.city.id}`,
-      )
+      .or(orParts.join(","))
       .order("rating", { ascending: false })
       .limit(limit);
     if (error) throw error;

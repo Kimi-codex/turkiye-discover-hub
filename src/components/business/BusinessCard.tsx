@@ -33,7 +33,7 @@ export function BusinessCard({
   const districtName = business.district
     ? pickLocalized(business.district.name, locale)
     : null;
-  const cityName = pickLocalized(business.city.name, locale);
+  const cityName = pickLocalized(business.city?.name, locale);
   const primaryCat = pickLocalized(business.primaryCategory.name, locale);
 
   const tags: string[] = [

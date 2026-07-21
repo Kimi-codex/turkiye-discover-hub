@@ -1,28 +1,29 @@
-## سبب المشكلة
+## سبب الخطأ الفعلي على صفحة `/en/place/bogazici-bufe-burger-wedujy`
 
-1. **صفحة View فارغة ("Business not found")** — زر View في `src/routes/$lang._authenticated.admin.businesses.tsx` يستخدم مسار غير موجود `/$lang/$businessSlug`. المسار الصحيح لصفحة العمل هو `/$lang/place/$slug` (ملف `src/routes/$lang.place.$slug.tsx`). لذلك يذهب الرابط إلى `/en/<slug>` ويسقط على route الفئات/المدن الذي يرمي `notFound()`.
+- استعلام قاعدة البيانات يعمل، لكن الأعمال المستوردة عندها `city_id = NULL` (40 من أصل 52 عمل منشور). الـ mapper يُرجع `city = {} as City`، فتصبح `business.city.id` قيمتها `undefined`.
+- ثم يستدعي loader الصفحة `services.businesses.getSimilar(b, 4)` والذي يبني مرشِّح Supabase:
+  ```
+  primary_category_id.eq.${id},city_id.eq.${business.city.id}
+  ```
+  فيصير `city_id.eq.undefined` → PostgREST يُرجع 400 → يُرمى → يلتقطه `errorComponent` → تظهر شاشة "Bir şeyler ters gitti".
+- بعد إصلاح الكراش تظهر باقي الحقول عبر fallbacks الموجودة في `pickLocalized`، والصور تُعرض من `source_url` (تم استعادتها في الجولة السابقة).
 
-2. **الصور لا تظهر** — قاعدة البيانات فيها 16 صف في `business_images` كلها `deleted_at IS NOT NULL` (تم حذفها جميعًا من لوحة Images سابقًا). لا توجد صور فعّالة، فيتحول `getBusinessImageUrl` إلى placeholder.
+## الخطة (تغييرات صغيرة، بدون إعادة تصميم)
 
-3. **لا توجد تقييمات (reviews = 0)** — على الأرجح ملف الاستيراد كان بصيغة `single_places_wrapper` أو `flat` لا تحمل مصفوفة reviews، أو تم استيراد businesses قبل تعديل خطوة الـexecute. لن تُحلّ هذه بمجرد تصليح الرابط.
+### 1) `src/lib/repos/supabase-repos.ts` — `getSimilar`
+بناء مرشِّح `.or(...)` ديناميكيًا: تضمين `primary_category_id` دائمًا، وتضمين `city_id` فقط عند وجود `business.city?.id`. لن يُرسَل `undefined` أبدًا إلى Supabase.
 
-## الخطة
+### 2) `src/routes/$lang.place.$slug.tsx` — عرض متسامح مع غياب city
+- `Breadcrumbs`: لا نضيف عنصر المدينة إذا كانت `b.city?.slug` غير موجودة.
+- JSON-LD: استخدام `pickLocalized(b.city?.name, "en") || ""` بدلًا من الوصول المباشر (`pickLocalized` أصلًا يعالج `undefined`، لكن `b.city?.name` يبقى أوضح).
+- العنوان: عرض `pickLocalized(b.city?.name, locale)` بدون كسر التصميم؛ عند غياب المدينة نُظهر جزء الفئة فقط.
 
-### 1) إصلاح رابط View في الأدمن
-- `src/routes/$lang._authenticated.admin.businesses.tsx`: تغيير `<Link to="/$lang/$businessSlug" params={{ lang, businessSlug: b.slug }}>` إلى `<Link to="/$lang/place/$slug" params={{ lang, slug: b.slug }}>`.
-- مسح أي استخدامات أخرى لـ `$businessSlug` في المشروع بـ ripgrep وتصحيحها.
+### 3) `src/components/business/BusinessCard.tsx`
+تعديل السطر `pickLocalized(business.city.name, locale)` إلى `pickLocalized(business.city?.name, locale)` حتى لا تنكسر بطاقات "Similar" أو أي قوائم تُعرض عمل بدون مدينة.
 
-### 2) استعادة الصور المحذوفة
-- تنفيذ migration بسيطة: `UPDATE business_images SET deleted_at = NULL WHERE deleted_at IS NOT NULL;` لإعادة تفعيل الـ16 سجلًا الحاليين. الصور ستُعرض عبر `source_url` (Google) لأن R2 غير مُعدّ — وهذا هو fallback المصمم في `getBusinessImageUrl`.
-- ملاحظة: بعض روابط Google Places قد تكون host-restricted وقد لا تظهر في المتصفح. إن حصل ذلك بعد الفحص، نضيف placeholder graceful عند فشل التحميل في `<BusinessImage>` (فحص لاحق فقط إذا لم تُعرض فعلًا).
-
-### 3) التحقق من محتوى صفحة التفاصيل
-- بعد فتح `/en/place/bogazici-bufe-burger-wedujy` نتأكد أن `BusinessGallery`, `OpeningHoursBlock`, header, وأزرار الاتصال تظهر بشكل سليم. التصميم موجود بالفعل في `$lang.place.$slug.tsx` — لا حاجة لإعادة تصميم؛ فقط نتحقق من الظهور بعد إصلاح الرابط والصور.
-
-### 4) (اختياري لهذا الدور) إعادة استيراد التقييمات
-لا يتم في هذا الدور لأنه يتطلب إعادة تشغيل خط الاستيراد؛ سأذكر ذلك كخطوة تالية إن أردت.
+### 4) التحقق
+فتح `/en/place/bogazici-bufe-burger-wedujy` في المتصفح والتأكد من ظهور: صور المعرض، العنوان، النجوم، ساعات العمل، والأزرار — بدون شاشة الخطأ.
 
 ## Technical notes
-- ملف مُعدَّل واحد فقط في الكود: `admin.businesses.tsx` (سطر واحد).
-- Migration واحدة قصيرة لاستعادة صفوف `business_images`.
-- التحقق: زيارة `/en/place/bogazici-bufe-burger-wedujy` بعد التغيير.
+- ثلاث ملفات فقط: `supabase-repos.ts`، `$lang.place.$slug.tsx`، `BusinessCard.tsx`.
+- لا تعديل على قاعدة البيانات. ملء `city_id` للأعمال المستوردة عمل منفصل مرتبط بخط الاستيراد وليس ضمن هذا الإصلاح.

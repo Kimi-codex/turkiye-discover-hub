@@ -59,7 +59,10 @@ export const Route = createFileRoute("/$lang/place/$slug")({
     }
     const b = loaderData.business;
     const desc = pickLocalized(b.description, locale) || b.address;
-    const title = `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)} · ${pickLocalized(b.city.name, locale)}`;
+    const cityName = pickLocalized(b.city?.name, locale);
+    const title = cityName
+      ? `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)} · ${cityName}`
+      : `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)}`;
     const cover = getBusinessImageUrl(
       b.images.find((i) => i.isCover) ?? b.images[0],
     );
@@ -71,7 +74,7 @@ export const Route = createFileRoute("/$lang/place/$slug")({
       address: {
         "@type": "PostalAddress",
         streetAddress: b.address,
-        addressLocality: pickLocalized(b.city.name, "en"),
+        addressLocality: pickLocalized(b.city?.name, "en"),
         addressCountry: "TR",
       },
       geo: {
@@ -152,10 +155,14 @@ function BusinessDetailsPage() {
             label: pickLocalized(b.primaryCategory.name, locale),
             to: `/${b.primaryCategory.slug}`,
           },
-          {
-            label: pickLocalized(b.city.name, locale),
-            to: `/${b.city.slug}`,
-          },
+          ...(b.city?.slug
+            ? [
+                {
+                  label: pickLocalized(b.city.name, locale),
+                  to: `/${b.city.slug}`,
+                },
+              ]
+            : []),
           { label: b.name },
         ]}
       />
