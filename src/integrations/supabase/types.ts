@@ -209,6 +209,8 @@ export type Database = {
           content_hash: string | null
           content_type: string | null
           created_at: string
+          deleted_at: string | null
+          error_code: string | null
           error_message: string | null
           file_size: number | null
           google_photo_category: string | null
@@ -224,7 +226,10 @@ export type Database = {
           r2_url: string | null
           retry_count: number
           sort_order: number
+          source_metadata: Json
           source_provider: string
+          source_title: string | null
+          source_type: string
           source_url: string | null
           storage_status: string
           updated_at: string
@@ -236,6 +241,8 @@ export type Database = {
           content_hash?: string | null
           content_type?: string | null
           created_at?: string
+          deleted_at?: string | null
+          error_code?: string | null
           error_message?: string | null
           file_size?: number | null
           google_photo_category?: string | null
@@ -251,7 +258,10 @@ export type Database = {
           r2_url?: string | null
           retry_count?: number
           sort_order?: number
+          source_metadata?: Json
           source_provider?: string
+          source_title?: string | null
+          source_type?: string
           source_url?: string | null
           storage_status?: string
           updated_at?: string
@@ -263,6 +273,8 @@ export type Database = {
           content_hash?: string | null
           content_type?: string | null
           created_at?: string
+          deleted_at?: string | null
+          error_code?: string | null
           error_message?: string | null
           file_size?: number | null
           google_photo_category?: string | null
@@ -278,7 +290,10 @@ export type Database = {
           r2_url?: string | null
           retry_count?: number
           sort_order?: number
+          source_metadata?: Json
           source_provider?: string
+          source_title?: string | null
+          source_type?: string
           source_url?: string | null
           storage_status?: string
           updated_at?: string
@@ -948,6 +963,75 @@ export type Database = {
           },
         ]
       }
+      image_processing_jobs: {
+        Row: {
+          attempt: number
+          business_image_id: string
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_error_code: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          metadata: Json
+          next_run_at: string
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          attempt?: number
+          business_image_id: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          metadata?: Json
+          next_run_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          attempt?: number
+          business_image_id?: string
+          claimed_at?: string | null
+          claimed_by?: string | null
+          created_at?: string
+          id?: string
+          last_error?: string | null
+          last_error_code?: string | null
+          lease_expires_at?: string | null
+          max_attempts?: number
+          metadata?: Json
+          next_run_at?: string
+          requested_by?: string | null
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "image_processing_jobs_business_image_id_fkey"
+            columns: ["business_image_id"]
+            isOneToOne: false
+            referencedRelation: "business_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "image_processing_jobs_business_image_id_fkey"
+            columns: ["business_image_id"]
+            isOneToOne: false
+            referencedRelation: "business_images_public"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batch_items: {
         Row: {
           action: string | null
@@ -1104,6 +1188,44 @@ export type Database = {
         }
         Relationships: []
       }
+      owner_notifications: {
+        Row: {
+          business_id: string | null
+          created_at: string
+          id: string
+          kind: string
+          payload: Json
+          read_at: string | null
+          user_id: string
+        }
+        Insert: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          kind: string
+          payload?: Json
+          read_at?: string | null
+          user_id: string
+        }
+        Update: {
+          business_id?: string | null
+          created_at?: string
+          id?: string
+          kind?: string
+          payload?: Json
+          read_at?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "owner_notifications_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       ownership_claims: {
         Row: {
           admin_notes: string | null
@@ -1255,7 +1377,71 @@ export type Database = {
             referencedColumns: ["id"]
           },
           {
+            foreignKeyName: "reports_image_id_fkey"
+            columns: ["image_id"]
+            isOneToOne: false
+            referencedRelation: "business_images_public"
+            referencedColumns: ["id"]
+          },
+          {
             foreignKeyName: "reports_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      review_replies: {
+        Row: {
+          author_id: string
+          body: string
+          business_id: string
+          created_at: string
+          id: string
+          moderated_at: string | null
+          moderated_by: string | null
+          moderation_notes: string | null
+          review_id: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          author_id: string
+          body: string
+          business_id: string
+          created_at?: string
+          id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          review_id: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          author_id?: string
+          body?: string
+          business_id?: string
+          created_at?: string
+          id?: string
+          moderated_at?: string | null
+          moderated_by?: string | null
+          moderation_notes?: string | null
+          review_id?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "review_replies_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "review_replies_review_id_fkey"
             columns: ["review_id"]
             isOneToOne: false
             referencedRelation: "reviews"
@@ -1428,11 +1614,95 @@ export type Database = {
       }
     }
     Views: {
-      [_ in never]: never
+      business_images_public: {
+        Row: {
+          business_id: string | null
+          google_photo_category: string | null
+          height: number | null
+          id: string | null
+          image_type: string | null
+          is_cover: boolean | null
+          r2_url: string | null
+          sort_order: number | null
+          source_title: string | null
+          source_type: string | null
+          source_url: string | null
+          storage_status: string | null
+          uploaded_at: string | null
+          width: number | null
+        }
+        Insert: {
+          business_id?: string | null
+          google_photo_category?: string | null
+          height?: number | null
+          id?: string | null
+          image_type?: string | null
+          is_cover?: boolean | null
+          r2_url?: string | null
+          sort_order?: number | null
+          source_title?: string | null
+          source_type?: string | null
+          source_url?: string | null
+          storage_status?: string | null
+          uploaded_at?: string | null
+          width?: number | null
+        }
+        Update: {
+          business_id?: string | null
+          google_photo_category?: string | null
+          height?: number | null
+          id?: string | null
+          image_type?: string | null
+          is_cover?: boolean | null
+          r2_url?: string | null
+          sort_order?: number | null
+          source_title?: string | null
+          source_type?: string | null
+          source_url?: string | null
+          storage_status?: string | null
+          uploaded_at?: string | null
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_images_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Functions: {
       approve_ownership_claim: { Args: { _claim_id: string }; Returns: Json }
       bootstrap_admin: { Args: { _target_user: string }; Returns: Json }
+      claim_next_image_jobs: {
+        Args: { _lease_seconds?: number; _limit?: number; _worker: string }
+        Returns: {
+          attempt: number
+          business_image_id: string
+          claimed_at: string | null
+          claimed_by: string | null
+          created_at: string
+          id: string
+          last_error: string | null
+          last_error_code: string | null
+          lease_expires_at: string | null
+          max_attempts: number
+          metadata: Json
+          next_run_at: string
+          requested_by: string | null
+          status: string
+          updated_at: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "image_processing_jobs"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -1440,6 +1710,8 @@ export type Database = {
         }
         Returns: boolean
       }
+      is_suspended: { Args: { _user: string }; Returns: boolean }
+      reap_stale_image_jobs: { Args: never; Returns: number }
       record_audit: {
         Args: {
           _action: string

@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch, Image as ImageIcon } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
@@ -13,6 +13,7 @@ const nav = [
   { to: "/reports", label: "Reports", icon: Flag },
   { to: "/ownership-claims", label: "Ownership Claims", icon: FileCheck },
   { to: "/imports", label: "Imports", icon: Upload },
+  { to: "/images", label: "Images", icon: ImageIcon },
   { to: "/users", label: "Users", icon: Users },
   { to: "/audit-logs", label: "Audit Logs", icon: ScrollText },
   { to: "/settings", label: "Settings", icon: Settings },

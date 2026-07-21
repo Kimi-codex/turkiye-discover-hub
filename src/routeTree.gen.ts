@@ -21,12 +21,14 @@ import { Route as LangAuthenticatedAdminRouteImport } from './routes/$lang._auth
 import { Route as LangAuthenticatedAccountRouteImport } from './routes/$lang._authenticated.account'
 import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
 import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
+import { Route as ApiPublicHooksImageTickRouteImport } from './routes/api/public/hooks/image-tick'
 import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
 import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
 import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
 import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
 import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
 import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
+import { Route as LangAuthenticatedAdminImagesRouteImport } from './routes/$lang._authenticated.admin.images'
 import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
 import { Route as LangAuthenticatedAdminCategoryMappingsRouteImport } from './routes/$lang._authenticated.admin.category-mappings'
 import { Route as LangAuthenticatedAdminCategoriesRouteImport } from './routes/$lang._authenticated.admin.categories'
@@ -98,6 +100,11 @@ const LangAuthenticatedAdminIndexRoute =
     path: '/',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
+const ApiPublicHooksImageTickRoute = ApiPublicHooksImageTickRouteImport.update({
+  id: '/api/public/hooks/image-tick',
+  path: '/api/public/hooks/image-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const LangAuthenticatedAdminUsersRoute =
   LangAuthenticatedAdminUsersRouteImport.update({
     id: '/users',
@@ -132,6 +139,12 @@ const LangAuthenticatedAdminImportsRoute =
   LangAuthenticatedAdminImportsRouteImport.update({
     id: '/imports',
     path: '/imports',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminImagesRoute =
+  LangAuthenticatedAdminImagesRouteImport.update({
+    id: '/images',
+    path: '/images',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
 const LangAuthenticatedAdminCitiesRoute =
@@ -200,12 +213,14 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
+  '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
@@ -225,12 +240,14 @@ export interface FileRoutesByTo {
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
+  '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
@@ -254,12 +271,14 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
   '/$lang/_authenticated/admin/category-mappings': typeof LangAuthenticatedAdminCategoryMappingsRoute
   '/$lang/_authenticated/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
+  '/$lang/_authenticated/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/_authenticated/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
   '/$lang/_authenticated/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/_authenticated/admin/reports': typeof LangAuthenticatedAdminReportsRoute
   '/$lang/_authenticated/admin/reviews': typeof LangAuthenticatedAdminReviewsRoute
   '/$lang/_authenticated/admin/settings': typeof LangAuthenticatedAdminSettingsRoute
   '/$lang/_authenticated/admin/users': typeof LangAuthenticatedAdminUsersRoute
+  '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/_authenticated/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/_authenticated/admin/businesses/$id': typeof LangAuthenticatedAdminBusinessesIdRoute
   '/$lang/_authenticated/admin/imports/$id': typeof LangAuthenticatedAdminImportsIdRoute
@@ -283,12 +302,14 @@ export interface FileRouteTypes {
     | '/$lang/admin/categories'
     | '/$lang/admin/category-mappings'
     | '/$lang/admin/cities'
+    | '/$lang/admin/images'
     | '/$lang/admin/imports'
     | '/$lang/admin/ownership-claims'
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
     | '/$lang/admin/users'
+    | '/api/public/hooks/image-tick'
     | '/$lang/admin/'
     | '/$lang/admin/businesses/$id'
     | '/$lang/admin/imports/$id'
@@ -308,12 +329,14 @@ export interface FileRouteTypes {
     | '/$lang/admin/categories'
     | '/$lang/admin/category-mappings'
     | '/$lang/admin/cities'
+    | '/$lang/admin/images'
     | '/$lang/admin/imports'
     | '/$lang/admin/ownership-claims'
     | '/$lang/admin/reports'
     | '/$lang/admin/reviews'
     | '/$lang/admin/settings'
     | '/$lang/admin/users'
+    | '/api/public/hooks/image-tick'
     | '/$lang/admin'
     | '/$lang/admin/businesses/$id'
     | '/$lang/admin/imports/$id'
@@ -336,12 +359,14 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/categories'
     | '/$lang/_authenticated/admin/category-mappings'
     | '/$lang/_authenticated/admin/cities'
+    | '/$lang/_authenticated/admin/images'
     | '/$lang/_authenticated/admin/imports'
     | '/$lang/_authenticated/admin/ownership-claims'
     | '/$lang/_authenticated/admin/reports'
     | '/$lang/_authenticated/admin/reviews'
     | '/$lang/_authenticated/admin/settings'
     | '/$lang/_authenticated/admin/users'
+    | '/api/public/hooks/image-tick'
     | '/$lang/_authenticated/admin/'
     | '/$lang/_authenticated/admin/businesses/$id'
     | '/$lang/_authenticated/admin/imports/$id'
@@ -350,6 +375,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   LangRoute: typeof LangRouteWithChildren
+  ApiPublicHooksImageTickRoute: typeof ApiPublicHooksImageTickRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -438,6 +464,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminIndexRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
+    '/api/public/hooks/image-tick': {
+      id: '/api/public/hooks/image-tick'
+      path: '/api/public/hooks/image-tick'
+      fullPath: '/api/public/hooks/image-tick'
+      preLoaderRoute: typeof ApiPublicHooksImageTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/$lang/_authenticated/admin/users': {
       id: '/$lang/_authenticated/admin/users'
       path: '/users'
@@ -478,6 +511,13 @@ declare module '@tanstack/react-router' {
       path: '/imports'
       fullPath: '/$lang/admin/imports'
       preLoaderRoute: typeof LangAuthenticatedAdminImportsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/images': {
+      id: '/$lang/_authenticated/admin/images'
+      path: '/images'
+      fullPath: '/$lang/admin/images'
+      preLoaderRoute: typeof LangAuthenticatedAdminImagesRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
     '/$lang/_authenticated/admin/cities': {
@@ -574,6 +614,7 @@ interface LangAuthenticatedAdminRouteChildren {
   LangAuthenticatedAdminCategoriesRoute: typeof LangAuthenticatedAdminCategoriesRoute
   LangAuthenticatedAdminCategoryMappingsRoute: typeof LangAuthenticatedAdminCategoryMappingsRoute
   LangAuthenticatedAdminCitiesRoute: typeof LangAuthenticatedAdminCitiesRoute
+  LangAuthenticatedAdminImagesRoute: typeof LangAuthenticatedAdminImagesRoute
   LangAuthenticatedAdminImportsRoute: typeof LangAuthenticatedAdminImportsRouteWithChildren
   LangAuthenticatedAdminOwnershipClaimsRoute: typeof LangAuthenticatedAdminOwnershipClaimsRoute
   LangAuthenticatedAdminReportsRoute: typeof LangAuthenticatedAdminReportsRoute
@@ -593,6 +634,7 @@ const LangAuthenticatedAdminRouteChildren: LangAuthenticatedAdminRouteChildren =
     LangAuthenticatedAdminCategoryMappingsRoute:
       LangAuthenticatedAdminCategoryMappingsRoute,
     LangAuthenticatedAdminCitiesRoute: LangAuthenticatedAdminCitiesRoute,
+    LangAuthenticatedAdminImagesRoute: LangAuthenticatedAdminImagesRoute,
     LangAuthenticatedAdminImportsRoute:
       LangAuthenticatedAdminImportsRouteWithChildren,
     LangAuthenticatedAdminOwnershipClaimsRoute:
@@ -650,17 +692,8 @@ const LangRouteWithChildren = LangRoute._addFileChildren(LangRouteChildren)
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   LangRoute: LangRouteWithChildren,
+  ApiPublicHooksImageTickRoute: ApiPublicHooksImageTickRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
