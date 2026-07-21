@@ -1685,6 +1685,14 @@ export type Database = {
     }
     Functions: {
       _bcr_field_allowlist: { Args: { _type: string }; Returns: string[] }
+      _try_bootstrap_first_admin: {
+        Args: {
+          _email_confirmed_at: string
+          _provider: string
+          _user_id: string
+        }
+        Returns: boolean
+      }
       apply_business_change_request: {
         Args: {
           _admin_notes: string
