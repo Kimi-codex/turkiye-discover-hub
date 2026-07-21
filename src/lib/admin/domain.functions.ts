@@ -65,7 +65,7 @@ export const listBusinessesAdmin = createServerFn({ method: "GET" })
     }),
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     let q = supabase
       .from("businesses")
       .select(
@@ -98,7 +98,7 @@ export const getBusinessAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .inputValidator((i: { id: string }) => ({ id: String(i?.id ?? "") }))
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const [
       { data: biz, error },
       { data: images },
@@ -174,7 +174,7 @@ export const updateBusinessAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const { data: before } = await supabase
       .from("businesses")
       .select("*")
@@ -214,7 +214,7 @@ export const setBusinessStatusAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const { data: before } = await supabase
       .from("businesses")
       .select("id, status")
@@ -249,7 +249,7 @@ export const setBusinessFlagAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const { error } = await supabase
       .from("businesses")
       .update({ [data.flag]: data.value })
@@ -268,7 +268,7 @@ export const deleteBusinessAdmin = createServerFn({ method: "POST" })
     return i;
   })
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const { data: before } = await supabase
       .from("businesses")
       .select("id, slug")
@@ -288,7 +288,7 @@ export const deleteBusinessAdmin = createServerFn({ method: "POST" })
 export const listCategoriesAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as AdminSb)
       .from("categories")
       .select("*, category_translations(*)")
       .order("sort_order");
@@ -317,7 +317,7 @@ export const upsertCategoryAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     // Cycle prevention: parent must not be self or descendant
     if (data.id && data.parent_id) {
       if (data.parent_id === data.id) throw new Response("Cannot be own parent", { status: 400 });
@@ -391,9 +391,9 @@ export const deleteCategoryAdmin = createServerFn({ method: "POST" })
     return i;
   })
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase.from("categories").delete().eq("id", data.id);
+    const { error } = await (context.supabase as AdminSb).from("categories").delete().eq("id", data.id);
     if (error) throw new Response(error.message, { status: 400 });
-    await audit(context.supabase, "category.delete", "category", data.id, null, null, {});
+    await audit((context.supabase as AdminSb), "category.delete", "category", data.id, null, null, {});
     return { ok: true };
   });
 
@@ -407,7 +407,7 @@ export const listCategoryMappingsAdmin = createServerFn({ method: "GET" })
     }),
   )
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await context.supabase
+    const { data: rows, error } = await (context.supabase as AdminSb)
       .from("category_mappings")
       .select("*")
       .eq("mapping_status", data.status)
@@ -438,13 +438,13 @@ export const setCategoryMappingAdmin = createServerFn({ method: "POST" })
       if (!data.categoryId) throw new Response("categoryId required to approve", { status: 400 });
       patch.category_id = data.categoryId;
     }
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as AdminSb)
       .from("category_mappings")
       .update(patch)
       .in("id", data.ids);
     if (error) throw new Response(error.message, { status: 400 });
     for (const id of data.ids) {
-      await audit(context.supabase, "category_mapping.set", "category_mapping", id, null, patch, {});
+      await audit((context.supabase as AdminSb), "category_mapping.set", "category_mapping", id, null, patch, {});
     }
     return { ok: true };
   });
@@ -454,7 +454,7 @@ export const setCategoryMappingAdmin = createServerFn({ method: "POST" })
 export const listCitiesAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as AdminSb)
       .from("cities")
       .select("*, city_translations(*)")
       .order("sort_order");
@@ -482,7 +482,7 @@ export const upsertCityAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     // Prevent duplicate slug (excluding self)
     const dupQ = supabase.from("cities").select("id").eq("slug", data.slug).limit(1);
     const { data: dup } = await dupQ;
@@ -547,7 +547,7 @@ export const listDistrictsAdmin = createServerFn({ method: "GET" })
     return i;
   })
   .handler(async ({ data, context }) => {
-    const { data: rows, error } = await context.supabase
+    const { data: rows, error } = await (context.supabase as AdminSb)
       .from("districts")
       .select("*, district_translations(*)")
       .eq("city_id", data.cityId)
@@ -573,7 +573,7 @@ export const upsertDistrictAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { supabase } = context;
+    const supabase = (context.supabase as AdminSb) as AdminSb;
     const { data: dup } = await supabase
       .from("districts")
       .select("id")
@@ -642,7 +642,7 @@ export const listReviewsAdmin = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const perPage = 50;
-    let q = context.supabase
+    let q = (context.supabase as AdminSb)
       .from("reviews")
       .select("*, businesses(name, slug)", { count: "exact" })
       .order("created_at", { ascending: false })
@@ -671,19 +671,19 @@ export const setReviewStatusAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: before } = await context.supabase
+    const { data: before } = await (context.supabase as AdminSb)
       .from("reviews")
       .select("id, status")
       .eq("id", data.id)
       .maybeSingle();
     if (!before) throw new Response("Not found", { status: 404 });
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as AdminSb)
       .from("reviews")
       .update({ status: data.status, admin_notes: data.adminNotes ?? null })
       .eq("id", data.id);
     if (error) throw new Response(error.message, { status: 400 });
     await audit(
-      context.supabase,
+      (context.supabase as AdminSb),
       "review.status_change",
       "review",
       data.id,
@@ -700,7 +700,7 @@ export const listReportsAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .inputValidator((i: { status?: string } | undefined) => ({ status: i?.status ?? null }))
   .handler(async ({ data, context }) => {
-    let q = context.supabase.from("reports").select("*").order("created_at", { ascending: false }).limit(200);
+    let q = (context.supabase as AdminSb).from("reports").select("*").order("created_at", { ascending: false }).limit(200);
     if (data.status) q = q.eq("status", data.status);
     const { data: rows, error } = await q;
     if (error) throw new Response(error.message, { status: 500 });
@@ -718,7 +718,7 @@ export const setReportStatusAdmin = createServerFn({ method: "POST" })
     },
   )
   .handler(async ({ data, context }) => {
-    const { data: before } = await context.supabase
+    const { data: before } = await (context.supabase as AdminSb)
       .from("reports")
       .select("id, status, internal_notes")
       .eq("id", data.id)
@@ -726,10 +726,10 @@ export const setReportStatusAdmin = createServerFn({ method: "POST" })
     if (!before) throw new Response("Not found", { status: 404 });
     const patch: Record<string, unknown> = { status: data.status };
     if (typeof data.internalNotes === "string") patch.internal_notes = data.internalNotes;
-    const { error } = await context.supabase.from("reports").update(patch).eq("id", data.id);
+    const { error } = await (context.supabase as AdminSb).from("reports").update(patch).eq("id", data.id);
     if (error) throw new Response(error.message, { status: 400 });
     await audit(
-      context.supabase,
+      (context.supabase as AdminSb),
       "report.status_change",
       "report",
       data.id,
@@ -746,7 +746,7 @@ export const listOwnershipClaimsAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .inputValidator((i: { status?: string } | undefined) => ({ status: i?.status ?? "pending" }))
   .handler(async ({ data, context }) => {
-    let q = context.supabase
+    let q = (context.supabase as AdminSb)
       .from("ownership_claims")
       .select("*, businesses(name, slug)")
       .order("created_at", { ascending: false })
@@ -765,7 +765,7 @@ export const approveOwnershipClaimAdmin = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     // Atomic RPC handles ownership assignment, role grant, audit.
-    const { data: res, error } = await context.supabase.rpc("approve_ownership_claim", {
+    const { data: res, error } = await (context.supabase as AdminSb).rpc("approve_ownership_claim", {
       _claim_id: data.id,
     });
     if (error) throw new Response(error.message, { status: 400 });
@@ -779,7 +779,7 @@ export const rejectOwnershipClaimAdmin = createServerFn({ method: "POST" })
     return i;
   })
   .handler(async ({ data, context }) => {
-    const { data: before } = await context.supabase
+    const { data: before } = await (context.supabase as AdminSb)
       .from("ownership_claims")
       .select("*")
       .eq("id", data.id)
@@ -787,7 +787,7 @@ export const rejectOwnershipClaimAdmin = createServerFn({ method: "POST" })
     if (!before) throw new Response("Not found", { status: 404 });
     if (before.status !== "pending")
       throw new Response("Claim is not pending", { status: 400 });
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as AdminSb)
       .from("ownership_claims")
       .update({
         status: "rejected",
@@ -796,7 +796,7 @@ export const rejectOwnershipClaimAdmin = createServerFn({ method: "POST" })
       })
       .eq("id", data.id);
     if (error) throw new Response(error.message, { status: 400 });
-    await audit(context.supabase, "ownership_claim.reject", "ownership_claim", data.id, before, {
+    await audit((context.supabase as AdminSb), "ownership_claim.reject", "ownership_claim", data.id, before, {
       status: "rejected",
       reason: data.reason ?? null,
     }, {});
@@ -826,7 +826,7 @@ export const listAuditLogsAdmin = createServerFn({ method: "GET" })
   )
   .handler(async ({ data, context }) => {
     const perPage = 100;
-    let q = context.supabase
+    let q = (context.supabase as AdminSb)
       .from("audit_logs")
       .select("*", { count: "exact" })
       .order("created_at", { ascending: false })
@@ -855,7 +855,7 @@ const SETTING_KEYS = [
 export const getSettingsAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
   .handler(async ({ context }) => {
-    const { data, error } = await context.supabase
+    const { data, error } = await (context.supabase as AdminSb)
       .from("site_settings")
       .select("key, value, description, updated_at")
       .in("key", SETTING_KEYS as unknown as string[]);
@@ -871,11 +871,11 @@ export const updateSettingAdmin = createServerFn({ method: "POST" })
     return i;
   })
   .handler(async ({ data, context }) => {
-    const { error } = await context.supabase
+    const { error } = await (context.supabase as AdminSb)
       .from("site_settings")
       .upsert({ key: data.key, value: data.value as never, updated_at: new Date().toISOString() });
     if (error) throw new Response(error.message, { status: 400 });
-    await audit(context.supabase, "settings.update", "site_setting", data.key, null, data.value, {});
+    await audit((context.supabase as AdminSb), "settings.update", "site_setting", data.key, null, data.value, {});
     return { ok: true };
   });
 
