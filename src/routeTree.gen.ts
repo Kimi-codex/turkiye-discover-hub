@@ -9,38 +9,134 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as LangRouteImport } from './routes/$lang'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as LangIndexRouteImport } from './routes/$lang.index'
+import { Route as LangSearchRouteImport } from './routes/$lang.search'
+import { Route as LangSlugRouteImport } from './routes/$lang.$slug'
+import { Route as LangPlaceSlugRouteImport } from './routes/$lang.place.$slug'
+import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
+import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 
+const LangRoute = LangRouteImport.update({
+  id: '/$lang',
+  path: '/$lang',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const LangIndexRoute = LangIndexRouteImport.update({
+  id: '/',
+  path: '/',
+  getParentRoute: () => LangRoute,
+} as any)
+const LangSearchRoute = LangSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
+  getParentRoute: () => LangRoute,
+} as any)
+const LangSlugRoute = LangSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => LangRoute,
+} as any)
+const LangPlaceSlugRoute = LangPlaceSlugRouteImport.update({
+  id: '/place/$slug',
+  path: '/place/$slug',
+  getParentRoute: () => LangRoute,
+} as any)
+const LangCitySlugCategorySlugRoute =
+  LangCitySlugCategorySlugRouteImport.update({
+    id: '/$citySlug/$categorySlug',
+    path: '/$citySlug/$categorySlug',
+    getParentRoute: () => LangRoute,
+  } as any)
+const LangCitySlugDistrictSlugCategorySlugRoute =
+  LangCitySlugDistrictSlugCategorySlugRouteImport.update({
+    id: '/$citySlug/$districtSlug/$categorySlug',
+    path: '/$citySlug/$districtSlug/$categorySlug',
+    getParentRoute: () => LangRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/$lang': typeof LangRouteWithChildren
+  '/$lang/$slug': typeof LangSlugRoute
+  '/$lang/search': typeof LangSearchRoute
+  '/$lang/': typeof LangIndexRoute
+  '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/place/$slug': typeof LangPlaceSlugRoute
+  '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/$lang/$slug': typeof LangSlugRoute
+  '/$lang/search': typeof LangSearchRoute
+  '/$lang': typeof LangIndexRoute
+  '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/place/$slug': typeof LangPlaceSlugRoute
+  '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/$lang': typeof LangRouteWithChildren
+  '/$lang/$slug': typeof LangSlugRoute
+  '/$lang/search': typeof LangSearchRoute
+  '/$lang/': typeof LangIndexRoute
+  '/$lang/$citySlug/$categorySlug': typeof LangCitySlugCategorySlugRoute
+  '/$lang/place/$slug': typeof LangPlaceSlugRoute
+  '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/'
+  fullPaths:
+    | '/'
+    | '/$lang'
+    | '/$lang/$slug'
+    | '/$lang/search'
+    | '/$lang/'
+    | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/place/$slug'
+    | '/$lang/$citySlug/$districtSlug/$categorySlug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/'
-  id: '__root__' | '/'
+  to:
+    | '/'
+    | '/$lang/$slug'
+    | '/$lang/search'
+    | '/$lang'
+    | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/place/$slug'
+    | '/$lang/$citySlug/$districtSlug/$categorySlug'
+  id:
+    | '__root__'
+    | '/'
+    | '/$lang'
+    | '/$lang/$slug'
+    | '/$lang/search'
+    | '/$lang/'
+    | '/$lang/$citySlug/$categorySlug'
+    | '/$lang/place/$slug'
+    | '/$lang/$citySlug/$districtSlug/$categorySlug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  LangRoute: typeof LangRouteWithChildren
 }
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/$lang': {
+      id: '/$lang'
+      path: '/$lang'
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/': {
       id: '/'
       path: '/'
@@ -48,22 +144,76 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/$lang/': {
+      id: '/$lang/'
+      path: '/'
+      fullPath: '/$lang/'
+      preLoaderRoute: typeof LangIndexRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/search': {
+      id: '/$lang/search'
+      path: '/search'
+      fullPath: '/$lang/search'
+      preLoaderRoute: typeof LangSearchRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/$slug': {
+      id: '/$lang/$slug'
+      path: '/$slug'
+      fullPath: '/$lang/$slug'
+      preLoaderRoute: typeof LangSlugRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/place/$slug': {
+      id: '/$lang/place/$slug'
+      path: '/place/$slug'
+      fullPath: '/$lang/place/$slug'
+      preLoaderRoute: typeof LangPlaceSlugRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/$citySlug/$categorySlug': {
+      id: '/$lang/$citySlug/$categorySlug'
+      path: '/$citySlug/$categorySlug'
+      fullPath: '/$lang/$citySlug/$categorySlug'
+      preLoaderRoute: typeof LangCitySlugCategorySlugRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/$citySlug/$districtSlug/$categorySlug': {
+      id: '/$lang/$citySlug/$districtSlug/$categorySlug'
+      path: '/$citySlug/$districtSlug/$categorySlug'
+      fullPath: '/$lang/$citySlug/$districtSlug/$categorySlug'
+      preLoaderRoute: typeof LangCitySlugDistrictSlugCategorySlugRouteImport
+      parentRoute: typeof LangRoute
+    }
   }
 }
 
+interface LangRouteChildren {
+  LangSlugRoute: typeof LangSlugRoute
+  LangSearchRoute: typeof LangSearchRoute
+  LangIndexRoute: typeof LangIndexRoute
+  LangCitySlugCategorySlugRoute: typeof LangCitySlugCategorySlugRoute
+  LangPlaceSlugRoute: typeof LangPlaceSlugRoute
+  LangCitySlugDistrictSlugCategorySlugRoute: typeof LangCitySlugDistrictSlugCategorySlugRoute
+}
+
+const LangRouteChildren: LangRouteChildren = {
+  LangSlugRoute: LangSlugRoute,
+  LangSearchRoute: LangSearchRoute,
+  LangIndexRoute: LangIndexRoute,
+  LangCitySlugCategorySlugRoute: LangCitySlugCategorySlugRoute,
+  LangPlaceSlugRoute: LangPlaceSlugRoute,
+  LangCitySlugDistrictSlugCategorySlugRoute:
+    LangCitySlugDistrictSlugCategorySlugRoute,
+}
+
+const LangRouteWithChildren = LangRoute._addFileChildren(LangRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  LangRoute: LangRouteWithChildren,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)
   ._addFileTypes<FileRouteTypes>()
-
-import type { getRouter } from './router.tsx'
-import type { startInstance } from './start.ts'
-declare module '@tanstack/react-start' {
-  interface Register {
-    ssr: true
-    router: Awaited<ReturnType<typeof getRouter>>
-    config: Awaited<ReturnType<typeof startInstance.getOptions>>
-  }
-}
