@@ -363,7 +363,7 @@ function AdminImagesPage() {
                             <Button
                               size="sm"
                               variant="outline"
-                              onClick={() => retry.mutate(jb.business_image_id)}
+                              onClick={() => retry.mutate(jb.id)}
                             >
                               Retry
                             </Button>
@@ -374,7 +374,7 @@ function AdminImagesPage() {
                             <Button
                               size="sm"
                               variant="ghost"
-                              onClick={() => cancel.mutate(jb.business_image_id)}
+                              onClick={() => cancel.mutate(jb.id)}
                             >
                               Cancel
                             </Button>
