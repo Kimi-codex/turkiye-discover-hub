@@ -1093,6 +1093,50 @@ export type Database = {
           },
         ]
       }
+      import_approvals: {
+        Row: {
+          approval_kind: string
+          approved_at: string
+          approved_by: string | null
+          artifact_hash: string
+          batch_id: string
+          id: string
+          invalidated_at: string | null
+          invalidation_reason: string | null
+          payload: Json
+        }
+        Insert: {
+          approval_kind: string
+          approved_at?: string
+          approved_by?: string | null
+          artifact_hash: string
+          batch_id: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          payload?: Json
+        }
+        Update: {
+          approval_kind?: string
+          approved_at?: string
+          approved_by?: string | null
+          artifact_hash?: string
+          batch_id?: string
+          id?: string
+          invalidated_at?: string | null
+          invalidation_reason?: string | null
+          payload?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "import_approvals_batch_id_fkey"
+            columns: ["batch_id"]
+            isOneToOne: false
+            referencedRelation: "import_batches"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       import_batch_items: {
         Row: {
           action: string | null
@@ -1102,15 +1146,21 @@ export type Database = {
           current_snapshot: Json | null
           error_message: string | null
           id: string
+          image_states: Json
           import_batch_id: string
           intent: string | null
           item_index: number | null
+          normalized_item_hash: string | null
           place_id: string | null
           preview_hash: string | null
           processed_at: string | null
           proposed_diff: Json | null
+          publication_decided_at: string | null
+          publication_decided_by: string | null
+          publication_decision: string | null
           raw_payload: Json | null
           status: string
+          target_updated_at: string | null
           updated_at: string
         }
         Insert: {
@@ -1121,15 +1171,21 @@ export type Database = {
           current_snapshot?: Json | null
           error_message?: string | null
           id?: string
+          image_states?: Json
           import_batch_id: string
           intent?: string | null
           item_index?: number | null
+          normalized_item_hash?: string | null
           place_id?: string | null
           preview_hash?: string | null
           processed_at?: string | null
           proposed_diff?: Json | null
+          publication_decided_at?: string | null
+          publication_decided_by?: string | null
+          publication_decision?: string | null
           raw_payload?: Json | null
           status?: string
+          target_updated_at?: string | null
           updated_at?: string
         }
         Update: {
@@ -1140,15 +1196,21 @@ export type Database = {
           current_snapshot?: Json | null
           error_message?: string | null
           id?: string
+          image_states?: Json
           import_batch_id?: string
           intent?: string | null
           item_index?: number | null
+          normalized_item_hash?: string | null
           place_id?: string | null
           preview_hash?: string | null
           processed_at?: string | null
           proposed_diff?: Json | null
+          publication_decided_at?: string | null
+          publication_decided_by?: string | null
+          publication_decision?: string | null
           raw_payload?: Json | null
           status?: string
+          target_updated_at?: string | null
           updated_at?: string
         }
         Relationships: [
@@ -1176,8 +1238,12 @@ export type Database = {
           created_by: string | null
           delete_requested_at: string | null
           duplicate_items: number
+          entity_mapping_hash: string | null
+          entity_mappings: Json
           error_message: string | null
           failed_items: number
+          field_inventory: Json
+          field_mapping_hash: string | null
           file_hash: string | null
           file_size: number | null
           id: string
@@ -1193,7 +1259,9 @@ export type Database = {
           processed_items: number
           processing_lock_at: string | null
           processing_lock_by: string | null
+          publication_hash: string | null
           published_at: string | null
+          schema_hash: string | null
           skipped_items: number
           source: string
           source_provider: string
@@ -1207,6 +1275,7 @@ export type Database = {
           updated_at: string
           updated_items: number
           valid_items: number
+          validation_snapshot_hash: string | null
         }
         Insert: {
           archived_at?: string | null
@@ -1215,8 +1284,12 @@ export type Database = {
           created_by?: string | null
           delete_requested_at?: string | null
           duplicate_items?: number
+          entity_mapping_hash?: string | null
+          entity_mappings?: Json
           error_message?: string | null
           failed_items?: number
+          field_inventory?: Json
+          field_mapping_hash?: string | null
           file_hash?: string | null
           file_size?: number | null
           id?: string
@@ -1232,7 +1305,9 @@ export type Database = {
           processed_items?: number
           processing_lock_at?: string | null
           processing_lock_by?: string | null
+          publication_hash?: string | null
           published_at?: string | null
+          schema_hash?: string | null
           skipped_items?: number
           source: string
           source_provider?: string
@@ -1246,6 +1321,7 @@ export type Database = {
           updated_at?: string
           updated_items?: number
           valid_items?: number
+          validation_snapshot_hash?: string | null
         }
         Update: {
           archived_at?: string | null
@@ -1254,8 +1330,12 @@ export type Database = {
           created_by?: string | null
           delete_requested_at?: string | null
           duplicate_items?: number
+          entity_mapping_hash?: string | null
+          entity_mappings?: Json
           error_message?: string | null
           failed_items?: number
+          field_inventory?: Json
+          field_mapping_hash?: string | null
           file_hash?: string | null
           file_size?: number | null
           id?: string
@@ -1271,7 +1351,9 @@ export type Database = {
           processed_items?: number
           processing_lock_at?: string | null
           processing_lock_by?: string | null
+          publication_hash?: string | null
           published_at?: string | null
+          schema_hash?: string | null
           skipped_items?: number
           source?: string
           source_provider?: string
@@ -1285,6 +1367,7 @@ export type Database = {
           updated_at?: string
           updated_items?: number
           valid_items?: number
+          validation_snapshot_hash?: string | null
         }
         Relationships: []
       }
