@@ -257,21 +257,39 @@ export function normalizeImages(raw: Record<string, unknown>): NormalizedImage[]
 }
 
 export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview[] {
-  const reviews = raw.reviews as Array<Record<string, unknown>> | undefined;
+  // Accept many aliases used by scraper/exporter outputs
+  const candidates: unknown[] = [
+    raw.reviews,
+    raw.reviews_data,
+    raw.user_reviews,
+    raw.google_reviews,
+    raw.reviewsList,
+    (raw.business as Record<string, unknown> | undefined)?.reviews,
+    (raw.details as Record<string, unknown> | undefined)?.reviews,
+  ];
+  let reviews: Array<Record<string, unknown>> | undefined;
+  for (const c of candidates) {
+    if (Array.isArray(c)) {
+      reviews = c as Array<Record<string, unknown>>;
+      break;
+    }
+  }
   if (!Array.isArray(reviews)) return [];
-  const placeId = (raw.place_id as string) ?? "";
+  const placeId = (raw.place_id as string) ?? (raw.id as string) ?? "";
   return reviews
     .map((r) => {
-      const rating = pickNumber(r.rating);
-      if (rating === null) return null;
-      const author = String(r.author_name ?? r.author ?? "").trim();
-      const text = String(r.text ?? r.review_text ?? "").trim();
+      const rating = pickNumber(r.rating ?? r.stars ?? r.score);
+      const author = String(r.author_name ?? r.author ?? r.user_name ?? r.name ?? "").trim();
+      const text = String(r.text ?? r.review_text ?? r.snippet ?? r.comment ?? r.body ?? "").trim();
+      // Skip only if we have neither a rating nor text
+      if (rating === null && text.length === 0) return null;
       const dateRaw =
-        (r.time && typeof r.time === "number"
+        (typeof r.time === "number"
           ? new Date((r.time as number) * 1000).toISOString()
           : null) ??
         (typeof r.review_date === "string" ? r.review_date : null) ??
         (typeof r.date === "string" ? r.date : null) ??
+        (typeof r.published_at === "string" ? r.published_at : null) ??
         null;
       const external =
         (typeof r.review_id === "string" && r.review_id) ||
@@ -280,6 +298,7 @@ export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview
       const fingerprint = createHash("sha256")
         .update(`${placeId}|${author}|${dateRaw ?? ""}|${text.slice(0, 200)}`)
         .digest("hex");
+      const clampedRating = rating !== null ? Math.max(1, Math.min(5, Math.round(rating))) : 5;
       return {
         externalReviewId: external,
         sourceFingerprint: fingerprint,
@@ -287,10 +306,14 @@ export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview
         authorAvatarUrl:
           (typeof r.profile_photo_url === "string" && r.profile_photo_url) ||
           (typeof r.author_avatar_url === "string" && r.author_avatar_url) ||
+          (typeof r.avatar === "string" && r.avatar) ||
           null,
-        rating: Math.max(1, Math.min(5, Math.round(rating))),
+        rating: clampedRating,
         reviewText: text,
-        reviewLanguage: (typeof r.language === "string" && r.language) || null,
+        reviewLanguage:
+          (typeof r.language === "string" && r.language) ||
+          (typeof r.lang === "string" && r.lang) ||
+          null,
         reviewDate: dateRaw,
       } satisfies NormalizedReview;
     })
