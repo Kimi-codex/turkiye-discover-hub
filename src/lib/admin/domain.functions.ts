@@ -328,8 +328,8 @@ export const upsertCategoryAdmin = createServerFn({ method: "POST" })
         if (seen.has(cur)) break;
         seen.add(cur);
         if (cur === data.id) throw new Response("Cycle in parent chain", { status: 400 });
-        const { data: p } = await supabase.from("categories").select("parent_id").eq("id", cur).maybeSingle();
-        cur = (p?.parent_id as string | null) ?? null;
+        const { data: p } = (await supabase.from("categories").select("parent_id").eq("id", cur).maybeSingle()) as { data: { parent_id: string | null } | null };
+        cur = p?.parent_id ?? null;
       }
     }
     let categoryId = data.id;
