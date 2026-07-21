@@ -487,6 +487,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           if (uErr) throw uErr;
           businessId = existing.id;
           updated++;
+          touchedBusinessIds.add(businessId);
           await markItem(supabase, item.id, "updated", "update", null, businessId);
         } else {
           patch.field_sources = fieldSources;
@@ -499,6 +500,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
           if (iErr) throw iErr;
           businessId = ins.id;
           inserted++;
+          touchedBusinessIds.add(businessId);
           await markItem(supabase, item.id, "inserted", "insert", null, businessId);
         }
 
