@@ -277,8 +277,6 @@ function ImportDetailPage() {
         </Button>
       </div>
 
-      <StageProgress currentStage={stage} />
-
       <NextAction
         stage={stage}
         storageExists={storageExists}
@@ -295,6 +293,8 @@ function ImportDetailPage() {
         detecting={detectMut.isPending}
         approving={approveMappingMut.isPending}
       />
+
+      <StageProgress currentStage={stage} />
 
       <div className="flex flex-wrap gap-1 border-b">
         {TAB_IDS.map((t) => {
