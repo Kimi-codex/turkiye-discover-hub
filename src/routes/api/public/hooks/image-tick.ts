@@ -107,9 +107,9 @@ async function processJob(admin: SbAdmin, adapter: R2StorageAdapter, job: {
   const normalized = await normalizeImage(dl.bytes);
   const key = buildImageKey({
     businessId: img.business_id,
+    placeId: (img as { place_id?: string | null }).place_id ?? "unknown",
     contentHash: normalized.contentHash,
     ext: normalized.ext,
-    size: "orig",
   });
 
   const put = await adapter.put({
