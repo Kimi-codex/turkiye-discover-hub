@@ -147,7 +147,7 @@ export const markImportBatchUploaded = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .in("status", ["pending", "failed"]);
     if (error) throw new Response(error.message, { status: 400 });
-    await advanceStage(supabase, data.id, "analyze");
+    await advanceStage(supabase, data.id, "detect_schema");
     return { ok: true };
   });
 
