@@ -239,14 +239,15 @@ export const getImportBatch = createServerFn({ method: "GET" })
         if (normalized.primaryCategorySource) catLabels.add(normalized.primaryCategorySource);
       }
     });
-    let mappingRows: unknown[] = [];
+    type MappingRow = { source_category: string; category_id: string | null; mapping_status: string };
+    let mappingRows: MappingRow[] = [];
     if (catLabels.size > 0) {
       const { data: m } = await supabase
         .from("category_mappings")
         .select("source_category, category_id, mapping_status")
         .eq("source_provider", "google")
         .in("source_category", Array.from(catLabels));
-      mappingRows = m ?? [];
+      mappingRows = (m ?? []) as MappingRow[];
     }
 
     return {
