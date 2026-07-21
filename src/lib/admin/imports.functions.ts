@@ -38,6 +38,14 @@ import {
   IMPORTABLE_FIELDS,
   type ImportableField,
 } from "@/lib/import/preview";
+import {
+  detectSchema,
+  suggestFieldMapping,
+  computeSchemaHash,
+  computeFieldMappingHash,
+  applyMappingEdits,
+  type MappingRow,
+} from "@/lib/import/schema-detector";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
