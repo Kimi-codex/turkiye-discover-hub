@@ -27,6 +27,7 @@ function AuthPage() {
   const navigate = useNavigate();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
   const [busy, setBusy] = useState(false);
 
@@ -45,6 +46,14 @@ function AuthPage() {
 
   async function handleSignUp(e: React.FormEvent) {
     e.preventDefault();
+    if (password.length < 8) {
+      toast.error(t("auth.password_too_short"));
+      return;
+    }
+    if (password !== confirmPassword) {
+      toast.error(t("auth.password_mismatch"));
+      return;
+    }
     setBusy(true);
     const { error } = await supabase.auth.signUp({
       email,
@@ -56,6 +65,7 @@ function AuthPage() {
     });
     setBusy(false);
     if (error) return toast.error(error.message);
+    // Generic message: never expose whether admin was granted.
     toast.success(t("auth.check_email"));
   }
 
