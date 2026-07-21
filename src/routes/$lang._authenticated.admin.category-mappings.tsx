@@ -71,6 +71,12 @@ function MappingsPage() {
   const selectedIds: string[] = Array.from(checked);
   const batchScoped = Boolean((q.data as { batchScoped?: boolean } | undefined)?.batchScoped);
   const labelCount = (q.data as { labelCount?: number | null } | undefined)?.labelCount ?? null;
+  const statusCounts =
+    (q.data as { statusCounts?: Record<string, number> | null } | undefined)?.statusCounts ?? null;
+  const pendingCount = (statusCounts?.pending ?? 0) + (statusCounts?.missing ?? 0);
+  const approvedCount = statusCounts?.approved ?? 0;
+  const ignoredCount = statusCounts?.ignored ?? 0;
+  const batchResolved = batchScoped && (labelCount ?? 0) > 0 && pendingCount === 0;
   const applyBulkCategory = () => {
     if (!bulkCategoryId) return;
     setSelection((prev) => {
@@ -95,6 +101,9 @@ function MappingsPage() {
           {batchScoped && (
             <p className="mt-1 text-xs text-muted-foreground">
               Batch filter active · {labelCount ?? 0} discovered label{labelCount === 1 ? "" : "s"}
+              {statusCounts
+                ? ` · ${pendingCount} pending · ${approvedCount} approved · ${ignoredCount} ignored`
+                : ""}
             </p>
           )}
         </div>
@@ -136,6 +145,27 @@ function MappingsPage() {
       {batchScoped && labelCount === 0 && (
         <div className="rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900">
           No category labels have been extracted for this batch yet. Return to the import batch, run analysis, then come back here.
+        </div>
+      )}
+      {batchResolved && (
+        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-emerald-300 bg-emerald-50 p-4 text-sm text-emerald-900">
+          <div>
+            <div className="font-medium">All category labels for this batch are resolved.</div>
+            <div className="mt-1 text-xs">
+              There are no pending labels left. Return to the import batch and continue to validation.
+            </div>
+          </div>
+          {search.batchId && (
+            <Button asChild size="sm">
+              <Link
+                to="/$lang/admin/imports/$id"
+                params={{ lang, id: search.batchId }}
+                search={{ tab: "categories" }}
+              >
+                Return and continue
+              </Link>
+            </Button>
+          )}
         </div>
       )}
       <div className="flex flex-wrap items-center gap-2 rounded-xl border bg-card p-3 text-sm">
@@ -278,7 +308,9 @@ function MappingsPage() {
                     ? "Loading mappings…"
                     : batchScoped
                       ? status === "pending"
-                        ? "No pending labels for this batch. Return to the import batch and continue."
+                        ? batchResolved
+                          ? "No pending labels for this batch — everything is already approved or ignored."
+                          : "No pending labels for this batch. Return to the import batch and continue."
                         : `No ${status} labels for this batch.`
                       : "Nothing to review"}
                 </td>
