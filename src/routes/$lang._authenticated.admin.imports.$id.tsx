@@ -12,10 +12,15 @@ import {
   runImportChunk,
   setImportItemApproval,
   cancelImportBatch,
+  detectImportSchema,
+  updateImportFieldMapping,
+  restoreSuggestedFieldMapping,
+  approveImportFieldMapping,
 } from "@/lib/admin/imports.functions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { IMPORTABLE_FIELDS } from "@/lib/import/preview";
+import type { MappingRow } from "@/lib/import/schema-detector";
 
 export const Route = createFileRoute("/$lang/_authenticated/admin/imports/$id")({
   ssr: false,
@@ -28,8 +33,10 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/imports/$id")(
 
 const TAB_IDS = [
   "overview",
+  "schema",
+  "field_mapping",
   "analysis",
-  "mapping",
+  "categories",
   "validation",
   "import",
   "translations",
@@ -40,6 +47,8 @@ type TabId = (typeof TAB_IDS)[number];
 
 const STAGE_ORDER = [
   "upload",
+  "detect_schema",
+  "field_mapping",
   "analyze",
   "mapping",
   "validation",
@@ -50,6 +59,21 @@ const STAGE_ORDER = [
   "publish",
   "completed",
 ] as const;
+
+const STAGE_TAB: Record<string, TabId> = {
+  upload: "overview",
+  detect_schema: "schema",
+  field_mapping: "field_mapping",
+  analyze: "analysis",
+  mapping: "categories",
+  validation: "validation",
+  preview: "import",
+  execute: "import",
+  translations: "translations",
+  images: "images",
+  publish: "overview",
+  completed: "overview",
+};
 
 function ImportDetailPage() {
   const { lang, id } = Route.useParams();
@@ -162,11 +186,80 @@ function ImportDetailPage() {
   const provenance = q.data!.provenance as Array<Record<string, unknown>>;
   const mappings = q.data!.mappings as Array<{ source_category: string; category_id: string | null; mapping_status: string }>;
   const storageExists = q.data!.storageExists as boolean;
+  const approvals = (q.data as { approvals?: Array<Record<string, unknown>> }).approvals ?? [];
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "");
+  const detectedSchema = (batch.detected_schema as import("@/lib/import/schema-detector").DetectedSchema | null) ?? null;
+  const fieldMapping = (batch.field_mapping as MappingRow[] | null) ?? [];
+  const fieldMappingHash = String(batch.field_mapping_hash ?? "");
+  const activeFmApproval = approvals.find(
+    (a) => a.approval_kind === "field_mapping" && a.invalidated_at == null,
+  );
+  const isFmApproved =
+    !!activeFmApproval && activeFmApproval.artifact_hash === fieldMappingHash;
 
   const setTab = (tab: TabId) =>
     navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
+
+  const detectMut = useMutation({
+    mutationFn: () => detectImportSchema({ data: { id } }),
+    onSuccess: (r) => {
+      toast.success(`Detected ${r.fieldCount} fields across ${r.totalItems} items`);
+      invalidate();
+      setTab("field_mapping");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const approveMappingMut = useMutation({
+    mutationFn: () => approveImportFieldMapping({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Field mapping approved — analysis unlocked");
+      invalidate();
+      setTab("analysis");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const restoreMappingMut = useMutation({
+    mutationFn: () => restoreSuggestedFieldMapping({ data: { id } }),
+    onSuccess: () => {
+      toast.success("Restored suggested mapping");
+      invalidate();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+  const editMappingMut = useMutation({
+    mutationFn: (edits: Array<Partial<MappingRow> & { sourcePath: string }>) =>
+      updateImportFieldMapping({ data: { id, edits } }),
+    onSuccess: () => invalidate(),
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const lockedReason: Partial<Record<TabId, string>> = {
+    schema: stage === "upload" ? "Upload the file first." : "",
+    field_mapping:
+      stage === "upload" || stage === "detect_schema"
+        ? "Run schema detection before editing the field mapping."
+        : "",
+    analysis: !isFmApproved
+      ? "Approve field mapping before running analysis."
+      : "",
+    categories:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("mapping")
+        ? "Run analysis first."
+        : "",
+    validation:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("validation")
+        ? "Confirm category mappings first."
+        : "",
+    import:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("preview")
+        ? "Compute preview first."
+        : "",
+  };
+  const isLocked = (t: TabId) => !!lockedReason[t];
 
   return (
     <div className="space-y-4">
@@ -186,21 +279,42 @@ function ImportDetailPage() {
 
       <StageProgress currentStage={stage} />
 
-      {/* Tabs */}
+      <NextAction
+        stage={stage}
+        storageExists={storageExists}
+        isFmApproved={isFmApproved}
+        onDetect={() => detectMut.mutate()}
+        onApproveMapping={() => approveMappingMut.mutate()}
+        onAnalyze={() => analyzeMut.mutate()}
+        onConfirmMapping={() => confirmMappingMut.mutate()}
+        onPreview={() => previewMut.mutate()}
+        onRun={() => runMut.mutate()}
+        onTranslations={() => translationsMut.mutate()}
+        onImagesDone={() => imagesDoneMut.mutate()}
+        onPublish={() => publishMut.mutate()}
+        detecting={detectMut.isPending}
+        approving={approveMappingMut.isPending}
+      />
+
       <div className="flex flex-wrap gap-1 border-b">
-        {TAB_IDS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={`border-b-2 px-3 py-1.5 text-sm capitalize transition-colors ${
-              currentTab === t
-                ? "border-primary text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            {t}
-          </button>
-        ))}
+        {TAB_IDS.map((t) => {
+          const locked = isLocked(t);
+          return (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`border-b-2 px-3 py-1.5 text-sm capitalize transition-colors ${
+                currentTab === t
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              } ${locked ? "opacity-60" : ""}`}
+              title={locked ? lockedReason[t] : undefined}
+            >
+              {t.replace("_", " ")}
+              {locked ? " 🔒" : ""}
+            </button>
+          );
+        })}
       </div>
 
       {currentTab === "overview" && (
@@ -227,23 +341,150 @@ function ImportDetailPage() {
           isRunning={runMut.isPending}
         />
       )}
-      {currentTab === "analysis" && <AnalysisTab batch={batch} items={items} />}
-      {currentTab === "mapping" && <MappingTab lang={lang} mappings={mappings} items={items} />}
-      {currentTab === "validation" && <ValidationTab items={items} />}
+      {currentTab === "schema" && (
+        isLocked("schema") ? (
+          <LockedPanel reason={lockedReason.schema!} />
+        ) : (
+          <SchemaTab
+            schema={detectedSchema}
+            onDetect={() => detectMut.mutate()}
+            detecting={detectMut.isPending}
+          />
+        )
+      )}
+      {currentTab === "field_mapping" && (
+        isLocked("field_mapping") ? (
+          <LockedPanel reason={lockedReason.field_mapping!} />
+        ) : (
+          <FieldMappingTab
+            mapping={fieldMapping}
+            schema={detectedSchema}
+            isApproved={isFmApproved}
+            activeApproval={activeFmApproval}
+            fieldMappingHash={fieldMappingHash}
+            onEdit={(edits) => editMappingMut.mutate(edits)}
+            onRestore={() => restoreMappingMut.mutate()}
+            onApprove={() => approveMappingMut.mutate()}
+            saving={editMappingMut.isPending}
+            restoring={restoreMappingMut.isPending}
+            approving={approveMappingMut.isPending}
+          />
+        )
+      )}
+      {currentTab === "analysis" && (
+        isLocked("analysis") ? (
+          <LockedPanel reason={lockedReason.analysis!} />
+        ) : (
+          <AnalysisTab batch={batch} items={items} />
+        )
+      )}
+      {currentTab === "categories" && (
+        isLocked("categories") ? (
+          <LockedPanel reason={lockedReason.categories!} />
+        ) : (
+          <MappingTab lang={lang} mappings={mappings} items={items} />
+        )
+      )}
+      {currentTab === "validation" && (
+        isLocked("validation") ? (
+          <LockedPanel reason={lockedReason.validation!} />
+        ) : (
+          <ValidationTab items={items} />
+        )
+      )}
       {currentTab === "import" && (
-        <ImportTab
-          items={items}
-          onToggleField={(itemId, current, field, checked) => {
-            const next = checked
-              ? Array.from(new Set([...current, field]))
-              : current.filter((f) => f !== field);
-            setApprovalMut.mutate({ itemId, approvedFields: next });
-          }}
-        />
+        isLocked("import") ? (
+          <LockedPanel reason={lockedReason.import!} />
+        ) : (
+          <ImportTab
+            items={items}
+            onToggleField={(itemId, current, field, checked) => {
+              const next = checked
+                ? Array.from(new Set([...current, field]))
+                : current.filter((f) => f !== field);
+              setApprovalMut.mutate({ itemId, approvedFields: next });
+            }}
+          />
+        )
       )}
       {currentTab === "translations" && <TranslationsTab provenance={provenance} />}
       {currentTab === "images" && <ImagesTab provenance={provenance} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
+    </div>
+  );
+}
+
+function NextAction(props: {
+  stage: string;
+  storageExists: boolean;
+  isFmApproved: boolean;
+  onDetect: () => void;
+  onApproveMapping: () => void;
+  onAnalyze: () => void;
+  onConfirmMapping: () => void;
+  onPreview: () => void;
+  onRun: () => void;
+  onTranslations: () => void;
+  onImagesDone: () => void;
+  onPublish: () => void;
+  detecting: boolean;
+  approving: boolean;
+}) {
+  const { stage, storageExists, isFmApproved } = props;
+  let label = "";
+  let onClick: (() => void) | null = null;
+  let disabled = false;
+  if (stage === "detect_schema") {
+    label = props.detecting ? "Detecting…" : "Detect schema";
+    onClick = props.onDetect;
+    disabled = !storageExists || props.detecting;
+  } else if (stage === "field_mapping") {
+    label = props.approving ? "Approving…" : "Approve field mapping → analysis";
+    onClick = props.onApproveMapping;
+    disabled = props.approving;
+  } else if (stage === "analyze") {
+    label = "Run analysis";
+    onClick = props.onAnalyze;
+    disabled = !isFmApproved;
+  } else if (stage === "mapping") {
+    label = "Confirm category mappings";
+    onClick = props.onConfirmMapping;
+  } else if (stage === "validation" || stage === "preview") {
+    label = "Compute import preview";
+    onClick = props.onPreview;
+  } else if (stage === "execute") {
+    label = "Run next execute chunk";
+    onClick = props.onRun;
+  } else if (stage === "translations") {
+    label = "Enqueue translations";
+    onClick = props.onTranslations;
+  } else if (stage === "images") {
+    label = "Advance images stage";
+    onClick = props.onImagesDone;
+  } else if (stage === "publish") {
+    label = "Publish imported businesses";
+    onClick = props.onPublish;
+  }
+  if (!onClick) return null;
+  return (
+    <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
+      <div className="text-sm">
+        <div className="font-medium">Next action</div>
+        <div className="text-xs text-muted-foreground">Current stage: {stage}</div>
+      </div>
+      <Button onClick={onClick} disabled={disabled}>
+        {label}
+      </Button>
+    </div>
+  );
+}
+
+function LockedPanel({ reason }: { reason: string }) {
+  return (
+    <div className="rounded-xl border border-dashed p-6 text-center text-sm text-muted-foreground">
+      <div className="text-2xl">🔒</div>
+      <div className="mt-2 font-medium text-foreground">This tab is locked</div>
+      <div className="mt-1 text-xs">{reason}</div>
     </div>
   );
 }
@@ -874,3 +1115,323 @@ function formatVal(v: unknown): string {
     return "?";
   }
 }
+
+// ---------- Schema tab ----------
+import type { DetectedSchema, MappingRow as MR } from "@/lib/import/schema-detector";
+
+function SchemaTab({
+  schema,
+  onDetect,
+  detecting,
+}: {
+  schema: DetectedSchema | null;
+  onDetect: () => void;
+  detecting: boolean;
+}) {
+  if (!schema) {
+    return (
+      <div className="rounded-xl border bg-card p-6 text-center text-sm">
+        <div className="mb-2 font-medium">No schema detected yet</div>
+        <p className="mb-3 text-xs text-muted-foreground">
+          Walk the uploaded JSON and build a complete field inventory.
+        </p>
+        <Button onClick={onDetect} disabled={detecting}>
+          {detecting ? "Detecting…" : "Detect schema"}
+        </Button>
+      </div>
+    );
+  }
+  const rows = schema.fields;
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-3">
+        <Card label="Items scanned">{schema.totalItems}</Card>
+        <Card label="Fields detected">{rows.length}</Card>
+        <Card label="Generated at">
+          <span className="text-xs">{new Date(schema.generatedAt).toLocaleString()}</span>
+        </Card>
+      </div>
+      <div className="rounded-xl border bg-card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left uppercase text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1">Path</th>
+              <th className="px-2 py-1">Type</th>
+              <th className="px-2 py-1">Occ.</th>
+              <th className="px-2 py-1">Null</th>
+              <th className="px-2 py-1">Missing</th>
+              <th className="px-2 py-1">Null+Miss %</th>
+              <th className="px-2 py-1">Confidence</th>
+              <th className="px-2 py-1">Samples</th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((f) => (
+              <tr key={f.sourcePath} className="border-t align-top">
+                <td className="px-2 py-1 font-mono">{f.sourcePath}</td>
+                <td className="px-2 py-1">{f.detectedType}</td>
+                <td className="px-2 py-1">{f.occurrenceCount}/{f.parentCount}</td>
+                <td className="px-2 py-1">{f.nullCount}</td>
+                <td className="px-2 py-1">{f.missingCount}</td>
+                <td className="px-2 py-1">{f.nullMissingPct}%</td>
+                <td className="px-2 py-1">{f.confidence}</td>
+                <td className="px-2 py-1 max-w-[280px] truncate text-muted-foreground">
+                  {f.sampleValues.map((s) => formatVal(s)).join(" · ") || "—"}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+// ---------- Field mapping tab ----------
+
+const TARGET_TABLES = [
+  "",
+  "businesses",
+  "business_opening_hours",
+  "business_category_links",
+  "business_images",
+  "reviews",
+];
+
+function FieldMappingTab({
+  mapping,
+  schema,
+  isApproved,
+  activeApproval,
+  fieldMappingHash,
+  onEdit,
+  onRestore,
+  onApprove,
+  saving,
+  restoring,
+  approving,
+}: {
+  mapping: MR[];
+  schema: DetectedSchema | null;
+  isApproved: boolean;
+  activeApproval: Record<string, unknown> | undefined;
+  fieldMappingHash: string;
+  onEdit: (edits: Array<Partial<MR> & { sourcePath: string }>) => void;
+  onRestore: () => void;
+  onApprove: () => void;
+  saving: boolean;
+  restoring: boolean;
+  approving: boolean;
+}) {
+  const samplesByPath = new Map(
+    (schema?.fields ?? []).map((f) => [f.sourcePath, f.sampleValues]),
+  );
+  const [openSamples, setOpenSamples] = useState<string | null>(null);
+
+  if (mapping.length === 0) {
+    return (
+      <div className="rounded-xl border bg-card p-6 text-center text-sm text-muted-foreground">
+        No field mapping — detect schema first.
+      </div>
+    );
+  }
+  const required = mapping.filter((r) => r.required);
+  const unresolvedRequired = required.filter(
+    (r) => r.status !== "mapped" || !r.targetTable || !r.targetColumn,
+  );
+  const canApprove = unresolvedRequired.length === 0;
+
+  return (
+    <div className="space-y-3">
+      <div className="grid gap-3 md:grid-cols-4">
+        <Card label="Mapping rows">{mapping.length}</Card>
+        <Card label="Required">{required.length}</Card>
+        <Card label="Unresolved required" tone={unresolvedRequired.length ? "danger" : undefined}>
+          {unresolvedRequired.length}
+        </Card>
+        <Card label="Approval status" tone={isApproved ? "success" : "warning"}>
+          {isApproved ? "approved" : "pending"}
+        </Card>
+      </div>
+      <div className="rounded-xl border bg-card p-3 text-xs">
+        <div>
+          <span className="text-muted-foreground">field_mapping_hash:</span>{" "}
+          <span className="font-mono break-all">{fieldMappingHash.slice(0, 32)}…</span>
+        </div>
+        {activeApproval && (
+          <div className="mt-1">
+            <span className="text-muted-foreground">approved artifact_hash:</span>{" "}
+            <span className="font-mono break-all">
+              {String(activeApproval.artifact_hash).slice(0, 32)}…
+            </span>
+            {activeApproval.artifact_hash !== fieldMappingHash && (
+              <span className="ml-2 rounded bg-destructive/10 px-1.5 py-0.5 text-destructive">
+                stale
+              </span>
+            )}
+          </div>
+        )}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={onApprove} disabled={!canApprove || approving}>
+          {approving ? "Approving…" : isApproved ? "Re-approve mapping" : "Approve mapping"}
+        </Button>
+        <Button variant="outline" onClick={onRestore} disabled={restoring}>
+          {restoring ? "Restoring…" : "Restore suggested"}
+        </Button>
+      </div>
+      {!canApprove && (
+        <div className="rounded-md border border-destructive/40 bg-destructive/5 p-2 text-xs text-destructive">
+          Required fields must be resolved before approval:{" "}
+          {unresolvedRequired.map((r) => r.sourcePath).join(", ")}
+        </div>
+      )}
+      <div className="rounded-xl border bg-card overflow-x-auto">
+        <table className="w-full text-xs">
+          <thead className="text-left uppercase text-muted-foreground">
+            <tr>
+              <th className="px-2 py-1">Source path</th>
+              <th className="px-2 py-1">Target table</th>
+              <th className="px-2 py-1">Target column</th>
+              <th className="px-2 py-1">Transform</th>
+              <th className="px-2 py-1">Status</th>
+              <th className="px-2 py-1">Required</th>
+              <th className="px-2 py-1">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {mapping.map((r) => {
+              const samples = samplesByPath.get(r.sourcePath) ?? [];
+              return (
+                <>
+                  <tr key={r.sourcePath} className="border-t align-top">
+                    <td className="px-2 py-1 font-mono">{r.sourcePath}</td>
+                    <td className="px-2 py-1">
+                      <select
+                        className="rounded border bg-background px-1 py-0.5 text-xs disabled:opacity-50"
+                        value={r.targetTable ?? ""}
+                        disabled={saving}
+                        onChange={(e) =>
+                          onEdit([
+                            {
+                              sourcePath: r.sourcePath,
+                              targetTable: e.target.value || null,
+                              status: e.target.value ? "mapped" : "ignored",
+                            },
+                          ])
+                        }
+                      >
+                        {TARGET_TABLES.map((t) => (
+                          <option key={t} value={t}>{t || "(none)"}</option>
+                        ))}
+                      </select>
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        className="w-32 rounded border bg-background px-1 py-0.5 text-xs font-mono disabled:opacity-50"
+                        value={r.targetColumn ?? ""}
+                        disabled={saving}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim() || null;
+                          if (v === (r.targetColumn ?? null)) return;
+                          onEdit([{ sourcePath: r.sourcePath, targetColumn: v }]);
+                        }}
+                        defaultValue={r.targetColumn ?? ""}
+                        placeholder="column"
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <input
+                        className="w-28 rounded border bg-background px-1 py-0.5 text-xs font-mono disabled:opacity-50"
+                        defaultValue={r.transform ?? ""}
+                        disabled={saving}
+                        onBlur={(e) => {
+                          const v = e.target.value.trim() || null;
+                          if (v === (r.transform ?? null)) return;
+                          onEdit([{ sourcePath: r.sourcePath, transform: v }]);
+                        }}
+                        placeholder="identity"
+                      />
+                    </td>
+                    <td className="px-2 py-1">
+                      <MappingStatusChip status={r.status} />
+                      {r.reason && (
+                        <div className="mt-0.5 text-[10px] text-muted-foreground">{r.reason}</div>
+                      )}
+                    </td>
+                    <td className="px-2 py-1">{r.required ? "yes" : "no"}</td>
+                    <td className="px-2 py-1">
+                      <div className="flex gap-1">
+                        {!r.required && r.status !== "ignored" && (
+                          <button
+                            className="rounded border px-1.5 py-0.5 text-[11px] hover:bg-muted"
+                            disabled={saving}
+                            onClick={() =>
+                              onEdit([
+                                {
+                                  sourcePath: r.sourcePath,
+                                  status: "ignored",
+                                  targetTable: null,
+                                  targetColumn: null,
+                                },
+                              ])
+                            }
+                          >
+                            ignore
+                          </button>
+                        )}
+                        {r.required && (
+                          <span
+                            className="rounded bg-amber-100 px-1.5 py-0.5 text-[11px] text-amber-800"
+                            title="Required — cannot be ignored"
+                          >
+                            required
+                          </span>
+                        )}
+                        <button
+                          className="rounded border px-1.5 py-0.5 text-[11px] hover:bg-muted"
+                          onClick={() =>
+                            setOpenSamples(openSamples === r.sourcePath ? null : r.sourcePath)
+                          }
+                        >
+                          samples
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                  {openSamples === r.sourcePath && (
+                    <tr key={r.sourcePath + "-s"} className="border-t bg-muted/30">
+                      <td colSpan={7} className="px-2 py-2 text-[11px]">
+                        <div className="font-medium">Sample values ({samples.length})</div>
+                        <ul className="mt-1 list-disc pl-4">
+                          {samples.map((s, i) => (
+                            <li key={i} className="font-mono">
+                              {formatVal(s)}
+                            </li>
+                          ))}
+                          {samples.length === 0 && <li className="text-muted-foreground">—</li>}
+                        </ul>
+                      </td>
+                    </tr>
+                  )}
+                </>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}
+
+function MappingStatusChip({ status }: { status: MR["status"] }) {
+  const tones: Record<MR["status"], string> = {
+    mapped: "bg-emerald-100 text-emerald-700",
+    ignored: "bg-muted text-muted-foreground",
+    unsupported: "bg-amber-100 text-amber-800",
+    required_missing: "bg-destructive/10 text-destructive",
+    store: "bg-blue-100 text-blue-700",
+  };
+  return <span className={`rounded px-1.5 py-0.5 text-[11px] ${tones[status]}`}>{status}</span>;
+}
+

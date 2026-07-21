@@ -38,6 +38,14 @@ import {
   IMPORTABLE_FIELDS,
   type ImportableField,
 } from "@/lib/import/preview";
+import {
+  detectSchema,
+  suggestFieldMapping,
+  computeSchemaHash,
+  computeFieldMappingHash,
+  applyMappingEdits,
+  type MappingRow,
+} from "@/lib/import/schema-detector";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -147,7 +155,7 @@ export const markImportBatchUploaded = createServerFn({ method: "POST" })
       .eq("id", data.id)
       .in("status", ["pending", "failed"]);
     if (error) throw new Response(error.message, { status: 400 });
-    await advanceStage(supabase, data.id, "analyze");
+    await advanceStage(supabase, data.id, "detect_schema");
     return { ok: true };
   });
 
@@ -174,7 +182,250 @@ export const markImportBatchFailed = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
-// ---------- List / detail ----------
+// ---------- Detect schema (stage: detect_schema → field_mapping) ----------
+
+async function invalidateApprovals(
+  supabase: Sb,
+  batchId: string,
+  reason: string,
+  kinds?: string[],
+) {
+  const q = supabase
+    .from("import_approvals")
+    .update({ invalidated_at: new Date().toISOString(), invalidation_reason: reason })
+    .eq("batch_id", batchId)
+    .is("invalidated_at", null);
+  if (kinds && kinds.length > 0) q.in("approval_kind", kinds);
+  await q;
+}
+
+export const detectImportSchema = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch, error } = await supabase
+      .from("import_batches")
+      .select("*")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Response(error.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if (!batch.storage_object_path) throw new Response("Batch has no file", { status: 400 });
+
+    await supabase
+      .from("import_batches")
+      .update({ status: "detecting", error_message: null })
+      .eq("id", data.id);
+
+    const bucket = batch.storage_bucket ?? IMPORTS_BUCKET;
+    const { data: blob, error: dlErr } = await supabase.storage
+      .from(bucket)
+      .download(batch.storage_object_path);
+    if (dlErr) {
+      await supabase
+        .from("import_batches")
+        .update({ status: "failed", error_message: `download_failed: ${dlErr.message}` })
+        .eq("id", data.id);
+      throw new Response(dlErr.message, { status: 500 });
+    }
+    const text = await blob.text();
+    const fileHash = createHash("sha256").update(text).digest("hex");
+    let payload: unknown;
+    try {
+      payload = JSON.parse(text);
+    } catch (e) {
+      await supabase
+        .from("import_batches")
+        .update({ status: "failed", error_message: `invalid_json: ${(e as Error).message}` })
+        .eq("id", data.id);
+      throw new Response("Invalid JSON", { status: 400 });
+    }
+    const schema = detectSchema(payload);
+    const schemaHash = computeSchemaHash(schema);
+    const mapping = suggestFieldMapping(schema);
+    const fieldMappingHash = computeFieldMappingHash(mapping);
+
+    // Any file change (new schema_hash) invalidates existing approvals.
+    const fileChanged = batch.file_hash && batch.file_hash !== fileHash;
+    const schemaChanged = batch.schema_hash && batch.schema_hash !== schemaHash;
+    if (fileChanged || schemaChanged) {
+      await invalidateApprovals(supabase, data.id, "file_or_schema_changed");
+    }
+
+    await supabase
+      .from("import_batches")
+      .update({
+        status: "schema_detected",
+        file_hash: fileHash,
+        detected_schema: schema,
+        field_mapping: mapping,
+        schema_hash: schemaHash,
+        field_mapping_hash: fieldMappingHash,
+        schema_detected_at: new Date().toISOString(),
+        field_mapping_updated_at: new Date().toISOString(),
+        field_mapping_approved_at: null,
+        preview_hash: null,
+        previewed_at: null,
+      })
+      .eq("id", data.id);
+    await advanceStage(supabase, data.id, "field_mapping");
+    return {
+      ok: true,
+      totalItems: schema.totalItems,
+      fieldCount: schema.fields.length,
+      schemaHash,
+      fieldMappingHash,
+    };
+  });
+
+export const updateImportFieldMapping = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator(
+    (i: {
+      id: string;
+      edits: Array<{
+        sourcePath: string;
+        targetTable?: string | null;
+        targetColumn?: string | null;
+        transform?: string | null;
+        status?: MappingRow["status"];
+        reason?: string | null;
+      }>;
+    }) => {
+      if (!i?.id) throw new Response("Missing id", { status: 400 });
+      if (!Array.isArray(i.edits) || i.edits.length === 0)
+        throw new Response("Missing edits", { status: 400 });
+      return i;
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("stage, field_mapping")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if (!["field_mapping", "analyze"].includes(batch.stage))
+      throw new Response(`Cannot edit mapping in stage ${batch.stage}`, { status: 400 });
+    const base = (batch.field_mapping as MappingRow[] | null) ?? [];
+    let next: MappingRow[];
+    try {
+      next = applyMappingEdits(base, data.edits);
+    } catch (e) {
+      throw new Response((e as Error).message, { status: 400 });
+    }
+    const newHash = computeFieldMappingHash(next);
+    // Any edit invalidates the field_mapping approval and everything downstream.
+    await invalidateApprovals(supabase, data.id, "field_mapping_edited");
+    await supabase
+      .from("import_batches")
+      .update({
+        field_mapping: next,
+        field_mapping_hash: newHash,
+        field_mapping_updated_at: new Date().toISOString(),
+        field_mapping_approved_at: null,
+        preview_hash: null,
+        previewed_at: null,
+      })
+      .eq("id", data.id);
+    // If we were in analyze, bounce back to field_mapping.
+    if (batch.stage === "analyze") await advanceStage(supabase, data.id, "field_mapping");
+    return { ok: true, fieldMappingHash: newHash };
+  });
+
+export const restoreSuggestedFieldMapping = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("stage, detected_schema")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if (!batch.detected_schema)
+      throw new Response("No detected schema — run detect first", { status: 400 });
+    const mapping = suggestFieldMapping(batch.detected_schema);
+    const hash = computeFieldMappingHash(mapping);
+    await invalidateApprovals(supabase, data.id, "mapping_restored_to_suggested");
+    await supabase
+      .from("import_batches")
+      .update({
+        field_mapping: mapping,
+        field_mapping_hash: hash,
+        field_mapping_updated_at: new Date().toISOString(),
+        field_mapping_approved_at: null,
+      })
+      .eq("id", data.id);
+    return { ok: true, fieldMappingHash: hash };
+  });
+
+export const approveImportFieldMapping = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("stage, field_mapping, field_mapping_hash, schema_hash, file_hash")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if (batch.stage !== "field_mapping")
+      throw new Response(`Cannot approve mapping in stage ${batch.stage}`, { status: 400 });
+    const mapping = (batch.field_mapping as MappingRow[] | null) ?? [];
+    if (mapping.length === 0)
+      throw new Response("No field mapping present — detect schema first", { status: 400 });
+    // Enforce all required rows are still resolved.
+    const unresolvedRequired = mapping.filter(
+      (r) => r.required && (r.status !== "mapped" || !r.targetTable || !r.targetColumn),
+    );
+    if (unresolvedRequired.length > 0) {
+      throw new Response(
+        `Required fields unmapped: ${unresolvedRequired.map((r) => r.sourcePath).join(", ")}`,
+        { status: 400 },
+      );
+    }
+    // Invalidate prior field_mapping approvals then insert a fresh row.
+    await invalidateApprovals(supabase, data.id, "superseded", ["field_mapping"]);
+    const nowIso = new Date().toISOString();
+    const { error: insErr } = await supabase.from("import_approvals").insert({
+      batch_id: data.id,
+      approval_kind: "field_mapping",
+      artifact_hash: batch.field_mapping_hash,
+      approved_by: context.userId,
+      approved_at: nowIso,
+      payload: {
+        schema_hash: batch.schema_hash,
+        file_hash: batch.file_hash,
+        rowCount: mapping.length,
+      },
+    });
+    if (insErr) throw new Response(insErr.message, { status: 400 });
+    await supabase
+      .from("import_batches")
+      .update({
+        status: "field_mapping_approved",
+        field_mapping_approved_at: nowIso,
+      })
+      .eq("id", data.id);
+    await advanceStage(supabase, data.id, "analyze");
+    return { ok: true };
+  });
+
+
 
 export const listImportBatches = createServerFn({ method: "GET" })
   .middleware([requireAdmin])
@@ -239,16 +490,22 @@ export const getImportBatch = createServerFn({ method: "GET" })
         if (normalized.primaryCategorySource) catLabels.add(normalized.primaryCategorySource);
       }
     });
-    type MappingRow = { source_category: string; category_id: string | null; mapping_status: string };
-    let mappingRows: MappingRow[] = [];
+    type CatMappingRow = { source_category: string; category_id: string | null; mapping_status: string };
+    let mappingRows: CatMappingRow[] = [];
     if (catLabels.size > 0) {
       const { data: m } = await supabase
         .from("category_mappings")
         .select("source_category, category_id, mapping_status")
         .eq("source_provider", "google")
         .in("source_category", Array.from(catLabels));
-      mappingRows = (m ?? []) as MappingRow[];
+      mappingRows = (m ?? []) as CatMappingRow[];
     }
+
+    const { data: approvals } = await supabase
+      .from("import_approvals")
+      .select("id, approval_kind, artifact_hash, approved_at, approved_by, invalidated_at, invalidation_reason, payload")
+      .eq("batch_id", data.id)
+      .order("approved_at", { ascending: false });
 
     return {
       batch,
@@ -256,6 +513,7 @@ export const getImportBatch = createServerFn({ method: "GET" })
       provenance: provenance ?? [],
       mappings: mappingRows,
       storageExists,
+      approvals: approvals ?? [],
     };
   });
 
@@ -277,6 +535,34 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     if (error) throw new Response(error.message, { status: 500 });
     if (!batch) throw new Response("Not found", { status: 404 });
     if (!batch.storage_object_path) throw new Response("Batch has no file", { status: 400 });
+
+    // Server-side gate: an active field_mapping approval must match the
+    // current field_mapping_hash. Any file/mapping change invalidates it.
+    if (batch.stage !== "analyze")
+      throw new Response(
+        `Cannot analyze in stage ${batch.stage}. Approve field mapping first.`,
+        { status: 400 },
+      );
+    if (!batch.field_mapping_hash)
+      throw new Response("Missing field_mapping_hash — detect + approve mapping first", {
+        status: 400,
+      });
+    const { data: approval } = await supabase
+      .from("import_approvals")
+      .select("id, artifact_hash")
+      .eq("batch_id", data.id)
+      .eq("approval_kind", "field_mapping")
+      .is("invalidated_at", null)
+      .order("approved_at", { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!approval)
+      throw new Response("Field mapping is not approved for this batch", { status: 400 });
+    if (approval.artifact_hash !== batch.field_mapping_hash)
+      throw new Response(
+        "Field mapping changed since approval — re-approve before analysis",
+        { status: 400 },
+      );
 
     await supabase
       .from("import_batches")
