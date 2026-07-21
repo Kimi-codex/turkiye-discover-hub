@@ -277,8 +277,6 @@ function ImportDetailPage() {
         </Button>
       </div>
 
-      <StageProgress currentStage={stage} />
-
       <NextAction
         stage={stage}
         storageExists={storageExists}
@@ -295,6 +293,8 @@ function ImportDetailPage() {
         detecting={detectMut.isPending}
         approving={approveMappingMut.isPending}
       />
+
+      <StageProgress currentStage={stage} />
 
       <div className="flex flex-wrap gap-1 border-b">
         {TAB_IDS.map((t) => {
@@ -432,47 +432,62 @@ function NextAction(props: {
 }) {
   const { stage, storageExists, isFmApproved } = props;
   let label = "";
+  let description = "";
   let onClick: (() => void) | null = null;
   let disabled = false;
   if (stage === "detect_schema") {
     label = props.detecting ? "Detecting…" : "Detect schema";
+    description = "Scan the uploaded JSON and build the field inventory.";
     onClick = props.onDetect;
     disabled = !storageExists || props.detecting;
   } else if (stage === "field_mapping") {
     label = props.approving ? "Approving…" : "Approve field mapping → analysis";
+    description = "Lock in the source → target field mapping and unlock analysis.";
     onClick = props.onApproveMapping;
     disabled = props.approving;
   } else if (stage === "analyze") {
     label = "Run analysis";
+    description = "Normalize every record and count valid / invalid rows.";
     onClick = props.onAnalyze;
     disabled = !isFmApproved;
   } else if (stage === "mapping") {
     label = "Confirm category mappings";
+    description = "Approve how source categories map to catalog categories.";
     onClick = props.onConfirmMapping;
   } else if (stage === "validation" || stage === "preview") {
     label = "Compute import preview";
+    description = "Diff every record against the database (inserts / updates / noops).";
     onClick = props.onPreview;
   } else if (stage === "execute") {
     label = "Run next execute chunk";
+    description = "Write the next batch of approved records to the database.";
     onClick = props.onRun;
   } else if (stage === "translations") {
     label = "Enqueue translations";
+    description = "Queue TR/EN/AR translation jobs for imported businesses.";
     onClick = props.onTranslations;
   } else if (stage === "images") {
     label = "Advance images stage";
+    description = "Image pipeline is Blocked; advance past this stage to publish.";
     onClick = props.onImagesDone;
   } else if (stage === "publish") {
     label = "Publish imported businesses";
+    description = "Flip imported businesses from pending review to published.";
     onClick = props.onPublish;
   }
   if (!onClick) return null;
   return (
-    <div className="rounded-xl border border-primary/40 bg-primary/5 p-3 flex items-center justify-between gap-3">
-      <div className="text-sm">
-        <div className="font-medium">Next action</div>
-        <div className="text-xs text-muted-foreground">Current stage: {stage}</div>
+    <div className="rounded-xl border-2 border-primary/60 bg-primary/5 p-5 flex flex-wrap items-center justify-between gap-4">
+      <div className="min-w-0 flex-1 text-sm">
+        <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+          Next step · stage {stage}
+        </div>
+        <div className="mt-1 text-base font-semibold text-foreground">{label}</div>
+        {description && (
+          <div className="mt-0.5 text-xs text-muted-foreground">{description}</div>
+        )}
       </div>
-      <Button onClick={onClick} disabled={disabled}>
+      <Button size="lg" onClick={onClick} disabled={disabled}>
         {label}
       </Button>
     </div>

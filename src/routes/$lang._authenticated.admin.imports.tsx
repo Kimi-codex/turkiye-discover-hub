@@ -9,6 +9,15 @@ import {
   markImportBatchFailed,
   deleteImportBatch,
   archiveImportBatch,
+  detectImportSchema,
+  approveImportFieldMapping,
+  analyzeImportBatch,
+  confirmImportMappings,
+  computeImportPreview,
+  runImportChunk,
+  enqueueBatchTranslations,
+  markImagesStageDone,
+  publishImportBatch,
 } from "@/lib/admin/imports.functions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
@@ -133,8 +142,8 @@ function ImportsPage() {
         <div>
           <h1 className="text-2xl font-semibold">Imports</h1>
           <p className="text-sm text-muted-foreground">
-            10-stage workflow: upload → analyze → mapping → validation → preview →
-            execute → translations → images → publish → completed.
+            10-stage workflow — each stage waits for you. Click{" "}
+            <span className="font-medium text-foreground">Next: …</span> on a card to advance one step.
           </p>
         </div>
         <div>
@@ -183,6 +192,30 @@ function ImportsPage() {
   );
 }
 
+type NextActionSpec = { label: string; run: (id: string) => Promise<unknown> };
+
+const NEXT_ACTIONS: Record<string, NextActionSpec> = {
+  detect_schema: { label: "Detect schema", run: (id) => detectImportSchema({ data: { id } }) },
+  field_mapping: {
+    label: "Approve field mapping",
+    run: (id) => approveImportFieldMapping({ data: { id } }),
+  },
+  analyze: { label: "Run analysis", run: (id) => analyzeImportBatch({ data: { id } }) },
+  mapping: {
+    label: "Confirm category mappings",
+    run: (id) => confirmImportMappings({ data: { id } }),
+  },
+  validation: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
+  preview: { label: "Compute preview", run: (id) => computeImportPreview({ data: { id } }) },
+  execute: { label: "Run next chunk", run: (id) => runImportChunk({ data: { id } }) },
+  translations: {
+    label: "Enqueue translations",
+    run: (id) => enqueueBatchTranslations({ data: { id } }),
+  },
+  images: { label: "Mark images done", run: (id) => markImagesStageDone({ data: { id } }) },
+  publish: { label: "Publish", run: (id) => publishImportBatch({ data: { id } }) },
+};
+
 function ImportCard({
   batch,
   lang,
@@ -196,6 +229,7 @@ function ImportCard({
   onDelete: () => void;
   onArchive: () => void;
 }) {
+  const qc = useQueryClient();
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "pending");
   const total = Number(batch.total_items ?? 0);
@@ -211,6 +245,16 @@ function ImportCard({
     status !== "archived" &&
     ["completed", "partially_completed", "failed", "cancelled"].includes(status);
 
+  const nextSpec = NEXT_ACTIONS[stage];
+  const nextMut = useMutation({
+    mutationFn: () => nextSpec!.run(batch.id),
+    onSuccess: () => {
+      toast.success(`${nextSpec!.label} — done`);
+      qc.invalidateQueries({ queryKey: ["admin", "imports"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="rounded-xl border bg-card p-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -225,6 +269,11 @@ function ImportCard({
             </Link>
             <StagePill stage={stage} />
             <StatusPill status={status} />
+            {nextSpec && (
+              <span className="inline-flex rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[11px] font-medium text-primary">
+                Waiting for you
+              </span>
+            )}
           </div>
           <div className="mt-1 text-xs text-muted-foreground">
             {new Date(String(batch.created_at)).toLocaleString()} ·{" "}
@@ -232,7 +281,12 @@ function ImportCard({
           </div>
         </div>
         <div className="flex flex-wrap gap-1">
-          <Button asChild size="sm">
+          {nextSpec && (
+            <Button size="sm" onClick={() => nextMut.mutate()} disabled={nextMut.isPending}>
+              {nextMut.isPending ? `${nextSpec.label}…` : `Next: ${nextSpec.label}`}
+            </Button>
+          )}
+          <Button asChild size="sm" variant="outline">
             <Link to="/$lang/_authenticated/admin/imports/$id" params={{ lang, id: batch.id }}>
               Open
             </Link>
