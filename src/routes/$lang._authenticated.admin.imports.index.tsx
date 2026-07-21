@@ -22,7 +22,7 @@ import {
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 
-export const Route = createFileRoute("/$lang/_authenticated/admin/imports")({
+export const Route = createFileRoute("/$lang/_authenticated/admin/imports/")({
   ssr: false,
   component: ImportsPage,
 });
