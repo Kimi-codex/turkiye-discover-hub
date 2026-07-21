@@ -452,7 +452,7 @@ function NextAction(props: {
     disabled = !isFmApproved;
   } else if (stage === "mapping") {
     label = "Confirm category mappings";
-    description = "Approve how source categories map to catalog categories.";
+    description = "First resolve every pending label in Category mappings; this button then unlocks validation.";
     onClick = props.onConfirmMapping;
   } else if (stage === "validation" || stage === "preview") {
     label = "Compute import preview";
