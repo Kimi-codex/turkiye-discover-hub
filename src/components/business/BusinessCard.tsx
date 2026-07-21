@@ -36,9 +36,11 @@ export function BusinessCard({
   const cityName = pickLocalized(business.city.name, locale);
   const primaryCat = pickLocalized(business.primaryCategory.name, locale);
 
-  const tags = [
+  const tags: string[] = [
     ...business.services.slice(0, 2).map((s) => s.value),
-    ...business.attributes.slice(0, 2).map((a) => a.value),
+    ...business.attributes
+      .slice(0, 2)
+      .map((a) => (a.value == null ? a.key : String(a.value))),
   ].slice(0, 3);
 
   return (

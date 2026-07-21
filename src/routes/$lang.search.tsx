@@ -163,15 +163,14 @@ function SearchPage() {
   const { data } = useSuspenseQuery(searchQuery(effectiveFilters));
 
   // If zero results but intent has narrowing chips, relax by dropping district+price.
-  const relaxedFilters = useMemo(() => {
+  const relaxedFilters = useMemo<SearchFilters | null>(() => {
     if (data.total > 0) return null;
     if (!effectiveFilters.district && !effectiveFilters.priceLevel) return null;
     return { ...effectiveFilters, district: null, priceLevel: null };
   }, [data.total, effectiveFilters]);
-  const { data: relaxedData } = useSuspenseQuery({
-    ...searchQuery(relaxedFilters ?? effectiveFilters),
-    enabled: !!relaxedFilters,
-  });
+  const { data: relaxedData } = useSuspenseQuery(
+    searchQuery(relaxedFilters ?? effectiveFilters),
+  );
   const showRelaxed = !!relaxedFilters && relaxedData && relaxedData.total > 0;
   const displayed = showRelaxed ? relaxedData : data;
 
@@ -187,7 +186,7 @@ function SearchPage() {
     navigate({
       to: "/$lang/search",
       params: { lang: locale },
-      search: (prev) => ({ ...prev, [chip.urlParam]: null, page: 1 }),
+      search: (prev: SearchParams) => ({ ...prev, [chip.urlParam]: null, page: 1 }),
     });
   }
 
@@ -196,7 +195,7 @@ function SearchPage() {
     navigate({
       to: "/$lang/search",
       params: { lang: locale },
-      search: (prev) => ({ ...prev, clarify: answer, page: 1 }),
+      search: (prev: SearchParams) => ({ ...prev, clarify: answer, page: 1 }),
     });
   }
 
