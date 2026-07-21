@@ -770,10 +770,9 @@ export const confirmImportMappings = createServerFn({ method: "POST" })
         .in("source_category", Array.from(labels))
         .eq("source_provider", "google");
       const byLabel = new Map<string, { source_category: string; mapping_status: string; category_id: string | null }>(
-        (rows ?? []).map((r: { source_category: string; mapping_status: string; category_id: string | null }) => [
-          r.source_category,
-          r,
-        ]),
+        (rows ?? []).map((r: { source_category: string; mapping_status: string; category_id: string | null }) =>
+          [r.source_category, r] as [string, { source_category: string; mapping_status: string; category_id: string | null }],
+        ),
       );
       labels.forEach((label) => {
         const r = byLabel.get(label);
