@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 import { Link, useParams } from "@tanstack/react-router";
-import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch, Image as ImageIcon, ClipboardList, MessageSquare } from "lucide-react";
+import { LayoutDashboard, Users, Building2, Upload, Flag, Shield, Tags, MapPin, Star, FileCheck, ScrollText, Settings, GitBranch, Image as ImageIcon, ClipboardList, MessageSquare, Languages } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const nav = [
