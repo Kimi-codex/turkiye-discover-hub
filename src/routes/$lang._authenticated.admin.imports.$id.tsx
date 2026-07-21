@@ -12,10 +12,15 @@ import {
   runImportChunk,
   setImportItemApproval,
   cancelImportBatch,
+  detectImportSchema,
+  updateImportFieldMapping,
+  restoreSuggestedFieldMapping,
+  approveImportFieldMapping,
 } from "@/lib/admin/imports.functions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { IMPORTABLE_FIELDS } from "@/lib/import/preview";
+import type { MappingRow } from "@/lib/import/schema-detector";
 
 export const Route = createFileRoute("/$lang/_authenticated/admin/imports/$id")({
   ssr: false,
@@ -28,8 +33,10 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/imports/$id")(
 
 const TAB_IDS = [
   "overview",
+  "schema",
+  "field_mapping",
   "analysis",
-  "mapping",
+  "categories",
   "validation",
   "import",
   "translations",
@@ -40,6 +47,8 @@ type TabId = (typeof TAB_IDS)[number];
 
 const STAGE_ORDER = [
   "upload",
+  "detect_schema",
+  "field_mapping",
   "analyze",
   "mapping",
   "validation",
@@ -50,6 +59,21 @@ const STAGE_ORDER = [
   "publish",
   "completed",
 ] as const;
+
+const STAGE_TAB: Record<string, TabId> = {
+  upload: "overview",
+  detect_schema: "schema",
+  field_mapping: "field_mapping",
+  analyze: "analysis",
+  mapping: "categories",
+  validation: "validation",
+  preview: "import",
+  execute: "import",
+  translations: "translations",
+  images: "images",
+  publish: "overview",
+  completed: "overview",
+};
 
 function ImportDetailPage() {
   const { lang, id } = Route.useParams();
