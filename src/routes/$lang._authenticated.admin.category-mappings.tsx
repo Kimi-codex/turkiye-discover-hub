@@ -99,9 +99,15 @@ function MappingsPage() {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {search.returnTo && (
+          {search.batchId && (
             <Button asChild size="sm" variant="outline">
-              <Link to={search.returnTo}>Return to import batch</Link>
+              <Link
+                to="/$lang/admin/imports/$id"
+                params={{ lang, id: search.batchId }}
+                search={{ tab: "categories" }}
+              >
+                Return to import batch
+              </Link>
             </Button>
           )}
           {search.batchId && (
