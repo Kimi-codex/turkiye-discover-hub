@@ -211,6 +211,8 @@ export type Database = {
           created_at: string
           error_message: string | null
           file_size: number | null
+          google_photo_category: string | null
+          google_photo_labels: Json | null
           height: number | null
           id: string
           image_type: string
@@ -236,6 +238,8 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           file_size?: number | null
+          google_photo_category?: string | null
+          google_photo_labels?: Json | null
           height?: number | null
           id?: string
           image_type?: string
@@ -261,6 +265,8 @@ export type Database = {
           created_at?: string
           error_message?: string | null
           file_size?: number | null
+          google_photo_category?: string | null
+          google_photo_labels?: Json | null
           height?: number | null
           id?: string
           image_type?: string
@@ -444,6 +450,7 @@ export type Database = {
           owner_id: string | null
           phone: string | null
           place_id: string
+          popular_times: Json | null
           price_level: number | null
           primary_category_id: string | null
           rating: number | null
@@ -479,6 +486,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           place_id: string
+          popular_times?: Json | null
           price_level?: number | null
           primary_category_id?: string | null
           rating?: number | null
@@ -514,6 +522,7 @@ export type Database = {
           owner_id?: string | null
           phone?: string | null
           place_id?: string
+          popular_times?: Json | null
           price_level?: number | null
           primary_category_id?: string | null
           rating?: number | null
@@ -1191,6 +1200,7 @@ export type Database = {
           created_at: string
           id: string
           image_id: string | null
+          internal_notes: string | null
           message: string | null
           report_type: string
           reporter_id: string | null
@@ -1205,6 +1215,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_id?: string | null
+          internal_notes?: string | null
           message?: string | null
           report_type: string
           reporter_id?: string | null
@@ -1219,6 +1230,7 @@ export type Database = {
           created_at?: string
           id?: string
           image_id?: string | null
+          internal_notes?: string | null
           message?: string | null
           report_type?: string
           reporter_id?: string | null
@@ -1253,6 +1265,7 @@ export type Database = {
       }
       reviews: {
         Row: {
+          admin_notes: string | null
           author_avatar_url: string | null
           author_name: string | null
           business_id: string
@@ -1272,6 +1285,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
+          admin_notes?: string | null
           author_avatar_url?: string | null
           author_name?: string | null
           business_id: string
@@ -1291,6 +1305,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
+          admin_notes?: string | null
           author_avatar_url?: string | null
           author_name?: string | null
           business_id?: string
