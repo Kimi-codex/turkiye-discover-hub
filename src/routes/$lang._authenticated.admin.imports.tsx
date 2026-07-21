@@ -33,17 +33,49 @@ type BatchRow = Record<string, unknown> & {
   stage: string;
 };
 
+const STAGE_ORDER = [
+  "upload",
+  "detect_schema",
+  "field_mapping",
+  "analyze",
+  "mapping",
+  "validation",
+  "preview",
+  "execute",
+  "translations",
+  "images",
+  "publish",
+  "completed",
+] as const;
+
 const STAGE_LABEL: Record<string, string> = {
   upload: "1. Upload",
-  analyze: "2. Analyze",
-  mapping: "3. Mapping",
-  validation: "4. Validation",
-  preview: "5. Preview",
-  execute: "6. Execute",
-  translations: "7. Translations",
-  images: "8. Images",
-  publish: "9. Publish",
-  completed: "10. Completed",
+  detect_schema: "2. Detect schema",
+  field_mapping: "3. Field mapping",
+  analyze: "4. Analyze",
+  mapping: "5. Category mapping",
+  validation: "6. Validation",
+  preview: "7. Preview",
+  execute: "8. Execute",
+  translations: "9. Translations",
+  images: "10. Images",
+  publish: "11. Publish",
+  completed: "12. Completed",
+};
+
+const STAGE_SHORT: Record<string, string> = {
+  upload: "Upload",
+  detect_schema: "Schema",
+  field_mapping: "Field map",
+  analyze: "Analyze",
+  mapping: "Categories",
+  validation: "Validate",
+  preview: "Preview",
+  execute: "Execute",
+  translations: "Translate",
+  images: "Images",
+  publish: "Publish",
+  completed: "Done",
 };
 
 function ImportsPage() {
