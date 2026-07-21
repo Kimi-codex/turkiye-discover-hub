@@ -53,6 +53,8 @@ export type Database = {
         Row: {
           action: string
           actor_id: string | null
+          after_data: Json | null
+          before_data: Json | null
           created_at: string
           entity_id: string | null
           entity_type: string | null
@@ -62,6 +64,8 @@ export type Database = {
         Insert: {
           action: string
           actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
@@ -71,6 +75,8 @@ export type Database = {
         Update: {
           action?: string
           actor_id?: string | null
+          after_data?: Json | null
+          before_data?: Json | null
           created_at?: string
           entity_id?: string | null
           entity_type?: string | null
@@ -209,6 +215,8 @@ export type Database = {
           id: string
           image_type: string
           is_cover: boolean
+          last_attempt_at: string | null
+          next_attempt_at: string | null
           place_id: string
           r2_key: string | null
           r2_url: string | null
@@ -218,6 +226,7 @@ export type Database = {
           source_url: string | null
           storage_status: string
           updated_at: string
+          uploaded_at: string | null
           width: number | null
         }
         Insert: {
@@ -231,6 +240,8 @@ export type Database = {
           id?: string
           image_type?: string
           is_cover?: boolean
+          last_attempt_at?: string | null
+          next_attempt_at?: string | null
           place_id: string
           r2_key?: string | null
           r2_url?: string | null
@@ -240,6 +251,7 @@ export type Database = {
           source_url?: string | null
           storage_status?: string
           updated_at?: string
+          uploaded_at?: string | null
           width?: number | null
         }
         Update: {
@@ -253,6 +265,8 @@ export type Database = {
           id?: string
           image_type?: string
           is_cover?: boolean
+          last_attempt_at?: string | null
+          next_attempt_at?: string | null
           place_id?: string
           r2_key?: string | null
           r2_url?: string | null
@@ -262,6 +276,7 @@ export type Database = {
           source_url?: string | null
           storage_status?: string
           updated_at?: string
+          uploaded_at?: string | null
           width?: number | null
         }
         Relationships: [
@@ -414,6 +429,7 @@ export type Database = {
           description: string | null
           district_id: string | null
           email: string | null
+          field_sources: Json
           formatted_address: string | null
           google_maps_url: string | null
           id: string
@@ -448,6 +464,7 @@ export type Database = {
           description?: string | null
           district_id?: string | null
           email?: string | null
+          field_sources?: Json
           formatted_address?: string | null
           google_maps_url?: string | null
           id?: string
@@ -482,6 +499,7 @@ export type Database = {
           description?: string | null
           district_id?: string | null
           email?: string | null
+          field_sources?: Json
           formatted_address?: string | null
           google_maps_url?: string | null
           id?: string
@@ -597,6 +615,7 @@ export type Database = {
           source_category: string
           source_provider: string
           updated_at: string
+          usage_count: number
         }
         Insert: {
           category_id?: string | null
@@ -607,6 +626,7 @@ export type Database = {
           source_category: string
           source_provider?: string
           updated_at?: string
+          usage_count?: number
         }
         Update: {
           category_id?: string | null
@@ -617,6 +637,7 @@ export type Database = {
           source_category?: string
           source_provider?: string
           updated_at?: string
+          usage_count?: number
         }
         Relationships: [
           {
@@ -920,37 +941,46 @@ export type Database = {
       }
       import_batch_items: {
         Row: {
+          action: string | null
           business_id: string | null
           created_at: string
           error_message: string | null
           id: string
           import_batch_id: string
+          item_index: number | null
           place_id: string | null
           processed_at: string | null
           raw_payload: Json | null
           status: string
+          updated_at: string
         }
         Insert: {
+          action?: string | null
           business_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
           import_batch_id: string
+          item_index?: number | null
           place_id?: string | null
           processed_at?: string | null
           raw_payload?: Json | null
           status?: string
+          updated_at?: string
         }
         Update: {
+          action?: string | null
           business_id?: string | null
           created_at?: string
           error_message?: string | null
           id?: string
           import_batch_id?: string
+          item_index?: number | null
           place_id?: string | null
           processed_at?: string | null
           raw_payload?: Json | null
           status?: string
+          updated_at?: string
         }
         Relationships: [
           {
@@ -974,40 +1004,94 @@ export type Database = {
           completed_at: string | null
           created_at: string
           created_by: string | null
+          duplicate_items: number
+          error_message: string | null
           failed_items: number
+          file_hash: string | null
+          file_size: number | null
           id: string
+          import_options: Json
+          inserted_items: number
+          invalid_items: number
           metadata: Json | null
+          needs_mapping_items: number
+          original_filename: string | null
           processed_items: number
+          processing_lock_at: string | null
+          processing_lock_by: string | null
+          skipped_items: number
           source: string
+          source_provider: string
+          started_at: string | null
           status: string
+          storage_bucket: string
+          storage_object_path: string | null
           total_items: number
           updated_at: string
+          updated_items: number
+          valid_items: number
         }
         Insert: {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          duplicate_items?: number
+          error_message?: string | null
           failed_items?: number
+          file_hash?: string | null
+          file_size?: number | null
           id?: string
+          import_options?: Json
+          inserted_items?: number
+          invalid_items?: number
           metadata?: Json | null
+          needs_mapping_items?: number
+          original_filename?: string | null
           processed_items?: number
+          processing_lock_at?: string | null
+          processing_lock_by?: string | null
+          skipped_items?: number
           source: string
+          source_provider?: string
+          started_at?: string | null
           status?: string
+          storage_bucket?: string
+          storage_object_path?: string | null
           total_items?: number
           updated_at?: string
+          updated_items?: number
+          valid_items?: number
         }
         Update: {
           completed_at?: string | null
           created_at?: string
           created_by?: string | null
+          duplicate_items?: number
+          error_message?: string | null
           failed_items?: number
+          file_hash?: string | null
+          file_size?: number | null
           id?: string
+          import_options?: Json
+          inserted_items?: number
+          invalid_items?: number
           metadata?: Json | null
+          needs_mapping_items?: number
+          original_filename?: string | null
           processed_items?: number
+          processing_lock_at?: string | null
+          processing_lock_by?: string | null
+          skipped_items?: number
           source?: string
+          source_provider?: string
+          started_at?: string | null
           status?: string
+          storage_bucket?: string
+          storage_object_path?: string | null
           total_items?: number
           updated_at?: string
+          updated_items?: number
+          valid_items?: number
         }
         Relationships: []
       }
@@ -1182,6 +1266,7 @@ export type Database = {
           review_language: string | null
           review_text: string | null
           source: string
+          source_fingerprint: string | null
           status: string
           updated_at: string
           user_id: string | null
@@ -1200,6 +1285,7 @@ export type Database = {
           review_language?: string | null
           review_text?: string | null
           source: string
+          source_fingerprint?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -1218,6 +1304,7 @@ export type Database = {
           review_language?: string | null
           review_text?: string | null
           source?: string
+          source_fingerprint?: string | null
           status?: string
           updated_at?: string
           user_id?: string | null
@@ -1329,12 +1416,34 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approve_ownership_claim: { Args: { _claim_id: string }; Returns: Json }
+      bootstrap_admin: { Args: { _target_user: string }; Returns: Json }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
           _user_id: string
         }
         Returns: boolean
+      }
+      record_audit: {
+        Args: {
+          _action: string
+          _after: Json
+          _before: Json
+          _entity_id: string
+          _entity_type: string
+          _metadata: Json
+        }
+        Returns: string
+      }
+      set_user_role: {
+        Args: {
+          _add: boolean
+          _confirm_self?: boolean
+          _role: Database["public"]["Enums"]["app_role"]
+          _target_user: string
+        }
+        Returns: Json
       }
     }
     Enums: {
