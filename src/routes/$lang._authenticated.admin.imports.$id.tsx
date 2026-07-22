@@ -11,6 +11,7 @@ import {
   markImagesStageDone,
   publishImportBatch,
   reprocessBatchImages,
+  reprocessBatchReviews,
   runImportChunk,
   setImportItemApproval,
   cancelImportBatch,
