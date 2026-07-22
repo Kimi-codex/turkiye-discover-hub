@@ -425,7 +425,7 @@ function ImportDetailPage() {
         )
       )}
       {currentTab === "translations" && <TranslationsTab provenance={provenance} />}
-      {currentTab === "images" && <ImagesTab provenance={provenance} />}
+      {currentTab === "images" && <ImagesTab provenance={provenance} batchId={id} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
     </div>
   );
