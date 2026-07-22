@@ -30,6 +30,7 @@ import {
 import {
   normalizeGooglePlace,
   normalizeImages,
+  normalizeReviews,
   validateNormalizedBusiness,
   type NormalizedBusiness,
 } from "@/lib/import/normalize";
@@ -1645,3 +1646,69 @@ export const reprocessBatchImages = createServerFn({ method: "POST" })
 
     return { ok: true, itemsScanned, itemsWithImages, imagesUpserted };
   });
+
+// ---------- Reprocess reviews for existing batch ----------
+/**
+ * Re-extract and upsert reviews rows for every item in a batch that already
+ * has a linked business_id. Google-sourced reviews are stored as
+ * status='published' (external, moderated by Google). Idempotent via
+ * onConflict=(business_id, source, source_fingerprint).
+ */
+export const reprocessBatchReviews = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: { batchId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: items, error } = await supabase
+      .from("import_batch_items")
+      .select("id, business_id, raw_payload")
+      .eq("import_batch_id", data.batchId)
+      .not("business_id", "is", null);
+    if (error) throw new Response(error.message, { status: 500 });
+
+    let itemsScanned = 0;
+    let itemsWithReviews = 0;
+    let reviewsUpserted = 0;
+
+    for (const it of items ?? []) {
+      itemsScanned++;
+      const rp = (it.raw_payload as Record<string, unknown> | null) ?? {};
+      const source = (rp.source as Record<string, unknown> | undefined) ?? null;
+      if (!source) continue;
+      const unwrapped = unwrapRecord(source);
+      const reviews = normalizeReviews(unwrapped);
+      if (reviews.length === 0) continue;
+      itemsWithReviews++;
+      for (const rv of reviews) {
+        const { error: rErr } = await supabase.from("reviews").upsert(
+          {
+            business_id: it.business_id as string,
+            source: "google",
+            external_review_id: rv.externalReviewId,
+            source_fingerprint: rv.sourceFingerprint,
+            author_name: rv.authorName,
+            author_avatar_url: rv.authorAvatarUrl,
+            rating: rv.rating,
+            review_text: rv.reviewText,
+            review_language: rv.reviewLanguage,
+            review_date: rv.reviewDate,
+            status: "published",
+          },
+          { onConflict: "business_id,source,source_fingerprint" },
+        );
+        if (!rErr) reviewsUpserted++;
+      }
+    }
+
+    await supabase.rpc("record_audit", {
+      _action: "import.reprocess_reviews",
+      _entity_type: "import_batch",
+      _entity_id: data.batchId,
+      _before: null,
+      _after: null,
+      _metadata: { itemsScanned, itemsWithReviews, reviewsUpserted },
+    });
+
+    return { ok: true, itemsScanned, itemsWithReviews, reviewsUpserted };
+  });
+

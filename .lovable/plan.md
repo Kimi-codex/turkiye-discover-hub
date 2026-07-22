@@ -1,37 +1,51 @@
-## السبب الجذري
+## المشكلة (السبب الجذري)
 
-كل سجل في الملف يحتوي على `images: [ "https://...", "https://...", ... ]` — أي **مصفوفة نصوص URL خام**، وليست كائنات `{ url, width, height, ... }`.
+الدُفعة `final.json` نُفّذت (Execute) بينما كان `normalizeImages` يرفض روابط الصور المكتوبة كـ **نصوص** (وليس كائنات)، وكذلك تم اعتماد نتائج المعالجة (`rp.normalized`) في مرحلة Analyze السابقة — أي أن الـ Execute يستخدم البيانات المُطبَّعة سلفًا. النتيجة:
 
-الدالة `normalizeImages` في `src/lib/import/normalize.ts` تتعامل مع كل عنصر باعتباره كائن (`p.url ?? p.photo_reference ?? p.source ?? p.src`). عندما يكون العنصر مجرد نص، كل هذه الحقول `undefined` فترجع `null` ويُتخطى الصف. النتيجة: `normalized.images = []` لكل الأعمال الأربعين، ولا يُدرج أي صف في `business_images` أثناء التنفيذ.
+- `business_images`: 0 صفوف من هذه الدُفعة (الـ16 الظاهرة قديمة من اختبار سابق).
+- `reviews`: 0 صفوف — نفس السبب (Analyze السابق أنتج `reviews: []`).
 
-الـ 16 سجل الظاهرين في الصفحة (بـ `source: manual`) من دفعات أقدم مختلفة تمامًا — لا علاقة لهم بالاستيراد الحالي.
+الأذونات و RLS سليمة، وبنية الحمولة صحيحة: كل عنصر يحتوي `images: [url,...]` و`reviews: [{rating,text,author,date}]`. المشكلة فقط أن Execute لا يعيد التطبيع من `raw_payload.source`.
+
+زر **"Reprocess images from source"** أضيف سابقًا داخل تبويب Images في صفحة تفاصيل الاستيراد، لكنه:
+1. غير مرئي بشكل كافٍ (مخفي داخل تبويب فرعي).
+2. لا يعالج الرفيوز إطلاقًا.
 
 ## الخطة
 
-### 1. إصلاح `normalizeImages` لقبول النصوص
-`src/lib/import/normalize.ts` — داخل `photos.forEach`، اعتبر العنصر إذا كان `typeof p === "string"` كأنه `{ url: p }`. يبقى فحص `^https?://` كما هو. لا تغيير في التصنيف/الغلاف.
+### 1) دالة سيرفر جديدة `reprocessBatchReviews`
+- في `src/lib/admin/imports.functions.ts`، نظيرة لـ `reprocessBatchImages`.
+- تمر على كل `import_batch_items` مرتبطة بـ `business_id`، تستدعي `unwrapRecord` ثم `normalizeReviews`، وتـ `upsert` في جدول `reviews` باستخدام `onConflict=(business_id, source, source_fingerprint)` مع `source='google'` و `status='published'`.
+- ترجع `{ itemsScanned, itemsWithReviews, reviewsUpserted }` وتُسجّل audit log.
 
-### 2. زر إعادة معالجة الصور لدفعة موجودة
-بدلًا من إعادة تشغيل التحليل كاملًا، أضف زر **"Reprocess images"** في صفحة تفاصيل الاستيراد `src/routes/$lang._authenticated.admin.imports.$id.tsx` يستدعي دالة خادم جديدة `reprocessBatchImages(batchId)` في `src/lib/admin/imports.functions.ts`:
-- تقرأ كل `import_batch_items` للدفعة التي لها `business_id` غير فارغ.
-- تعيد استخراج الصور من `raw_payload.source` عبر `unwrapRecord` + `normalizeImages` (الدالة المصححة).
-- تعمل `upsert` في `business_images` بنفس منطق `executeImport` (`source_type='google_places'`, `storage_status='pending'`, إلخ) لكل صورة، مع مراعاة `onConflict` الحالي.
-- تعيد عدّاد الصور المُدرجة/المحدَّثة.
+### 2) دالة موحّدة `reprocessBatchData`
+- تستدعي داخليًا `reprocessBatchImages` + `reprocessBatchReviews` وتعيد الملخصين معًا. لتمكين زر واحد يفعل كل شيء.
 
-هذا يُعالج الدفعة الحالية دون إعادة إدراج الأعمال.
+### 3) تحسين واجهة إعادة المعالجة
+في `src/routes/$lang._authenticated.admin.imports.$id.tsx`:
+- نقل زر **"Reprocess data (images + reviews)"** إلى شريط الإجراءات العلوي للدفعة المكتملة (بجانب Open/Schema/Archive)، ليكون واضحًا فور فتح الدفعة.
+- إظهار Toast بعد التنفيذ بعدد الصور والرفيوز المُدرجة.
+- إبطال (invalidate) استعلامات `admin/images` و `admin/reviews` والدُفعة الحالية.
 
-### 3. اختبار وحدة سريع
-تحديث `src/lib/import/__tests__/pipeline.test.ts` (أو ملف مجاور) بحالة: مصفوفة نصوص → 5 صور مطبعة، الغلاف = الأولى.
+في `src/routes/$lang._authenticated.admin.imports.index.tsx`:
+- إضافة زر ثانوي **"Reprocess"** على كارت أي دفعة `completed` — لتفادي الحاجة لفتح التفاصيل.
 
-### 4. تحقق نهائي
-تشغيل الزر على الدفعة العالقة، ثم عرض صفحة `/admin/images` لرؤية 200 سجل (40 × 5) بحالة `pending` — سيبقون `external_only` لعرض `source_url` حتى تُهيَّأ R2.
+### 4) تنفيذ فوري للدفعة الحالية
+بعد تفعيل الأزرار، اضغط زر Reprocess مرة واحدة على `final.json` — سيُدرج ~200 صورة و~200 رفيو، وستظهر مباشرة في:
+- `/en/admin/images` (تبويب Records)
+- صفحة العمل العامة (`/en/place/...`) في قسم التقييمات
 
-## تفاصيل تقنية
+### تفاصيل تقنية
 
-- التغيير في `normalizeImages` سطر واحد فعليًا:
-  ```ts
-  const p = typeof rawP === "string" ? { url: rawP } : rawP;
-  ```
-  ثم استخدم `p` كما هو.
-- `reprocessBatchImages` تستخدم `requireAdmin` middleware وتفعل `supabase.from("business_images").upsert(..., { onConflict: "business_id,source_url" })` — نفس النمط الموجود في `executeImport`.
-- لا تعديل على DB schema، ولا تعديل على تدفق العمل، ولا على القوائم/الإحصاءات (ستتحدث تلقائيًا لأن العدّاد يقرأ من `business_images` مباشرة).
+- لا تعديل على مخطط قاعدة البيانات — الأذونات و RLS و `onConflict` كلها جاهزة.
+- `normalizeReviews` الحالي يتعامل مع الشكل الموجود في `raw_payload.source.reviews` (بعد unwrap تصبح في `raw.reviews`).
+- `normalizeImages` بعد التصحيح الأخير يقبل مصفوفة روابط نصية.
+- إعادة المعالجة idempotent: التشغيل المتكرر لا ينشئ تكرارات بفضل `onConflict`.
+- الرفيوز المُستوردة تُحفظ بـ `status='published'` وليس `pending`، لأنها من Google (مصدر خارجي موثوق) — رفيوز المستخدمين على المنصة تظل `pending` وتحتاج مراجعة.
+
+## نطاق التغيير
+- `src/lib/admin/imports.functions.ts` (إضافة دالتين)
+- `src/routes/$lang._authenticated.admin.imports.$id.tsx` (نقل الزر + دمج)
+- `src/routes/$lang._authenticated.admin.imports.index.tsx` (زر سريع على الكارت)
+
+لا تغييرات في القاعدة، لا مايجريشن، لا تعديل RLS.

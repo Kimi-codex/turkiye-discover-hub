@@ -11,6 +11,7 @@ import {
   markImagesStageDone,
   publishImportBatch,
   reprocessBatchImages,
+  reprocessBatchReviews,
   runImportChunk,
   setImportItemApproval,
   cancelImportBatch,
@@ -279,6 +280,25 @@ function ImportDetailPage() {
   };
   const isLocked = (t: TabId) => !!lockedReason[t];
 
+  const reprocessImagesFn = useServerFn(reprocessBatchImages);
+  const reprocessReviewsFn = useServerFn(reprocessBatchReviews);
+  const reprocessAllMut = useMutation({
+    mutationFn: async () => {
+      const [imgs, revs] = await Promise.all([
+        reprocessImagesFn({ data: { batchId: id } }),
+        reprocessReviewsFn({ data: { batchId: id } }),
+      ]);
+      return { imgs, revs };
+    },
+    onSuccess: async ({ imgs, revs }) => {
+      toast.success(
+        `Reprocessed: ${imgs.imagesUpserted} images · ${revs.reviewsUpserted} reviews across ${imgs.itemsScanned} items`,
+      );
+      await qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -288,12 +308,23 @@ function ImportDetailPage() {
             Batch ID: <span className="font-mono">{id}</span>
           </div>
         </div>
-        <Button asChild variant="outline">
-          <Link to="/$lang/admin/imports" params={{ lang }}>
-            ← Back
-          </Link>
-        </Button>
+        <div className="flex flex-wrap items-center gap-2">
+          <Button
+            variant="secondary"
+            onClick={() => reprocessAllMut.mutate()}
+            disabled={reprocessAllMut.isPending}
+            title="Re-extract images and reviews from each item's raw payload and upsert. Idempotent."
+          >
+            {reprocessAllMut.isPending ? "Reprocessing…" : "Reprocess data (images + reviews)"}
+          </Button>
+          <Button asChild variant="outline">
+            <Link to="/$lang/admin/imports" params={{ lang }}>
+              ← Back
+            </Link>
+          </Button>
+        </div>
       </div>
+
 
       <NextAction
         stage={stage}
