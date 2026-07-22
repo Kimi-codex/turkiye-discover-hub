@@ -1,63 +1,37 @@
-# الريفيوز: كتابة + مراجعة إدارية + إصلاح الاستيراد
+## السبب الجذري
 
-## التشخيص (مؤكَّد بالقراءة)
+كل سجل في الملف يحتوي على `images: [ "https://...", "https://...", ... ]` — أي **مصفوفة نصوص URL خام**، وليست كائنات `{ url, width, height, ... }`.
 
-1. **زر "Write a review"** في `src/routes/$lang.place.$slug.tsx` مجرد زر شكلي — لا Dialog ولا insert. لذلك المستخدم لا يستطيع فعليًا كتابة ريفيو.
-2. **لا يوجد أي صف في جدول `reviews`** (`SELECT status,count(*) → []`) رغم استيراد 40 نشاطًا في الدفعة `1c09b6c8…`. وبالفحص:
-   - `field_inventory` فارغ لكن ذلك لا يهم — `normalizeReviews` يقرأ `raw.reviews` مباشرة.
-   - `normalizeReviews` يتجاهل أي عنصر `rating === null`، ولا يدعم الأشكال البديلة الشائعة في تصديرات Google (`reviews_data`, `user_reviews`, `latest_reviews`, `business.reviews` بعد الفك). لذلك ملف `final.json` الحالي — الذي على الأرجح يستخدم أحد هذه المفاتيح — يُعطي 0 ريفيوز.
-   - لا يوجد أي عدّاد يخبر المشرف بعدد الريفيوز التي رآها المُطبِّع مقابل التي كُتبت، فيبدو الاستيراد وكأنه "نجح" بينما الريفيوز مفقودة صامتًا.
-3. سياسات RLS الحالية بالفعل تسمح بـ `INSERT` لريفيوز المنصة (`source='platform'`) وتُخفي أي ريفيو `status != 'published'` عن العامة، إذًا المطلوب فقط قناة كتابة + شاشة مراجعة.
+الدالة `normalizeImages` في `src/lib/import/normalize.ts` تتعامل مع كل عنصر باعتباره كائن (`p.url ?? p.photo_reference ?? p.source ?? p.src`). عندما يكون العنصر مجرد نص، كل هذه الحقول `undefined` فترجع `null` ويُتخطى الصف. النتيجة: `normalized.images = []` لكل الأعمال الأربعين، ولا يُدرج أي صف في `business_images` أثناء التنفيذ.
 
----
+الـ 16 سجل الظاهرين في الصفحة (بـ `source: manual`) من دفعات أقدم مختلفة تمامًا — لا علاقة لهم بالاستيراد الحالي.
 
-## الخطوات
+## الخطة
 
-### 1) نموذج كتابة ريفيو (مستخدم مسجَّل)
-- ملف جديد: `src/components/business/WriteReviewDialog.tsx` — Dialog يحتوي: نجوم 1-5، نص (5-2000 حرف)، زر إرسال.
-- Server function جديد `submitReview` في `src/lib/reviews/reviews.functions.ts` مع `requireSupabaseAuth`، ينفّذ:
-  ```
-  insert into reviews (business_id, user_id, source, rating, review_text,
-                       review_language, status)
-  values (..., 'platform', ..., ..., <locale>, 'pending')
-  ```
-  ثم يُعيد `{ ok: true }`.
-- في `src/routes/$lang.place.$slug.tsx`: يستبدل زر "Write review" الحالي بمفتاح فتح للـDialog. إذا المستخدم غير مسجَّل → تحويل إلى `/{lang}/auth?redirect=...`.
-- بعد الإرسال: Toast «شكرًا، ريفيوك قيد المراجعة» + إخفاء الزر أو إظهار حالة "Pending".
+### 1. إصلاح `normalizeImages` لقبول النصوص
+`src/lib/import/normalize.ts` — داخل `photos.forEach`، اعتبر العنصر إذا كان `typeof p === "string"` كأنه `{ url: p }`. يبقى فحص `^https?://` كما هو. لا تغيير في التصنيف/الغلاف.
 
-### 2) صفحة إدارة الريفيوز (Moderation)
-- ملف جديد: `src/routes/$lang._authenticated.admin.reviews.tsx` + رابط جانبي «Reviews» في Admin shell.
-- تبويبات: **Pending / Published / Rejected**، مع بحث بالاسم أو النشاط.
-- كل صف: صاحب الريفيو، النشاط (رابط), النجوم, النص, التاريخ, المصدر (`platform`/`google`), أزرار **Approve / Reject / Delete**.
-- Server fns في نفس الملف (admin-gated): `listReviewsForModeration`, `setReviewStatus(id, 'published'|'rejected')`, `deleteReview(id)`.
-- تدقيق في `audit_logs` لكل تغيير حالة.
+### 2. زر إعادة معالجة الصور لدفعة موجودة
+بدلًا من إعادة تشغيل التحليل كاملًا، أضف زر **"Reprocess images"** في صفحة تفاصيل الاستيراد `src/routes/$lang._authenticated.admin.imports.$id.tsx` يستدعي دالة خادم جديدة `reprocessBatchImages(batchId)` في `src/lib/admin/imports.functions.ts`:
+- تقرأ كل `import_batch_items` للدفعة التي لها `business_id` غير فارغ.
+- تعيد استخراج الصور من `raw_payload.source` عبر `unwrapRecord` + `normalizeImages` (الدالة المصححة).
+- تعمل `upsert` في `business_images` بنفس منطق `executeImport` (`source_type='google_places'`, `storage_status='pending'`, إلخ) لكل صورة، مع مراعاة `onConflict` الحالي.
+- تعيد عدّاد الصور المُدرجة/المحدَّثة.
 
-### 3) إصلاح استيراد الريفيوز
-- `src/lib/import/normalize.ts` → `normalizeReviews`:
-  - قبول أي من: `raw.reviews`, `raw.reviews_data`, `raw.user_reviews`, `raw.latest_reviews`, أو المصفوفة نفسها من `raw.business?.reviews` إن وُجدت.
-  - تخفيف شرط الرفض: قبول `rating === null` عندما يكون هناك نص، وتخزينه كـ`rating=0` مرفوض من الفلترة النهائية بدل تجاهله بصمت — بدلًا من ذلك: عدّه ضمن "skipped_no_rating" في تقرير الاستيراد.
-- `src/lib/import/schema-detector.ts`: إضافة تعرُّف على مفاتيح `reviews_data[]`, `user_reviews[]`, `latest_reviews[]` (aliases فقط للعرض في Field Mapping).
-- `imports.functions.ts`:
-  - تجميع عدّادات لكل دفعة: `reviewsSeen`, `reviewsWritten`, `reviewsSkippedNoRating`, وحفظها في `metadata.reviewStats`.
-  - في حالة `revErr`، تسجيل السبب في لوق الدفعة بدل الابتلاع الصامت.
-- إضافة زر **"Reprocess reviews"** على بطاقة الدفعة المكتملة في `src/routes/$lang._authenticated.admin.imports.$id.tsx` يستدعي `reprocessReviewsForBatch(batchId)`: يُعيد تنزيل الملف من التخزين، ويعيد فقط شقّ الريفيوز عبر `upsert` (idempotent — نفس `source_fingerprint`).
-- إعدادات: احترام `site_settings.reviews.auto_publish` (موجود). عند `false` → `status='pending'`، وإلا `'published'`. الافتراضي `false` كما هو الآن، لكي تمرّ الريفيوز المستوردة أيضًا من نفس شاشة المراجعة.
+هذا يُعالج الدفعة الحالية دون إعادة إدراج الأعمال.
 
-### 4) عرض في صفحة النشاط
-- `src/lib/repos/supabase-repos.ts` → `listForBusiness`: يبقى فلتر `status='published'`.
-- في `src/routes/$lang.place.$slug.tsx`: إضافة empty-state «لا توجد ريفيوز بعد — كن أول من يكتب».
+### 3. اختبار وحدة سريع
+تحديث `src/lib/import/__tests__/pipeline.test.ts` (أو ملف مجاور) بحالة: مصفوفة نصوص → 5 صور مطبعة، الغلاف = الأولى.
 
----
+### 4. تحقق نهائي
+تشغيل الزر على الدفعة العالقة، ثم عرض صفحة `/admin/images` لرؤية 200 سجل (40 × 5) بحالة `pending` — سيبقون `external_only` لعرض `source_url` حتى تُهيَّأ R2.
 
 ## تفاصيل تقنية
 
-- **RLS**: لا تغييرات في السياسات. `reviews_platform_insert_self` (موجود) يسمح للمستخدم بإدخال ريفيو بـ`user_id = auth.uid()` و`source='platform'`. سياسات الأدمن الحالية تكفي لتحديث `status`.
-- **حماية من السبام**: منع كتابة أكثر من ريفيو واحد لكل مستخدم لنفس النشاط عبر فحص مسبق داخل `submitReview` (استعلام `select id where business_id=… and user_id=…` — نعالجه بـ`.maybeSingle()` لتفادي أخطاء عدم وجود صف). إن وُجد → رد `{ ok:false, reason:'already_submitted' }`.
-- **حالة الاستيراد**: لا مايجريشن مطلوبة. `metadata` عمود JSONB موجود على `import_batches`.
-- **إحصائيات الاستيراد**: تُعرض في بطاقة الدفعة تحت "Import summary": `Reviews: seen X → written Y (skipped Z)`.
-
-## ما لن يُلمَس
-
-- شكل صفحة النشاط أو التصميم العام.
-- خط أنابيب الصور والترجمة.
-- بنية `businesses` أو الـ RPCs.
+- التغيير في `normalizeImages` سطر واحد فعليًا:
+  ```ts
+  const p = typeof rawP === "string" ? { url: rawP } : rawP;
+  ```
+  ثم استخدم `p` كما هو.
+- `reprocessBatchImages` تستخدم `requireAdmin` middleware وتفعل `supabase.from("business_images").upsert(..., { onConflict: "business_id,source_url" })` — نفس النمط الموجود في `executeImport`.
+- لا تعديل على DB schema، ولا تعديل على تدفق العمل، ولا على القوائم/الإحصاءات (ستتحدث تلقائيًا لأن العدّاد يقرأ من `business_images` مباشرة).

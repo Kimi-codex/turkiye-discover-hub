@@ -1,6 +1,7 @@
 import { useMemo, useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   analyzeImportBatch,
   computeImportPreview,
@@ -9,6 +10,7 @@ import {
   getImportBatch,
   markImagesStageDone,
   publishImportBatch,
+  reprocessBatchImages,
   runImportChunk,
   setImportItemApproval,
   cancelImportBatch,
@@ -425,7 +427,7 @@ function ImportDetailPage() {
         )
       )}
       {currentTab === "translations" && <TranslationsTab provenance={provenance} />}
-      {currentTab === "images" && <ImagesTab provenance={provenance} />}
+      {currentTab === "images" && <ImagesTab provenance={provenance} batchId={id} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
     </div>
   );
@@ -999,8 +1001,17 @@ function TranslationsTab({ provenance }: { provenance: Array<Record<string, unkn
   );
 }
 
-function ImagesTab({ provenance }: { provenance: Array<Record<string, unknown>> }) {
+function ImagesTab({ provenance, batchId }: { provenance: Array<Record<string, unknown>>; batchId: string }) {
   const { lang } = Route.useParams();
+  const reprocessFn = useServerFn(reprocessBatchImages);
+  const reprocess = useMutation({
+    mutationFn: () => reprocessFn({ data: { batchId } }),
+    onSuccess: (r: { itemsScanned: number; itemsWithImages: number; imagesUpserted: number }) =>
+      toast.success(
+        `Reprocessed ${r.itemsScanned} items · ${r.itemsWithImages} with images · ${r.imagesUpserted} rows written`,
+      ),
+    onError: (e: Error) => toast.error(e.message),
+  });
   return (
     <div className="space-y-3">
       <div className="rounded-xl border border-amber-400 bg-amber-50 p-3 text-sm text-amber-900">
@@ -1017,6 +1028,15 @@ function ImagesTab({ provenance }: { provenance: Array<Record<string, unknown>> 
         <p className="text-xs text-muted-foreground">
           See <Link to="/$lang/admin/images" params={{ lang }} className="underline">Images admin</Link> for record vs job counts and safe deletion.
         </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <Button size="sm" onClick={() => reprocess.mutate()} disabled={reprocess.isPending}>
+            {reprocess.isPending ? "Reprocessing…" : "Reprocess images from source"}
+          </Button>
+          <span className="text-xs text-muted-foreground">
+            Re-extracts photo URLs from each item's raw payload and upserts <code>business_images</code> rows.
+            Safe to run repeatedly.
+          </span>
+        </div>
       </div>
     </div>
   );

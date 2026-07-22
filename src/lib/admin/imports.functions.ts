@@ -29,6 +29,7 @@ import {
 } from "@/lib/import/format";
 import {
   normalizeGooglePlace,
+  normalizeImages,
   validateNormalizedBusiness,
   type NormalizedBusiness,
 } from "@/lib/import/normalize";
@@ -1577,3 +1578,70 @@ function slugify(name: string, placeId: string): string {
   const tail = placeId.slice(-6).toLowerCase().replace(/[^a-z0-9]/g, "");
   return base ? `${base}-${tail}` : tail;
 }
+
+// ---------- Reprocess images for existing batch ----------
+/**
+ * Re-extract and upsert business_images rows for every item in a batch that
+ * already has a linked business_id. Used to backfill after fixing the
+ * normalizer (e.g., accept bare URL strings). Idempotent via
+ * onConflict=(business_id, source_url).
+ */
+export const reprocessBatchImages = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((d: { batchId: string }) => d)
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: items, error } = await supabase
+      .from("import_batch_items")
+      .select("id, business_id, raw_payload")
+      .eq("import_batch_id", data.batchId)
+      .not("business_id", "is", null);
+    if (error) throw new Response(error.message, { status: 500 });
+
+    let itemsScanned = 0;
+    let imagesUpserted = 0;
+    let itemsWithImages = 0;
+
+    for (const it of items ?? []) {
+      itemsScanned++;
+      const rp = (it.raw_payload as Record<string, unknown> | null) ?? {};
+      const source = (rp.source as Record<string, unknown> | undefined) ?? null;
+      if (!source) continue;
+      const unwrapped = unwrapRecord(source);
+      const images = normalizeImages(unwrapped);
+      if (images.length === 0) continue;
+      itemsWithImages++;
+      for (const img of images) {
+        const { error: imgErr } = await supabase.from("business_images").upsert(
+          {
+            business_id: it.business_id as string,
+            source_url: img.sourceUrl,
+            source_provider: "google",
+            source_type: "google_places",
+            sort_order: img.sortOrder,
+            is_cover: img.isCover,
+            google_photo_category: img.googleCategory,
+            google_photo_labels: img.googleLabels ?? [],
+            storage_status: "pending",
+            width: img.width ?? null,
+            height: img.height ?? null,
+            image_type: img.isCover ? "cover" : "gallery",
+            deleted_at: null,
+          },
+          { onConflict: "business_id,source_url" },
+        );
+        if (!imgErr) imagesUpserted++;
+      }
+    }
+
+    await supabase.rpc("record_audit", {
+      _action: "import.reprocess_images",
+      _entity_type: "import_batch",
+      _entity_id: data.batchId,
+      _before: null,
+      _after: null,
+      _metadata: { itemsScanned, itemsWithImages, imagesUpserted },
+    });
+
+    return { ok: true, itemsScanned, itemsWithImages, imagesUpserted };
+  });
