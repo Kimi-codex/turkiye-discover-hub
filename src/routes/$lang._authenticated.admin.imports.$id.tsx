@@ -1006,7 +1006,7 @@ function ImagesTab({ provenance, batchId }: { provenance: Array<Record<string, u
   const reprocessFn = useServerFn(reprocessBatchImages);
   const reprocess = useMutation({
     mutationFn: () => reprocessFn({ data: { batchId } }),
-    onSuccess: (r) =>
+    onSuccess: (r: { itemsScanned: number; itemsWithImages: number; imagesUpserted: number }) =>
       toast.success(
         `Reprocessed ${r.itemsScanned} items · ${r.itemsWithImages} with images · ${r.imagesUpserted} rows written`,
       ),
