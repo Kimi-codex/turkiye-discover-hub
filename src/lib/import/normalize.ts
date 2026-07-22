@@ -199,10 +199,13 @@ export function classifyImage(photo: Record<string, unknown>): NormalizedImage["
 }
 
 export function normalizeImages(raw: Record<string, unknown>): NormalizedImage[] {
-  const photos = (raw.photos ?? raw.images) as Array<Record<string, unknown>> | undefined;
+  const photos = (raw.photos ?? raw.images ?? raw.imageUrls) as unknown[] | undefined;
   if (!Array.isArray(photos) || photos.length === 0) return [];
   const items: NormalizedImage[] = [];
-  photos.forEach((p, i) => {
+  photos.forEach((rawP, i) => {
+    // Support bare URL strings as well as photo objects.
+    const p: Record<string, unknown> =
+      typeof rawP === "string" ? { url: rawP } : (rawP as Record<string, unknown>);
     const url =
       (typeof p.url === "string" && p.url) ||
       (typeof p.photo_reference === "string" && (p.photo_reference as string)) ||
