@@ -29,6 +29,7 @@ import {
 } from "@/lib/import/format";
 import {
   normalizeGooglePlace,
+  normalizeImages,
   validateNormalizedBusiness,
   type NormalizedBusiness,
 } from "@/lib/import/normalize";
