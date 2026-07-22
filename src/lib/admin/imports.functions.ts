@@ -30,6 +30,7 @@ import {
 import {
   normalizeGooglePlace,
   normalizeImages,
+  normalizeReviews,
   validateNormalizedBusiness,
   type NormalizedBusiness,
 } from "@/lib/import/normalize";
