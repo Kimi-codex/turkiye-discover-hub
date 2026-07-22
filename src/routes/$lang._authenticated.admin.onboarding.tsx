@@ -46,7 +46,15 @@ function AdminOnboardingPage() {
     enabled: Boolean(selectedId),
   });
   const review = useMutation({
-    mutationFn: (decision: "mark_under_review" | "changes_requested" | "additional_documents_required" | "reject" | "approve_existing") =>
+    mutationFn: (
+      decision:
+        | "mark_under_review"
+        | "changes_requested"
+        | "additional_documents_required"
+        | "reject"
+        | "approve_existing"
+        | "approve_new_business",
+    ) =>
       reviewBusinessOnboardingAdmin({
         data: {
           id: selectedId!,
@@ -72,6 +80,7 @@ function AdminOnboardingPage() {
   const events = (row?.events as Array<Record<string, unknown>> | undefined) ?? [];
   const isReviewable = row && ["submitted", "under_review"].includes(String(row.status));
   const canApproveExisting = isReviewable && row?.submission_type === "existing_business_verification";
+  const canApproveNewBusiness = isReviewable && row?.submission_type === "new_business";
 
   async function openAsset(kind: "document" | "image", id: unknown) {
     try {
@@ -232,6 +241,9 @@ function AdminOnboardingPage() {
                   </Button>
                   <Button disabled={!canApproveExisting || review.isPending} onClick={() => review.mutate("approve_existing")}>
                     Approve existing verification
+                  </Button>
+                  <Button disabled={!canApproveNewBusiness || review.isPending} onClick={() => review.mutate("approve_new_business")}>
+                    Approve new business
                   </Button>
                 </div>
 

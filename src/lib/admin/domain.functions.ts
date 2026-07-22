@@ -909,6 +909,7 @@ const ONBOARDING_REVIEW_DECISIONS = [
   "additional_documents_required",
   "reject",
   "approve_existing",
+  "approve_new_business",
 ] as const;
 
 type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
@@ -1047,7 +1048,7 @@ export const reviewBusinessOnboardingAdmin = createServerFn({ method: "POST" })
           ? "onboarding.event.changes_requested"
           : data.decision === "additional_documents_required"
             ? "onboarding.event.additional_documents_required"
-            : data.decision === "approve_existing"
+            : data.decision === "approve_existing" || data.decision === "approve_new_business"
               ? "onboarding.event.approved"
               : "onboarding.event.under_review");
 
@@ -1061,6 +1062,17 @@ export const reviewBusinessOnboardingAdmin = createServerFn({ method: "POST" })
 
     if (data.decision === "approve_existing") {
       const { data: row, error } = await supabase.rpc("approve_existing_business_onboarding_submission", {
+        _submission_id: data.id,
+        _applicant_message_key: messageKey,
+        _applicant_message_params: data.applicantMessageParams,
+        _private_notes: data.privateNotes,
+      });
+      if (error) throw new Response(error.message, { status: 400 });
+      return { ok: true, row };
+    }
+
+    if (data.decision === "approve_new_business") {
+      const { data: row, error } = await supabase.rpc("approve_new_business_onboarding_submission", {
         _submission_id: data.id,
         _applicant_message_key: messageKey,
         _applicant_message_params: data.applicantMessageParams,
