@@ -97,8 +97,8 @@ export const listPendingRepliesAdmin = createServerFn({ method: "GET" })
     const supabase = context.supabase as Sb;
     const { data, error } = await supabase
       .from("review_replies")
-      .select("*, businesses:business_id(name, slug), reviews:review_id(rating, body)")
-      .eq("status", "pending")
+      .select("*, businesses:business_id(name, slug), reviews:review_id(rating, review_text)")
+      .eq("status", "pending_review")
       .order("created_at", { ascending: true })
       .limit(200);
     if (error) throw new Response(error.message, { status: 500 });
@@ -122,12 +122,12 @@ export const moderateReplyAdmin = createServerFn({ method: "POST" })
       .eq("id", data.replyId)
       .single();
     if (rErr || !reply) throw new Response("Not found", { status: 404 });
-    if (reply.status !== "pending")
+    if (reply.status !== "pending_review")
       throw new Response("Already moderated", { status: 409 });
     const { error } = await supabase
       .from("review_replies")
       .update({
-        status: data.approve ? "approved" : "rejected",
+        status: data.approve ? "published" : "rejected",
         moderated_by: context.userId,
         moderated_at: new Date().toISOString(),
         moderation_notes: data.notes ?? null,
@@ -138,7 +138,7 @@ export const moderateReplyAdmin = createServerFn({ method: "POST" })
     await supabase.from("owner_notifications").insert({
       user_id: reply.author_id,
       business_id: reply.business_id,
-      kind: `review_reply.${data.approve ? "approved" : "rejected"}`,
+      kind: `review_reply.${data.approve ? "published" : "rejected"}`,
       payload: { reply_id: reply.id, notes: data.notes ?? null },
     });
     return { ok: true };

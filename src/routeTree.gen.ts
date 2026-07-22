@@ -31,6 +31,7 @@ import { Route as LangAuthenticatedAdminChangeRequestsRouteImport } from './rout
 import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
 import { Route as LangAuthenticatedAdminImagesRouteImport } from './routes/$lang._authenticated.admin.images'
 import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
+import { Route as LangAuthenticatedAdminOnboardingRouteImport } from './routes/$lang._authenticated.admin.onboarding'
 import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
 import { Route as LangAuthenticatedAdminReplyModerationRouteImport } from './routes/$lang._authenticated.admin.reply-moderation'
 import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
@@ -42,6 +43,7 @@ import { Route as LangAuthenticatedOwnerIndexRouteImport } from './routes/$lang.
 import { Route as LangAuthenticatedOwnerBusinessIdRouteImport } from './routes/$lang._authenticated.owner.$businessId'
 import { Route as LangAuthenticatedOwnerClaimRouteImport } from './routes/$lang._authenticated.owner.claim'
 import { Route as LangAuthenticatedOwnerNotificationsRouteImport } from './routes/$lang._authenticated.owner.notifications'
+import { Route as LangAuthenticatedOwnerOnboardingRouteImport } from './routes/$lang._authenticated.owner.onboarding'
 import { Route as ApiPublicHooksImageTickRouteImport } from './routes/api/public/hooks/image-tick'
 import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
 import { Route as LangAuthenticatedAdminChangeRequestsIdRouteImport } from './routes/$lang._authenticated.admin.change-requests.$id'
@@ -177,6 +179,12 @@ const LangAuthenticatedAdminImportsRoute =
     path: '/imports',
     getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
+const LangAuthenticatedAdminOnboardingRoute =
+  LangAuthenticatedAdminOnboardingRouteImport.update({
+    id: '/onboarding',
+    path: '/onboarding',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
 const LangAuthenticatedAdminOwnershipClaimsRoute =
   LangAuthenticatedAdminOwnershipClaimsRouteImport.update({
     id: '/ownership-claims',
@@ -241,6 +249,12 @@ const LangAuthenticatedOwnerNotificationsRoute =
   LangAuthenticatedOwnerNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
+    getParentRoute: () => LangAuthenticatedOwnerRoute,
+  } as any)
+const LangAuthenticatedOwnerOnboardingRoute =
+  LangAuthenticatedOwnerOnboardingRouteImport.update({
+    id: '/onboarding',
+    path: '/onboarding',
     getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
 const ApiPublicHooksImageTickRoute = ApiPublicHooksImageTickRouteImport.update({
@@ -342,6 +356,7 @@ export interface FileRoutesByFullPath {
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
+  '/$lang/admin/onboarding': typeof LangAuthenticatedAdminOnboardingRoute
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
@@ -352,6 +367,7 @@ export interface FileRoutesByFullPath {
   '/$lang/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
   '/$lang/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
+  '/$lang/owner/onboarding': typeof LangAuthenticatedOwnerOnboardingRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner/': typeof LangAuthenticatedOwnerIndexRoute
@@ -385,6 +401,7 @@ export interface FileRoutesByTo {
   '/$lang/admin/change-requests': typeof LangAuthenticatedAdminChangeRequestsRouteWithChildren
   '/$lang/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/admin/images': typeof LangAuthenticatedAdminImagesRoute
+  '/$lang/admin/onboarding': typeof LangAuthenticatedAdminOnboardingRoute
   '/$lang/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/admin/reports': typeof LangAuthenticatedAdminReportsRoute
@@ -394,6 +411,7 @@ export interface FileRoutesByTo {
   '/$lang/admin/users': typeof LangAuthenticatedAdminUsersRoute
   '/$lang/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
   '/$lang/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
+  '/$lang/owner/onboarding': typeof LangAuthenticatedOwnerOnboardingRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/admin': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/owner': typeof LangAuthenticatedOwnerIndexRoute
@@ -433,6 +451,7 @@ export interface FileRoutesById {
   '/$lang/_authenticated/admin/cities': typeof LangAuthenticatedAdminCitiesRoute
   '/$lang/_authenticated/admin/images': typeof LangAuthenticatedAdminImagesRoute
   '/$lang/_authenticated/admin/imports': typeof LangAuthenticatedAdminImportsRouteWithChildren
+  '/$lang/_authenticated/admin/onboarding': typeof LangAuthenticatedAdminOnboardingRoute
   '/$lang/_authenticated/admin/ownership-claims': typeof LangAuthenticatedAdminOwnershipClaimsRoute
   '/$lang/_authenticated/admin/reply-moderation': typeof LangAuthenticatedAdminReplyModerationRoute
   '/$lang/_authenticated/admin/reports': typeof LangAuthenticatedAdminReportsRoute
@@ -443,6 +462,7 @@ export interface FileRoutesById {
   '/$lang/_authenticated/owner/$businessId': typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   '/$lang/_authenticated/owner/claim': typeof LangAuthenticatedOwnerClaimRoute
   '/$lang/_authenticated/owner/notifications': typeof LangAuthenticatedOwnerNotificationsRoute
+  '/$lang/_authenticated/owner/onboarding': typeof LangAuthenticatedOwnerOnboardingRoute
   '/api/public/hooks/image-tick': typeof ApiPublicHooksImageTickRoute
   '/$lang/_authenticated/admin/': typeof LangAuthenticatedAdminIndexRoute
   '/$lang/_authenticated/owner/': typeof LangAuthenticatedOwnerIndexRoute
@@ -482,6 +502,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/cities'
     | '/$lang/admin/images'
     | '/$lang/admin/imports'
+    | '/$lang/admin/onboarding'
     | '/$lang/admin/ownership-claims'
     | '/$lang/admin/reply-moderation'
     | '/$lang/admin/reports'
@@ -492,6 +513,7 @@ export interface FileRouteTypes {
     | '/$lang/owner/$businessId'
     | '/$lang/owner/claim'
     | '/$lang/owner/notifications'
+    | '/$lang/owner/onboarding'
     | '/api/public/hooks/image-tick'
     | '/$lang/admin/'
     | '/$lang/owner/'
@@ -525,6 +547,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/change-requests'
     | '/$lang/admin/cities'
     | '/$lang/admin/images'
+    | '/$lang/admin/onboarding'
     | '/$lang/admin/ownership-claims'
     | '/$lang/admin/reply-moderation'
     | '/$lang/admin/reports'
@@ -534,6 +557,7 @@ export interface FileRouteTypes {
     | '/$lang/admin/users'
     | '/$lang/owner/claim'
     | '/$lang/owner/notifications'
+    | '/$lang/owner/onboarding'
     | '/api/public/hooks/image-tick'
     | '/$lang/admin'
     | '/$lang/owner'
@@ -572,6 +596,7 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/admin/cities'
     | '/$lang/_authenticated/admin/images'
     | '/$lang/_authenticated/admin/imports'
+    | '/$lang/_authenticated/admin/onboarding'
     | '/$lang/_authenticated/admin/ownership-claims'
     | '/$lang/_authenticated/admin/reply-moderation'
     | '/$lang/_authenticated/admin/reports'
@@ -582,6 +607,7 @@ export interface FileRouteTypes {
     | '/$lang/_authenticated/owner/$businessId'
     | '/$lang/_authenticated/owner/claim'
     | '/$lang/_authenticated/owner/notifications'
+    | '/$lang/_authenticated/owner/onboarding'
     | '/api/public/hooks/image-tick'
     | '/$lang/_authenticated/admin/'
     | '/$lang/_authenticated/owner/'
@@ -761,6 +787,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminImportsRouteImport
       parentRoute: typeof LangAuthenticatedAdminRoute
     }
+    '/$lang/_authenticated/admin/onboarding': {
+      id: '/$lang/_authenticated/admin/onboarding'
+      path: '/onboarding'
+      fullPath: '/$lang/admin/onboarding'
+      preLoaderRoute: typeof LangAuthenticatedAdminOnboardingRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
     '/$lang/_authenticated/admin/ownership-claims': {
       id: '/$lang/_authenticated/admin/ownership-claims'
       path: '/ownership-claims'
@@ -836,6 +869,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/$lang/owner/notifications'
       preLoaderRoute: typeof LangAuthenticatedOwnerNotificationsRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerRoute
+    }
+    '/$lang/_authenticated/owner/onboarding': {
+      id: '/$lang/_authenticated/owner/onboarding'
+      path: '/onboarding'
+      fullPath: '/$lang/owner/onboarding'
+      preLoaderRoute: typeof LangAuthenticatedOwnerOnboardingRouteImport
       parentRoute: typeof LangAuthenticatedOwnerRoute
     }
     '/api/public/hooks/image-tick': {
@@ -988,6 +1028,7 @@ interface LangAuthenticatedAdminRouteChildren {
   LangAuthenticatedAdminCitiesRoute: typeof LangAuthenticatedAdminCitiesRoute
   LangAuthenticatedAdminImagesRoute: typeof LangAuthenticatedAdminImagesRoute
   LangAuthenticatedAdminImportsRoute: typeof LangAuthenticatedAdminImportsRouteWithChildren
+  LangAuthenticatedAdminOnboardingRoute: typeof LangAuthenticatedAdminOnboardingRoute
   LangAuthenticatedAdminOwnershipClaimsRoute: typeof LangAuthenticatedAdminOwnershipClaimsRoute
   LangAuthenticatedAdminReplyModerationRoute: typeof LangAuthenticatedAdminReplyModerationRoute
   LangAuthenticatedAdminReportsRoute: typeof LangAuthenticatedAdminReportsRoute
@@ -1013,6 +1054,8 @@ const LangAuthenticatedAdminRouteChildren: LangAuthenticatedAdminRouteChildren =
     LangAuthenticatedAdminImagesRoute: LangAuthenticatedAdminImagesRoute,
     LangAuthenticatedAdminImportsRoute:
       LangAuthenticatedAdminImportsRouteWithChildren,
+    LangAuthenticatedAdminOnboardingRoute:
+      LangAuthenticatedAdminOnboardingRoute,
     LangAuthenticatedAdminOwnershipClaimsRoute:
       LangAuthenticatedAdminOwnershipClaimsRoute,
     LangAuthenticatedAdminReplyModerationRoute:
@@ -1071,6 +1114,7 @@ interface LangAuthenticatedOwnerRouteChildren {
   LangAuthenticatedOwnerBusinessIdRoute: typeof LangAuthenticatedOwnerBusinessIdRouteWithChildren
   LangAuthenticatedOwnerClaimRoute: typeof LangAuthenticatedOwnerClaimRoute
   LangAuthenticatedOwnerNotificationsRoute: typeof LangAuthenticatedOwnerNotificationsRoute
+  LangAuthenticatedOwnerOnboardingRoute: typeof LangAuthenticatedOwnerOnboardingRoute
   LangAuthenticatedOwnerIndexRoute: typeof LangAuthenticatedOwnerIndexRoute
 }
 
@@ -1081,6 +1125,8 @@ const LangAuthenticatedOwnerRouteChildren: LangAuthenticatedOwnerRouteChildren =
     LangAuthenticatedOwnerClaimRoute: LangAuthenticatedOwnerClaimRoute,
     LangAuthenticatedOwnerNotificationsRoute:
       LangAuthenticatedOwnerNotificationsRoute,
+    LangAuthenticatedOwnerOnboardingRoute:
+      LangAuthenticatedOwnerOnboardingRoute,
     LangAuthenticatedOwnerIndexRoute: LangAuthenticatedOwnerIndexRoute,
   }
 

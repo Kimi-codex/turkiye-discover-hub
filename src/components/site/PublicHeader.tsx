@@ -35,6 +35,19 @@ async function fetchUserRoles(userId: string | undefined): Promise<string[]> {
   return (data ?? []).map((r) => r.role as string);
 }
 
+async function hasActiveBusinessMembership(userId: string | undefined): Promise<boolean> {
+  if (!userId) return false;
+  const { data, error } = await (supabase as any)
+    .from("business_members")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "manager"])
+    .limit(1);
+  if (error) return false;
+  return (data ?? []).length > 0;
+}
+
 export function PublicHeader({
   variant = "solid",
   showCompactSearch = false,
@@ -53,9 +66,15 @@ export function PublicHeader({
     enabled: !!user?.id,
     staleTime: 60_000,
   });
+  const { data: hasBusinessMembership = false } = useQuery({
+    queryKey: ["business-membership", user?.id ?? "guest"],
+    queryFn: () => hasActiveBusinessMembership(user?.id),
+    enabled: !!user?.id,
+    staleTime: 60_000,
+  });
 
   const isAdmin = roles.includes("admin");
-  const isOwner = roles.includes("business_owner");
+  const isOwner = roles.includes("business_owner") || hasBusinessMembership;
 
   const transparent = variant === "transparent";
 

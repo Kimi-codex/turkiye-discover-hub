@@ -34,15 +34,15 @@ function ReplyModeration() {
         {(q.data?.rows ?? []).map((r: {
           id: string; body: string; created_at: string;
           businesses: { name: string } | null;
-          reviews: { rating: number; body: string | null } | null;
+          reviews: { rating: number; review_text: string | null } | null;
         }) => (
           <li key={r.id} className="rounded-xl border bg-card p-4">
             <div className="mb-2 text-sm text-muted-foreground">
               {r.businesses?.name} · Review ★{r.reviews?.rating}
             </div>
-            {r.reviews?.body && (
+            {r.reviews?.review_text && (
               <blockquote className="mb-2 border-l-2 pl-2 text-sm italic text-muted-foreground">
-                {r.reviews.body}
+                {r.reviews.review_text}
               </blockquote>
             )}
             <p className="text-sm">{r.body}</p>

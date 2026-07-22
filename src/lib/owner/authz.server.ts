@@ -4,9 +4,10 @@
  * Every business-scoped owner server function MUST call `assertOwns` FIRST
  * with the businessId taken from validated input (never trust arbitrary
  * client data). The `owner_authz` RPC in the DB checks in one round-trip
- * that the caller is: authenticated, not suspended, has the business_owner
- * role, and owns the specific businessId. RLS on `businesses` still applies
- * as a second line of defense.
+ * that the caller is authenticated, not suspended, and either has an active
+ * owner membership for the specific business or matches the legacy
+ * owner_id + business_owner fallback. RLS on `businesses` still applies as a
+ * second line of defense.
  */
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
+import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
@@ -13,7 +15,6 @@ import { useT, useLocaleContext } from "@/lib/i18n";
 export const Route = createFileRoute("/$lang/auth")({
   head: () => ({
     meta: [
-      { title: "Giriş Yap · TurkeyDirect" },
       { name: "robots", content: "noindex" },
     ],
   }),
@@ -29,6 +30,9 @@ function AuthPage() {
   const [password, setPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [registrationIntent, setRegistrationIntent] = useState<"explore" | "business">("explore");
+  const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
@@ -54,13 +58,28 @@ function AuthPage() {
       toast.error(t("auth.password_mismatch"));
       return;
     }
+    if (!termsAccepted) {
+      toast.error(t("auth.terms_required"));
+      return;
+    }
     setBusy(true);
+    const termsAcceptedAt = new Date().toISOString();
     const { error } = await supabase.auth.signUp({
       email,
       password,
       options: {
-        emailRedirectTo: `${window.location.origin}/${locale}`,
-        data: { full_name: name, preferred_language: locale },
+        emailRedirectTo:
+          registrationIntent === "business"
+            ? `${window.location.origin}/${locale}/owner/onboarding`
+            : `${window.location.origin}/${locale}/account`,
+        data: {
+          full_name: name,
+          phone,
+          preferred_language: locale,
+          registration_intent: registrationIntent,
+          terms_accepted_at: termsAcceptedAt,
+          terms_version: "2026-07-22",
+        },
       },
     });
     setBusy(false);
@@ -76,7 +95,7 @@ function AuthPage() {
     });
     if (res.error) {
       setBusy(false);
-      toast.error(res.error.message ?? "Google sign-in failed");
+      toast.error(res.error.message ?? t("auth.google_failed"));
     }
   }
 
@@ -144,6 +163,17 @@ function AuthPage() {
               <Input id="up-name" value={name} onChange={(e) => setName(e.target.value)} />
             </div>
             <div className="grid gap-2">
+              <Label htmlFor="up-phone">{t("auth.phone")}</Label>
+              <Input
+                id="up-phone"
+                type="tel"
+                required
+                value={phone}
+                onChange={(e) => setPhone(e.target.value)}
+                autoComplete="tel"
+              />
+            </div>
+            <div className="grid gap-2">
               <Label htmlFor="up-email">{t("auth.email")}</Label>
               <Input
                 id="up-email"
@@ -186,6 +216,33 @@ function AuthPage() {
                 <p className="text-xs text-destructive">{t("auth.password_mismatch")}</p>
               ) : null}
             </div>
+            <div className="grid gap-3">
+              <Label>{t("auth.intent_label")}</Label>
+              <RadioGroup
+                value={registrationIntent}
+                onValueChange={(value) =>
+                  setRegistrationIntent(value === "business" ? "business" : "explore")
+                }
+                className="gap-3"
+              >
+                <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                  <RadioGroupItem value="explore" className="mt-0.5" />
+                  <span>{t("auth.intent_explore")}</span>
+                </label>
+                <label className="flex items-start gap-3 rounded-md border p-3 text-sm">
+                  <RadioGroupItem value="business" className="mt-0.5" />
+                  <span>{t("auth.intent_business")}</span>
+                </label>
+              </RadioGroup>
+            </div>
+            <label className="flex items-start gap-3 text-sm">
+              <Checkbox
+                checked={termsAccepted}
+                onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                className="mt-0.5"
+              />
+              <span>{t("auth.terms_accept")}</span>
+            </label>
             <Button type="submit" disabled={busy}>
               {t("auth.signup")}
             </Button>

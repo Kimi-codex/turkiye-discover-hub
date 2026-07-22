@@ -794,9 +794,9 @@ export const listReportsAdmin = createServerFn({ method: "GET" })
 export const setReportStatusAdmin = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator(
-    (i: { id: string; status: "new" | "in_review" | "resolved" | "rejected"; internalNotes?: string }) => {
+    (i: { id: string; status: "new" | "under_review" | "resolved" | "dismissed"; internalNotes?: string }) => {
       if (!i?.id) throw new Response("Invalid id", { status: 400 });
-      if (!["new", "in_review", "resolved", "rejected"].includes(i.status))
+      if (!["new", "under_review", "resolved", "dismissed"].includes(i.status))
         throw new Response("Invalid status", { status: 400 });
       return i;
     },
@@ -888,6 +888,238 @@ export const rejectOwnershipClaimAdmin = createServerFn({ method: "POST" })
   });
 
 // ─────────────────────────── AUDIT LOGS ────────────────────────────
+
+// Business onboarding submissions
+
+const ONBOARDING_STATUSES = [
+  "draft",
+  "submitted",
+  "under_review",
+  "changes_requested",
+  "additional_documents_required",
+  "approved",
+  "rejected",
+  "withdrawn",
+  "all",
+] as const;
+
+const ONBOARDING_REVIEW_DECISIONS = [
+  "mark_under_review",
+  "changes_requested",
+  "additional_documents_required",
+  "reject",
+  "approve_existing",
+] as const;
+
+type OnboardingStatus = (typeof ONBOARDING_STATUSES)[number];
+type OnboardingReviewDecision = (typeof ONBOARDING_REVIEW_DECISIONS)[number];
+
+function requireUuid(value: unknown, label: string) {
+  if (
+    typeof value !== "string" ||
+    !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value)
+  ) {
+    throw new Response(`Invalid ${label}`, { status: 400 });
+  }
+  return value;
+}
+
+export const listBusinessOnboardingAdmin = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { status?: OnboardingStatus } | undefined) => {
+    const status = i?.status ?? "submitted";
+    if (!ONBOARDING_STATUSES.includes(status)) throw new Response("Invalid status", { status: 400 });
+    return { status };
+  })
+  .handler(async ({ data, context }) => {
+    let q = (context.supabase as AdminSb)
+      .from("business_onboarding_submissions")
+      .select(
+        "id, applicant_id, submission_type, target_business_id, status, version, locale_draft, business_name_localized, applicant_full_name, applicant_phone, applicant_role, applicant_business_email, commercial_registration_number, commercial_registration_legal_name, commercial_registration_country, submitted_at, reviewed_at, reviewed_by, admin_decision, applicant_message_key, approved_business_id, created_at, updated_at",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(200);
+    if (data.status !== "all") q = q.eq("status", data.status);
+    const { data: rows, error } = await q;
+    if (error) throw new Response(error.message, { status: 500 });
+    return { rows: rows ?? [] };
+  });
+
+export const getBusinessOnboardingAdmin = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => ({ id: requireUuid(i?.id, "id") }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as AdminSb;
+    const { data: row, error } = await supabase
+      .from("business_onboarding_submissions")
+      .select("*, documents:business_onboarding_documents(*), images:business_onboarding_images(*), events:business_onboarding_events(*)")
+      .eq("id", data.id)
+      .single();
+    if (error || !row) throw new Response("Submission not found", { status: 404 });
+
+    let targetBusiness = null;
+    if (row.target_business_id) {
+      const { data: business } = await supabase
+        .from("businesses")
+        .select("id, name, slug, status, owner_id, is_verified, formatted_address, phone, email, website")
+        .eq("id", row.target_business_id)
+        .maybeSingle();
+      targetBusiness = business ?? null;
+    }
+
+    return { row, targetBusiness };
+  });
+
+export const getBusinessOnboardingAssetUrlAdmin = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { kind: "document" | "image"; id: string }) => {
+    const kind = i?.kind;
+    if (kind !== "document" && kind !== "image") throw new Response("Invalid asset kind", { status: 400 });
+    return { kind, id: requireUuid(i?.id, "id") };
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as AdminSb;
+    const table = data.kind === "document" ? "business_onboarding_documents" : "business_onboarding_images";
+    const { data: asset, error } = await supabase
+      .from(table)
+      .select("id, storage_bucket, storage_path, status")
+      .eq("id", data.id)
+      .single();
+    if (error || !asset) throw new Response("Asset not found", { status: 404 });
+    if (asset.status === "removed") throw new Response("Asset has been removed", { status: 410 });
+
+    const expectedBucket = data.kind === "document" ? "business-verification-documents" : "business-onboarding-images";
+    if (asset.storage_bucket !== expectedBucket || typeof asset.storage_path !== "string" || !asset.storage_path) {
+      throw new Response("Invalid asset storage metadata", { status: 400 });
+    }
+
+    const { data: signed, error: signError } = await supabase.storage
+      .from(expectedBucket)
+      .createSignedUrl(asset.storage_path, 300);
+    if (signError || !signed?.signedUrl) throw new Response("Could not create signed URL", { status: 500 });
+    return { url: signed.signedUrl };
+  });
+
+export const reviewBusinessOnboardingAdmin = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator(
+    (i: {
+      id: string;
+      decision: OnboardingReviewDecision;
+      applicantMessageKey?: string | null;
+      applicantMessageParams?: Record<string, unknown> | null;
+      privateNotes?: string | null;
+    }) => {
+      const decision = i?.decision;
+      if (!ONBOARDING_REVIEW_DECISIONS.includes(decision)) {
+        throw new Response("Invalid decision", { status: 400 });
+      }
+      return {
+        id: requireUuid(i?.id, "id"),
+        decision,
+        applicantMessageKey:
+          typeof i?.applicantMessageKey === "string" && i.applicantMessageKey.trim()
+            ? i.applicantMessageKey.trim()
+            : null,
+        applicantMessageParams: i?.applicantMessageParams ?? {},
+        privateNotes: typeof i?.privateNotes === "string" && i.privateNotes.trim() ? i.privateNotes.trim() : null,
+      };
+    },
+  )
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as AdminSb;
+    const { data: before, error: beforeError } = await supabase
+      .from("business_onboarding_submissions")
+      .select("*")
+      .eq("id", data.id)
+      .single();
+    if (beforeError || !before) throw new Response("Submission not found", { status: 404 });
+    if (!["submitted", "under_review"].includes(before.status)) {
+      throw new Response("Submission is not reviewable", { status: 400 });
+    }
+
+    const now = new Date().toISOString();
+    const messageKey =
+      data.applicantMessageKey ??
+      (data.decision === "reject"
+        ? "onboarding.event.rejected"
+        : data.decision === "changes_requested"
+          ? "onboarding.event.changes_requested"
+          : data.decision === "additional_documents_required"
+            ? "onboarding.event.additional_documents_required"
+            : data.decision === "approve_existing"
+              ? "onboarding.event.approved"
+              : "onboarding.event.under_review");
+
+    const patch: Record<string, unknown> = {
+      reviewed_at: now,
+      reviewed_by: context.userId,
+      admin_notes_private: data.privateNotes,
+      applicant_message_key: messageKey,
+      applicant_message_params: data.applicantMessageParams,
+    };
+
+    if (data.decision === "approve_existing") {
+      const { data: row, error } = await supabase.rpc("approve_existing_business_onboarding_submission", {
+        _submission_id: data.id,
+        _applicant_message_key: messageKey,
+        _applicant_message_params: data.applicantMessageParams,
+        _private_notes: data.privateNotes,
+      });
+      if (error) throw new Response(error.message, { status: 400 });
+      return { ok: true, row };
+    }
+
+    if (data.decision === "mark_under_review") {
+      patch.status = "under_review";
+      patch.admin_decision = null;
+    } else if (data.decision === "changes_requested") {
+      patch.status = "changes_requested";
+      patch.admin_decision = "changes_requested";
+    } else if (data.decision === "additional_documents_required") {
+      patch.status = "additional_documents_required";
+      patch.admin_decision = "additional_documents_required";
+    } else if (data.decision === "reject") {
+      patch.status = "rejected";
+      patch.admin_decision = "reject";
+    }
+
+    const { data: after, error: updateError } = await supabase
+      .from("business_onboarding_submissions")
+      .update(patch)
+      .eq("id", data.id)
+      .select()
+      .single();
+    if (updateError) throw new Response(updateError.message, { status: 400 });
+
+    await supabase.from("business_onboarding_events").insert({
+      submission_id: data.id,
+      actor_id: context.userId,
+      event_type: data.decision,
+      visibility: data.decision === "mark_under_review" ? "internal" : "applicant",
+      message_key: messageKey,
+      message_params: data.applicantMessageParams,
+      metadata: { private_notes: Boolean(data.privateNotes) },
+    });
+
+    if (data.decision !== "mark_under_review") {
+      await supabase.from("user_notifications").insert({
+        user_id: before.applicant_id,
+        kind: "business_onboarding",
+        title_key: "onboarding.notification.title",
+        message_key: messageKey,
+        message_params: data.applicantMessageParams,
+        related_business_id: after.approved_business_id ?? before.target_business_id ?? null,
+        related_submission_id: data.id,
+      });
+    }
+
+    await audit(supabase, `business_onboarding.${data.decision}`, "business_onboarding_submission", data.id, before, after, {
+      decision: data.decision,
+    });
+
+    return { ok: true, row: after };
+  });
 
 export const listAuditLogsAdmin = createServerFn({ method: "GET" })
   .middleware([requireAdmin])

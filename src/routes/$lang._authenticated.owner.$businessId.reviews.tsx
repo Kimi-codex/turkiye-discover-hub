@@ -64,7 +64,7 @@ function OwnerReviewsTab() {
 
   return (
     <ul className="space-y-4">
-      {(q.data?.reviews ?? []).map((r: { id: string; rating: number; body: string | null; created_at: string; user_id: string | null }) => {
+      {(q.data?.reviews ?? []).map((r: { id: string; rating: number; review_text: string | null; created_at: string; user_id: string | null }) => {
         const rep = replies.get(r.id);
         return (
           <li key={r.id} className="rounded-xl border bg-card p-4">
@@ -72,7 +72,7 @@ function OwnerReviewsTab() {
               <div className="text-sm font-medium">★ {r.rating}</div>
               <div className="text-xs text-muted-foreground">{new Date(r.created_at).toLocaleDateString()}</div>
             </div>
-            {r.body && <p className="text-sm">{r.body}</p>}
+            {r.review_text && <p className="text-sm">{r.review_text}</p>}
             <div className="mt-2 flex gap-2">
               <Button size="sm" variant="ghost" onClick={() => flag.mutate(r.id)}>Report</Button>
             </div>
@@ -83,7 +83,7 @@ function OwnerReviewsTab() {
                   <Badge variant="outline">{rep.status}</Badge>
                 </div>
                 <p>{rep.body}</p>
-                {rep.status === "pending" && (
+                {rep.status === "pending_review" && (
                   <Button size="sm" variant="ghost" className="mt-2" onClick={() => wm.mutate(rep.id)}>Withdraw</Button>
                 )}
               </div>

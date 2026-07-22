@@ -13,6 +13,7 @@ const nav = [
   { to: "/cities", label: "Cities", icon: MapPin },
   { to: "/reviews", label: "Reviews", icon: Star },
   { to: "/reports", label: "Reports", icon: Flag },
+  { to: "/onboarding", label: "Business Onboarding", icon: FileCheck },
   { to: "/ownership-claims", label: "Ownership Claims", icon: FileCheck },
   { to: "/imports", label: "Imports", icon: Upload },
   { to: "/images", label: "Images", icon: ImageIcon },

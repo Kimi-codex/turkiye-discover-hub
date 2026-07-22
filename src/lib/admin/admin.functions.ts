@@ -26,16 +26,17 @@ export const getAdminOverview = createServerFn({ method: "GET" })
       "reviews",
       "reports",
       "ownership_claims",
+      "business_onboarding_submissions",
       "categories",
       "cities",
       "import_batches",
     ] as const;
     const results = await Promise.all(
       tables.map((t) =>
-        supabase
+        (supabase as any)
           .from(t)
           .select("*", { count: "exact", head: true })
-          .then((r) => [t, r.count ?? 0] as const),
+          .then((r: { count: number | null }) => [t, r.count ?? 0] as const),
       ),
     );
     return Object.fromEntries(results) as Record<(typeof tables)[number], number>;

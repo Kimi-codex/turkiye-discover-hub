@@ -33,10 +33,32 @@ export const listMyBusinesses = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .handler(async ({ context }) => {
     const supabase = context.supabase as Sb;
+    const membership = await supabase
+      .from("business_members")
+      .select(
+        "role, is_primary, businesses:business_id(id, name, slug, status, verified:is_verified, featured:is_featured, rating, review_count, primary_category_id, city_id, updated_at)",
+      )
+      .eq("user_id", context.userId)
+      .eq("status", "active")
+      .eq("role", "owner")
+      .order("created_at", { ascending: false });
+
+    if (!membership.error) {
+      return {
+        rows: (membership.data ?? [])
+          .map((m: { role: string; is_primary: boolean; businesses: unknown }) => ({
+            ...((m.businesses ?? {}) as Record<string, unknown>),
+            membership_role: m.role,
+            membership_is_primary: m.is_primary,
+          }))
+          .filter((row: Record<string, unknown>) => typeof row.id === "string"),
+      };
+    }
+
     const { data, error } = await supabase
       .from("businesses")
       .select(
-        "id, name, slug, status, verified, featured, rating, review_count, primary_category_id, city_id, updated_at",
+        "id, name, slug, status, verified:is_verified, featured:is_featured, rating, review_count, primary_category_id, city_id, updated_at",
       )
       .eq("owner_id", context.userId)
       .order("updated_at", { ascending: false });
@@ -71,8 +93,15 @@ export const getOwnedBusiness = createServerFn({ method: "GET" })
       supabase.from("business_translations").select("*").eq("business_id", data.businessId),
     ]);
     if (biz.error) throw new Response(biz.error.message, { status: 500 });
+    const business = biz.data
+      ? {
+          ...biz.data,
+          verified: biz.data.is_verified,
+          featured: biz.data.is_featured,
+        }
+      : null;
     return {
-      business: biz.data,
+      business,
       hours: hours.data ?? [],
       services: services.data ?? [],
       attributes: attrs.data ?? [],
@@ -239,7 +268,7 @@ export const submitOwnershipClaim = createServerFn({ method: "POST" })
     return { row };
   });
 
-/** Private signed-upload URL under owner-uploads/claims/{uid}/… */
+/** Private signed-upload URL under owner-uploads/{uid}/claims/... */
 export const createClaimEvidenceUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: { fileName: string; contentType: string }) => ({
@@ -249,7 +278,7 @@ export const createClaimEvidenceUpload = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
     const safe = data.fileName.replace(/[^\w.-]+/g, "_").slice(-120);
-    const path = `claims/${context.userId}/${Date.now()}_${safe}`;
+    const path = `${context.userId}/claims/${Date.now()}_${safe}`;
     const { data: signed, error } = await supabase.storage
       .from("owner-uploads")
       .createSignedUploadUrl(path);
@@ -272,7 +301,7 @@ export const listMyOwnershipClaims = createServerFn({ method: "GET" })
 
 // ─────────────────── Owner private image uploads ───────────────
 
-/** Create a signed upload URL under owner-uploads/{business_id}/…
+/** Create a signed upload URL under owner-uploads/{uid}/businesses/{business_id}/...
  *  After upload the owner calls `submitImageRequest` (image_request CR). */
 export const createOwnerImageUpload = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -284,7 +313,7 @@ export const createOwnerImageUpload = createServerFn({ method: "POST" })
     const supabase = context.supabase as Sb;
     await assertOwns(supabase, data.businessId);
     const safe = data.fileName.replace(/[^\w.-]+/g, "_").slice(-120);
-    const path = `${data.businessId}/${Date.now()}_${context.userId}_${safe}`;
+    const path = `${context.userId}/businesses/${data.businessId}/${Date.now()}_${safe}`;
     const { data: signed, error } = await supabase.storage
       .from("owner-uploads")
       .createSignedUploadUrl(path);
@@ -352,7 +381,7 @@ export const listOwnedReviews = createServerFn({ method: "GET" })
         .from("review_replies")
         .select("*")
         .eq("business_id", data.businessId)
-        .in("status", ["pending", "approved"]),
+        .in("status", ["pending_review", "published"]),
     ]);
     if (rev.error) throw new Response(rev.error.message, { status: 500 });
     return { reviews: rev.data ?? [], replies: rep.data ?? [] };
@@ -365,7 +394,7 @@ const replySchema = z.object({
 });
 
 /** Submit ONE active reply per review. Repeat submissions rejected while
- *  an existing pending/approved reply from any owner exists for the review. */
+ *  an existing pending/published reply from any owner exists for the review. */
 export const submitReviewReply = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i: z.input<typeof replySchema>) => replySchema.parse(i))
@@ -387,7 +416,7 @@ export const submitReviewReply = createServerFn({ method: "POST" })
       .from("review_replies")
       .select("id, status")
       .eq("review_id", data.reviewId)
-      .in("status", ["pending", "approved"])
+      .in("status", ["pending_review", "published"])
       .maybeSingle();
     if (existing)
       throw new Response("An active reply already exists for this review", {
@@ -401,7 +430,7 @@ export const submitReviewReply = createServerFn({ method: "POST" })
         business_id: data.businessId,
         author_id: context.userId,
         body: data.body,
-        status: "pending",
+        status: "pending_review",
       })
       .select()
       .single();
@@ -423,12 +452,12 @@ export const withdrawReviewReply = createServerFn({ method: "POST" })
     if (repErr || !rep) throw new Response("Not found", { status: 404 });
     if (rep.author_id !== context.userId)
       throw new Response("Forbidden", { status: 403 });
-    if (rep.status !== "pending")
+    if (rep.status !== "pending_review")
       throw new Response("Only pending replies can be withdrawn", { status: 409 });
     await assertOwns(supabase, rep.business_id);
     const { error } = await supabase
       .from("review_replies")
-      .update({ status: "withdrawn" })
+      .update({ status: "superseded" })
       .eq("id", data.replyId)
       .eq("author_id", context.userId);
     if (error) throw new Response(error.message, { status: 400 });
@@ -460,7 +489,7 @@ export const ownerSubmitReport = createServerFn({ method: "POST" })
         image_id: data.imageId ?? null,
         report_type: data.reportType,
         message: data.message,
-        status: "open",
+        status: "new",
       })
       .select()
       .single();

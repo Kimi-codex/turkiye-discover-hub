@@ -40,6 +40,7 @@ function AdminDashboard() {
     ["Reviews", data.reviews],
     ["Reports", data.reports],
     ["Ownership claims", data.ownership_claims],
+    ["Business onboarding", data.business_onboarding_submissions],
     ["Categories", data.categories],
     ["Cities", data.cities],
     ["Import batches", data.import_batches],

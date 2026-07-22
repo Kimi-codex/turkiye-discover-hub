@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
-const STATUSES = ["new", "in_review", "resolved", "rejected"] as const;
+const STATUSES = ["new", "under_review", "resolved", "dismissed"] as const;
 
 export const Route = createFileRoute("/$lang/_authenticated/admin/reports")({
   ssr: false,
