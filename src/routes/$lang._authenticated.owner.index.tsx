@@ -35,7 +35,7 @@ function OwnerHome() {
             </p>
           </div>
           <Button asChild variant="outline">
-            <Link to={`/${lang}/owner/claim`}>Claim a business</Link>
+            <Link to="/$lang/owner/claim" params={{ lang }}>Claim a business</Link>
           </Button>
         </header>
 
@@ -70,10 +70,10 @@ function OwnerHome() {
                   </div>
                   <div className="mt-3 flex gap-2">
                     <Button asChild size="sm" variant="outline">
-                      <Link to={`/${lang}/owner/${b.id}`}>Manage</Link>
+                      <Link to="/$lang/owner/$businessId" params={{ lang, businessId: b.id }}>Manage</Link>
                     </Button>
                     <Button asChild size="sm" variant="ghost">
-                      <Link to={`/${lang}/owner/${b.id}/reviews`}>Reviews</Link>
+                      <Link to="/$lang/owner/$businessId/reviews" params={{ lang, businessId: b.id }}>Reviews</Link>
                     </Button>
                   </div>
                 </li>

@@ -10,8 +10,8 @@
  * up in a small dictionary and returned separately from the inventory so
  * unknown paths are still surfaced (marked "unsupported") for admin review.
  */
-import { createHash } from "crypto";
 import { extractImportItems, unwrapRecord } from "./format";
+import { sha256Hex } from "@/lib/utils/sha256";
 
 export type DetectedType =
   | "string"
@@ -116,10 +116,13 @@ const SUGGESTIONS: Record<string, Suggestion> = {
   "reviews[].time": { targetTable: "reviews", targetColumn: "review_date", transform: "epochSeconds" },
   "reviews[].profile_photo_url": { targetTable: "reviews", targetColumn: "author_avatar_url", transform: "url" },
   // ----- images[] / photos[] -----
-  "photos[].photo_reference": { targetTable: "business_images", targetColumn: "source_url", transform: "identity" },
+  "photos[].photo_reference": { targetTable: "business_images", targetColumn: "source_metadata", transform: "photoReference" },
+  "photos[].name": { targetTable: "business_images", targetColumn: "source_metadata", transform: "photoReference" },
   "photos[].width": { targetTable: "business_images", targetColumn: "width", transform: "integer" },
   "photos[].height": { targetTable: "business_images", targetColumn: "height", transform: "integer" },
   "images[].url": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  "images[].image_url": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  "images[].source": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
   "images[].width": { targetTable: "business_images", targetColumn: "width", transform: "integer" },
   "images[].height": { targetTable: "business_images", targetColumn: "height", transform: "integer" },
   "images[].categories[]": { targetTable: "business_images", targetColumn: "google_photo_labels", transform: "arrayOfString" },
@@ -310,7 +313,7 @@ export function computeSchemaHash(schema: DetectedSchema): string {
   const canonical = schema.fields
     .map((f) => `${f.sourcePath}|${f.detectedType}`)
     .sort();
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  return sha256Hex(JSON.stringify(canonical));
 }
 
 /** Stable canonical hash of the field-mapping (field_mapping_hash). */
@@ -327,7 +330,7 @@ export function computeFieldMappingHash(mapping: MappingRow[]): string {
         r.required ? "1" : "0",
       ].join("|"),
     );
-  return createHash("sha256").update(JSON.stringify(canonical)).digest("hex");
+  return sha256Hex(JSON.stringify(canonical));
 }
 
 /** Merge admin edits (partial) with existing rows. Preserves order of `base`. */

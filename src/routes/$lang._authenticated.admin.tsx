@@ -1,28 +1,52 @@
-import { Outlet, createFileRoute, isRedirect } from "@tanstack/react-router";
-import { getAdminGate } from "@/lib/admin/admin.functions";
+import { Outlet, createFileRoute } from "@tanstack/react-router";
 import { AdminShell } from "@/components/admin/AdminShell";
+import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { useEffect, useState } from "react";
 
 export const Route = createFileRoute("/$lang/_authenticated/admin")({
   ssr: false,
-  loader: async () => {
-    try {
-      await getAdminGate();
-      return { ok: true as const };
-    } catch (err) {
-      if (isRedirect(err)) throw err;
-      // Server threw 401/403 — surface it to errorComponent, do NOT render shell.
-      const status =
-        err instanceof Response
-          ? err.status
-          : (err as { status?: number } | undefined)?.status ?? 403;
-      throw new Response(status === 401 ? "Unauthorized" : "Forbidden", { status });
-    }
-  },
   component: AdminLayout,
-  errorComponent: AdminErrorPage,
 });
 
 function AdminLayout() {
+  const { user, loading } = useAuth();
+  const [adminState, setAdminState] = useState<"checking" | "allowed" | "denied">("checking");
+
+  useEffect(() => {
+    let cancelled = false;
+    if (loading) return;
+    if (!user) {
+      setAdminState("denied");
+      return;
+    }
+    setAdminState("checking");
+    supabase
+      .rpc("has_role", {
+        _user_id: user.id,
+        _role: "admin",
+      })
+      .then(({ data, error }) => {
+        if (cancelled) return;
+        setAdminState(!error && data === true ? "allowed" : "denied");
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [loading, user]);
+
+  if (loading || adminState === "checking") {
+    return <AdminAccessMessage title="Checking admin access…" />;
+  }
+
+  if (!user) {
+    return <AdminAccessMessage title="401" message="You must be signed in to access the admin area." />;
+  }
+
+  if (adminState !== "allowed") {
+    return <AdminAccessMessage title="403" message="You do not have permission to access the admin area." />;
+  }
+
   return (
     <AdminShell>
       <Outlet />
@@ -30,19 +54,11 @@ function AdminLayout() {
   );
 }
 
-function AdminErrorPage({ error }: { error: unknown }) {
-  const status =
-    error instanceof Response
-      ? error.status
-      : (error as { status?: number } | undefined)?.status ?? 403;
+function AdminAccessMessage({ title, message }: { title: string; message?: string }) {
   return (
     <div className="mx-auto max-w-lg px-4 py-24 text-center">
-      <div className="mb-2 text-5xl font-semibold">{status}</div>
-      <p className="text-muted-foreground">
-        {status === 401
-          ? "You must be signed in to access the admin area."
-          : "You do not have permission to access the admin area."}
-      </p>
+      <div className="mb-2 text-5xl font-semibold">{title}</div>
+      {message ? <p className="text-muted-foreground">{message}</p> : null}
     </div>
   );
 }

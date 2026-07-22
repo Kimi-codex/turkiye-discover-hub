@@ -180,7 +180,7 @@ const BUSINESS_SELECT = `
   district:districts!businesses_district_id_fkey(${DISTRICT_SELECT}),
   primary_category:categories!businesses_primary_category_id_fkey(${CATEGORY_SELECT}),
   business_category_links(category:categories(${CATEGORY_SELECT})),
-  business_images(id, source_url, r2_key, r2_url, storage_status, image_type, is_cover, sort_order, width, height),
+  business_images_public(id, source_url, r2_url, storage_status, image_type, is_cover, sort_order, width, height),
   business_opening_hours(day_of_week, open_time, close_time, is_closed, raw_value, sort_order),
   business_services(service_key, value, sort_order),
   business_attributes(attribute_key, value, source),
@@ -226,14 +226,14 @@ function mapBusiness(row: any): Business {
         sortOrder: 0,
       });
 
-  const images: BusinessImage[] = (row.business_images ?? [])
+  const images: BusinessImage[] = (row.business_images_public ?? row.business_images ?? [])
     .sort((a: any, b: any) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((im: any) => ({
       id: im.id,
       businessId: row.id,
       placeId: row.place_id,
       sourceUrl: im.source_url,
-      r2Key: im.r2_key,
+      r2Key: im.r2_key ?? null,
       r2Url: im.r2_url,
       storageStatus: im.storage_status,
       imageType: im.image_type,

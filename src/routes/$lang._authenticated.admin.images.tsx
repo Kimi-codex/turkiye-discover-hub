@@ -47,24 +47,26 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/images")({
       context.queryClient.ensureQueryData(jobsQuery()),
     ]),
   component: AdminImagesPage,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="p-6 text-sm text-destructive">
-        Failed to load image pipeline: {(error as Error).message}
-        <button
-          className="ml-2 underline"
-          onClick={() => {
-            reset();
-            router.invalidate();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  },
+  errorComponent: AdminImagesError,
 });
+
+function AdminImagesError({ error, reset }: { error: unknown; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="p-6 text-sm text-destructive">
+      Failed to load image pipeline: {(error as Error).message}
+      <button
+        className="ml-2 underline"
+        onClick={() => {
+          reset();
+          router.invalidate();
+        }}
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
 
 function AdminImagesPage() {
   const [tab, setTab] = useState<"records" | "jobs">("records");
@@ -113,6 +115,18 @@ function AdminImagesPage() {
     setSelectedRecords((prev) =>
       checked ? Array.from(new Set([...prev, id])) : prev.filter((recordId) => recordId !== id),
     );
+  };
+  const sourceReference = (row: ImageRecord) => {
+    const metadata = row.source_metadata;
+    if (
+      metadata &&
+      typeof metadata === "object" &&
+      "source_reference" in metadata &&
+      typeof metadata.source_reference === "string"
+    ) {
+      return metadata.source_reference;
+    }
+    return row.source_url ?? null;
   };
 
   return (
@@ -242,6 +256,7 @@ function AdminImagesPage() {
                   </th>
                   <th className="px-3 py-2">Business</th>
                   <th className="px-3 py-2">src_url</th>
+                  <th className="px-3 py-2">source_ref</th>
                   <th className="px-3 py-2">r2_key</th>
                   <th className="px-3 py-2">storage_status</th>
                   <th className="px-3 py-2">source_type</th>
@@ -270,6 +285,9 @@ function AdminImagesPage() {
                     <td className="px-3 py-2">
                       <YesNo v={!!row.source_url} />
                     </td>
+                    <td className="max-w-[220px] truncate px-3 py-2 font-mono text-[10px]" title={sourceReference(row) ?? ""}>
+                      {sourceReference(row) ?? "—"}
+                    </td>
                     <td className="px-3 py-2">
                       <YesNo v={!!row.r2_key} />
                     </td>
@@ -297,7 +315,7 @@ function AdminImagesPage() {
                 ))}
                 {records.length === 0 && (
                   <tr>
-                    <td colSpan={9} className="px-3 py-8 text-center text-sm text-muted-foreground">
+                    <td colSpan={10} className="px-3 py-8 text-center text-sm text-muted-foreground">
                       No image records.
                     </td>
                   </tr>

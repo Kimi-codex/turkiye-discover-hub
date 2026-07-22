@@ -38,7 +38,7 @@ export function SortSelect({ value }: SortSelectProps) {
             to: pathname,
             search: (prev: Record<string, unknown> | undefined) => ({
               ...(prev ?? {}),
-              sort: next,
+              sort: next as SortOption,
               page: 1,
             }),
           });

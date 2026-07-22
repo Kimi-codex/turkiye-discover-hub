@@ -72,7 +72,7 @@ function EditBusinessPage() {
       <div className="flex items-center justify-between">
         <h1 className="text-2xl font-semibold">Edit business</h1>
         <Button asChild variant="outline">
-          <Link to="/$lang/_authenticated/admin/businesses" params={{ lang }}>
+          <Link to="/$lang/admin/businesses" params={{ lang }}>
             Back
           </Link>
         </Button>

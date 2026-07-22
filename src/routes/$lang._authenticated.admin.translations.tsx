@@ -28,24 +28,26 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/translations")
       context.queryClient.ensureQueryData(jobsQuery),
     ]),
   component: AdminTranslationsPage,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="p-6 text-sm text-destructive">
-        Failed to load translations: {(error as Error).message}
-        <button
-          className="ml-2 underline"
-          onClick={() => {
-            reset();
-            router.invalidate();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  },
+  errorComponent: AdminTranslationsError,
 });
+
+function AdminTranslationsError({ error, reset }: { error: unknown; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="p-6 text-sm text-destructive">
+      Failed to load translations: {(error as Error).message}
+      <button
+        className="ml-2 underline"
+        onClick={() => {
+          reset();
+          router.invalidate();
+        }}
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
 
 function AdminTranslationsPage() {
   const { data: status } = useSuspenseQuery(statusQuery);

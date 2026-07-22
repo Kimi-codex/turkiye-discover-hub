@@ -25,7 +25,7 @@ export const Route = createFileRoute("/$lang")({
       const segments = location.pathname.split("/").filter(Boolean);
       segments[0] = DEFAULT_LOCALE;
       const search = location.searchStr ?? "";
-      throw redirect({ to: `/${segments.join("/")}${search}` });
+      throw redirect({ href: `/${segments.join("/")}${search}` });
     }
     return { locale: params.lang as Locale };
   },

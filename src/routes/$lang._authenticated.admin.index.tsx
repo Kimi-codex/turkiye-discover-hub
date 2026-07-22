@@ -12,24 +12,26 @@ export const Route = createFileRoute("/$lang/_authenticated/admin/")({
   ssr: false,
   loader: ({ context }) => context.queryClient.ensureQueryData(overviewQuery),
   component: AdminDashboard,
-  errorComponent: ({ error, reset }) => {
-    const router = useRouter();
-    return (
-      <div className="p-6 text-sm text-destructive">
-        Failed to load dashboard: {(error as Error).message}
-        <button
-          className="ml-2 underline"
-          onClick={() => {
-            reset();
-            router.invalidate();
-          }}
-        >
-          Retry
-        </button>
-      </div>
-    );
-  },
+  errorComponent: AdminDashboardError,
 });
+
+function AdminDashboardError({ error, reset }: { error: unknown; reset: () => void }) {
+  const router = useRouter();
+  return (
+    <div className="p-6 text-sm text-destructive">
+      Failed to load dashboard: {(error as Error).message}
+      <button
+        className="ml-2 underline"
+        onClick={() => {
+          reset();
+          router.invalidate();
+        }}
+      >
+        Retry
+      </button>
+    </div>
+  );
+}
 
 function AdminDashboard() {
   const { data } = useSuspenseQuery(overviewQuery);

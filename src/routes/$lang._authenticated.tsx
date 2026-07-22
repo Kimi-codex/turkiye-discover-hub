@@ -6,7 +6,7 @@ export const Route = createFileRoute("/$lang/_authenticated")({
   beforeLoad: async ({ params }) => {
     const { data, error } = await supabase.auth.getUser();
     if (error || !data.user) {
-      throw redirect({ to: `/${params.lang}/auth` });
+      throw redirect({ to: "/$lang/auth", params: { lang: params.lang } });
     }
     return { user: data.user };
   },

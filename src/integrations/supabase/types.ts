@@ -237,6 +237,7 @@ export type Database = {
           sort_order: number
           source_metadata: Json
           source_provider: string
+          source_fingerprint: string | null
           source_title: string | null
           source_type: string
           source_url: string | null
@@ -269,6 +270,7 @@ export type Database = {
           sort_order?: number
           source_metadata?: Json
           source_provider?: string
+          source_fingerprint?: string | null
           source_title?: string | null
           source_type?: string
           source_url?: string | null
@@ -301,6 +303,7 @@ export type Database = {
           sort_order?: number
           source_metadata?: Json
           source_provider?: string
+          source_fingerprint?: string | null
           source_title?: string | null
           source_type?: string
           source_url?: string | null

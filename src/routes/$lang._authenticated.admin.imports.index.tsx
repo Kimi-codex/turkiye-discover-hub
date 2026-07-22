@@ -80,6 +80,7 @@ const STAGE_SHORT: Record<string, string> = {
 
 function ImportsPage() {
   const { lang } = Route.useParams();
+  const navigate = useNavigate();
   const qc = useQueryClient();
   const fileRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
@@ -146,7 +147,10 @@ function ImportsPage() {
       await markImportBatchUploaded({ data: { id: batchId } });
       toast.success("Uploaded");
       qc.invalidateQueries({ queryKey: ["admin", "imports"] });
-      window.location.assign(`/${lang}/admin/imports/${batchId}`);
+      await navigate({
+        to: "/$lang/admin/imports/$id",
+        params: { lang, id: batchId },
+      });
     } catch (e) {
       const msg = (e as Error).message ?? "Upload failed";
       setUploadError(msg);

@@ -53,7 +53,7 @@ function ChangeRequestsList() {
             <div className="flex items-center gap-2">
               <Badge variant="outline">{r.status}</Badge>
               <Button asChild size="sm" variant="outline">
-                <Link to={`/${lang}/admin/change-requests/${r.id}`}>Review</Link>
+                <Link to="/$lang/admin/change-requests/$id" params={{ lang, id: r.id }}>Review</Link>
               </Button>
             </div>
           </div>

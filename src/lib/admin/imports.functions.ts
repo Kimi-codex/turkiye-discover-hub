@@ -20,7 +20,6 @@
  * any particular file, fixture, or place_id.
  */
 import { createServerFn } from "@tanstack/react-start";
-import { createHash } from "crypto";
 import { requireAdmin } from "./require-admin.middleware";
 import {
   detectImportFormat,
@@ -48,6 +47,7 @@ import {
   applyMappingEdits,
   type MappingRow,
 } from "@/lib/import/schema-detector";
+import { sha256Hex } from "@/lib/utils/sha256";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -238,7 +238,7 @@ export const detectImportSchema = createServerFn({ method: "POST" })
       throw new Response(dlErr.message, { status: 500 });
     }
     const text = await blob.text();
-    const fileHash = createHash("sha256").update(text).digest("hex");
+    const fileHash = sha256Hex(text);
     let payload: unknown;
     try {
       payload = JSON.parse(text);
@@ -587,7 +587,7 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     }
 
     const text = await blob.text();
-    const fileHash = createHash("sha256").update(text).digest("hex");
+    const fileHash = sha256Hex(text);
     let payload: unknown;
     try {
       payload = JSON.parse(text);
@@ -613,7 +613,7 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
     const placeIds = normalizedItems
       .map((x) => x.n?.placeId)
       .filter((x): x is string => !!x);
-    let existingByPlaceId = new Map<string, Record<string, unknown>>();
+    const existingByPlaceId = new Map<string, Record<string, unknown>>();
     if (placeIds.length > 0) {
       const { data: exs } = await supabase
         .from("businesses")
@@ -691,6 +691,7 @@ export const analyzeImportBatch = createServerFn({ method: "POST" })
       const { data: existingMappings } = await supabase
         .from("category_mappings")
         .select("source_category")
+        .eq("source_provider", "google")
         .in("source_category", labels);
       const existingSet = new Set(
         (existingMappings ?? []).map((r: { source_category: string }) => r.source_category),
@@ -817,6 +818,17 @@ export const computeImportPreview = createServerFn({ method: "POST" })
     if (!batch) throw new Response("Not found", { status: 404 });
     if (!["mapping", "validation", "preview"].includes(batch.stage))
       throw new Response(`Cannot preview in stage ${batch.stage}`, { status: 400 });
+    const { count: processedCount } = await supabase
+      .from("import_batch_items")
+      .select("id", { count: "exact", head: true })
+      .eq("import_batch_id", data.id)
+      .not("processed_at", "is", null);
+    if ((processedCount ?? 0) > 0) {
+      throw new Response(
+        "Cannot recompute preview after execution has started. Create a new batch instead.",
+        { status: 409 },
+      );
+    }
 
     // Re-hydrate current snapshot for update items, since businesses may have
     // been edited since analyze. This is what protects against stale previews.
@@ -965,17 +977,37 @@ export const runImportChunk = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
+    const lockOwner = `${context.userId}:runImportChunk`;
     const { data: batch } = await supabase
       .from("import_batches")
       .select("*")
       .eq("id", data.id)
       .maybeSingle();
     if (!batch) throw new Response("Not found", { status: 404 });
-    if (!["preview", "execute", "ready", "importing"].includes(batch.stage) &&
-        !["ready", "importing", "previewed", "preview"].includes(batch.status))
+    if (!["preview", "execute"].includes(String(batch.stage)))
       throw new Response(`Batch is stage=${batch.stage}, cannot run`, { status: 400 });
+    if (["completed", "partially_completed", "failed", "cancelled", "archived"].includes(String(batch.status))) {
+      throw new Response(`Batch status=${batch.status}, cannot run`, { status: 400 });
+    }
     if (!batch.preview_hash)
       throw new Response("Missing preview_hash — compute preview first", { status: 400 });
+
+    const staleBefore = new Date(Date.now() - 5 * 60 * 1000).toISOString();
+    const { data: lockRows, error: lockErr } = await supabase
+      .from("import_batches")
+      .update({
+        processing_lock_at: new Date().toISOString(),
+        processing_lock_by: lockOwner,
+      })
+      .eq("id", data.id)
+      .or(`processing_lock_at.is.null,processing_lock_at.lt.${staleBefore}`)
+      .select("id");
+    if (lockErr) throw new Response(`Could not acquire import lock: ${lockErr.message}`, { status: 500 });
+    if (!lockRows || lockRows.length === 0) {
+      throw new Response("Import batch is already processing. Wait for the current chunk to finish.", {
+        status: 409,
+      });
+    }
 
     // Load next chunk of pending items whose preview_hash still matches.
     const { data: items } = await supabase
@@ -983,6 +1015,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
       .select("*")
       .eq("import_batch_id", data.id)
       .eq("status", "pending")
+      .is("processed_at", null)
       .eq("preview_hash", batch.preview_hash)
       .order("item_index")
       .limit(CHUNK_SIZE);
@@ -994,11 +1027,14 @@ export const runImportChunk = createServerFn({ method: "POST" })
         .select("id", { count: "exact", head: true })
         .eq("import_batch_id", data.id)
         .eq("status", "pending")
+        .is("processed_at", null)
         .neq("preview_hash", batch.preview_hash);
       if ((stale ?? 0) > 0) {
+        await clearImportLock(supabase, data.id, lockOwner);
         return { ok: false, processed: 0, done: false, staleItems: stale, needsRepreview: true };
       }
       await finalizeExecute(supabase, data.id);
+      await clearImportLock(supabase, data.id, lockOwner);
       return { ok: true, processed: 0, done: true };
     }
 
@@ -1035,6 +1071,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
     const mappingIndex = new Map<string, string>();
     (mappings ?? []).forEach((m: { source_category: string; category_id: string }) => {
       mappingIndex.set(m.source_category, m.category_id);
+      mappingIndex.set(m.source_category.toLowerCase().trim(), m.category_id);
     });
 
     let inserted = 0;
@@ -1043,8 +1080,6 @@ export const runImportChunk = createServerFn({ method: "POST" })
     let failed = 0;
     let reviewsWritten = 0;
     let imagesWritten = 0;
-    const touchedBusinessIds = new Set<string>();
-
     for (const item of items) {
       const rp = (item.raw_payload as Record<string, unknown> | null) ?? {};
       const normalized = (rp.normalized as NormalizedBusiness | null) ?? null;
@@ -1065,7 +1100,9 @@ export const runImportChunk = createServerFn({ method: "POST" })
           continue;
         }
         const primaryCatId = normalized.primaryCategorySource
-          ? mappingIndex.get(normalized.primaryCategorySource) ?? null
+          ? mappingIndex.get(normalized.primaryCategorySource) ??
+            mappingIndex.get(normalized.primaryCategorySource.toLowerCase().trim()) ??
+            null
           : null;
         if (requireCategoryMapping && !primaryCatId) {
           await markItem(supabase, item.id, "needs_mapping", "needs_mapping", "unmapped_category");
@@ -1075,9 +1112,10 @@ export const runImportChunk = createServerFn({ method: "POST" })
 
         const { data: existing } = await supabase
           .from("businesses")
-          .select("id, name, slug, field_sources, status")
+          .select("id, name, slug, field_sources, status, source")
           .eq("place_id", normalized.placeId)
           .maybeSingle();
+        let businessIdForChildren: string | null = existing?.id ?? null;
 
         const slug = existing?.slug ?? slugify(normalized.name, normalized.placeId);
         const nowIso = new Date().toISOString();
@@ -1119,13 +1157,6 @@ export const runImportChunk = createServerFn({ method: "POST" })
             fieldSources[f] = { source: "import", updated_at: nowIso };
             appliedFields.push(f);
           }
-          if (appliedFields.length === 0 && intent !== "noop") {
-            // Approved 0 fields — record as noop.
-            await recordProvenance(supabase, existing.id, item.import_batch_id, item.id, "noop", []);
-            await markItem(supabase, item.id, "skipped", "skip", "no_fields_approved", existing.id);
-            skipped++;
-            continue;
-          }
           if (appliedFields.length > 0) {
             patch.field_sources = fieldSources;
             const { error: uErr } = await supabase
@@ -1134,7 +1165,6 @@ export const runImportChunk = createServerFn({ method: "POST" })
               .eq("id", existing.id);
             if (uErr) throw uErr;
             updated++;
-            touchedBusinessIds.add(existing.id);
             await recordProvenance(
               supabase,
               existing.id,
@@ -1145,8 +1175,9 @@ export const runImportChunk = createServerFn({ method: "POST" })
             );
             await markItem(supabase, item.id, "updated", "update", null, existing.id);
           } else {
+            const reason = intent !== "noop" ? "no_fields_approved" : "noop";
             await recordProvenance(supabase, existing.id, item.import_batch_id, item.id, "noop", []);
-            await markItem(supabase, item.id, "skipped", "skip", "noop", existing.id);
+            await markItem(supabase, item.id, "skipped", "skip", reason, existing.id);
             skipped++;
           }
         } else {
@@ -1171,17 +1202,21 @@ export const runImportChunk = createServerFn({ method: "POST" })
             .single();
           if (iErr) throw iErr;
           const businessId = ins.id as string;
+          businessIdForChildren = businessId;
           inserted++;
-          touchedBusinessIds.add(businessId);
           await recordProvenance(supabase, businessId, item.import_batch_id, item.id, "insert", appliedFields);
           await markItem(supabase, item.id, "inserted", "insert", null, businessId);
         }
 
-        const businessIdForChildren = existing?.id ?? [...touchedBusinessIds].pop()!;
+        if (!businessIdForChildren) throw new Error("import_item_missing_business_id");
 
         // Opening hours: replace only for inserts / when explicitly approved.
         if (!existing && normalized.openingHours.length > 0) {
-          await supabase.from("business_opening_hours").delete().eq("business_id", businessIdForChildren);
+          const { error: hoursDeleteErr } = await supabase
+            .from("business_opening_hours")
+            .delete()
+            .eq("business_id", businessIdForChildren);
+          if (hoursDeleteErr) throw new Error(`opening_hours_delete_failed: ${hoursDeleteErr.message}`);
           const hoursRows = normalized.openingHours.map((h) => ({
             business_id: businessIdForChildren,
             day_of_week: h.dayOfWeek,
@@ -1189,30 +1224,44 @@ export const runImportChunk = createServerFn({ method: "POST" })
             close_time: h.closeTime,
             is_closed: h.isClosed,
           }));
-          await supabase.from("business_opening_hours").insert(hoursRows);
+          const { error: hoursInsertErr } = await supabase.from("business_opening_hours").insert(hoursRows);
+          if (hoursInsertErr) throw new Error(`opening_hours_insert_failed: ${hoursInsertErr.message}`);
         }
 
         // Images / reviews — always upserted from source (idempotent).
         if (normalized.images.length > 0) {
+          if (normalized.images.some((img) => img.isCover)) {
+            const { error: coverResetErr } = await supabase
+              .from("business_images")
+              .update({ is_cover: false })
+              .eq("business_id", businessIdForChildren)
+              .eq("source_type", "google_places");
+            if (coverResetErr) throw new Error(`image_cover_reset_failed: ${coverResetErr.message}`);
+          }
           for (const img of normalized.images) {
             const { error: imgErr } = await supabase.from("business_images").upsert(
               {
                 business_id: businessIdForChildren,
+                place_id: normalized.placeId,
                 source_url: img.sourceUrl,
+                source_fingerprint: img.sourceFingerprint,
+                source_metadata: img.sourceMetadata,
                 source_provider: "google",
                 source_type: "google_places",
                 sort_order: img.sortOrder,
                 is_cover: img.isCover,
                 google_photo_category: img.googleCategory,
                 google_photo_labels: img.googleLabels ?? [],
-                storage_status: "pending",
+                storage_status: img.sourceUrl ? "external_only" : "pending",
                 width: img.width ?? null,
                 height: img.height ?? null,
                 image_type: img.isCover ? "cover" : "gallery",
+                deleted_at: null,
               },
-              { onConflict: "business_id,source_url" },
+              { onConflict: "business_id,source_fingerprint" },
             );
-            if (!imgErr) imagesWritten++;
+            if (imgErr) throw new Error(`image_upsert_failed: ${imgErr.message}`);
+            imagesWritten++;
           }
         }
 
@@ -1234,47 +1283,59 @@ export const runImportChunk = createServerFn({ method: "POST" })
               },
               { onConflict: "business_id,source,source_fingerprint" },
             );
-            if (!revErr) reviewsWritten++;
+            if (revErr) throw new Error(`review_upsert_failed: ${revErr.message}`);
+            reviewsWritten++;
           }
         }
 
-        if (!existing) {
-          const catIds = Array.from(
-            new Set(
-              [primaryCatId, ...normalized.categoriesSource.map((c) => mappingIndex.get(c) ?? null)].filter(
-                (x): x is string => !!x,
+        const catIds = Array.from(
+          new Set(
+            [
+              primaryCatId,
+              ...normalized.categoriesSource.map(
+                (c) => mappingIndex.get(c) ?? mappingIndex.get(c.toLowerCase().trim()) ?? null,
               ),
+            ].filter(
+              (x): x is string => !!x,
             ),
-          );
-          if (catIds.length > 0) {
-            await supabase.from("business_category_links").delete().eq("business_id", businessIdForChildren);
-            const links = catIds.map((cid) => ({
-              business_id: businessIdForChildren,
-              category_id: cid,
-              is_primary: cid === primaryCatId,
-            }));
-            await supabase.from("business_category_links").insert(links);
+          ),
+        );
+        const maySyncImportOwnedCategories =
+          !existing || String(existing.source ?? "") === "google_json";
+        if (maySyncImportOwnedCategories && catIds.length > 0) {
+          const { error: categoryDeleteErr } = await supabase
+            .from("business_category_links")
+            .delete()
+            .eq("business_id", businessIdForChildren);
+          if (categoryDeleteErr) throw new Error(`category_links_delete_failed: ${categoryDeleteErr.message}`);
+          const links = catIds.map((cid) => ({
+            business_id: businessIdForChildren,
+            category_id: cid,
+            is_primary: cid === primaryCatId,
+          }));
+          const { error: categoryInsertErr } = await supabase
+            .from("business_category_links")
+            .upsert(links, { onConflict: "business_id,category_id" });
+          if (categoryInsertErr) throw new Error(`category_links_insert_failed: ${categoryInsertErr.message}`);
+          if (existing && primaryCatId) {
+            const { error: primaryCategoryErr } = await supabase
+              .from("businesses")
+              .update({
+                primary_category_id: primaryCatId,
+                field_sources: {
+                  ...fieldSources,
+                  primary_category_id: { source: "import", updated_at: nowIso },
+                },
+              })
+              .eq("id", businessIdForChildren);
+            if (primaryCategoryErr) {
+              throw new Error(`primary_category_update_failed: ${primaryCategoryErr.message}`);
+            }
           }
         }
       } catch (e) {
         failed++;
         await markItem(supabase, item.id, "failed", null, (e as Error).message?.slice(0, 400) ?? "error");
-      }
-    }
-
-    // Enqueue translation jobs for every business touched this chunk.
-    if (touchedBusinessIds.size > 0) {
-      try {
-        const { enqueueMissingTranslations } = await import(
-          "@/lib/translations/service.server"
-        );
-        for (const bid of touchedBusinessIds) {
-          await enqueueMissingTranslations(bid).catch((err) => {
-            console.warn("[import] enqueueMissingTranslations failed", bid, err);
-          });
-        }
-      } catch (err) {
-        console.warn("[import] translation enqueue module failed", err);
       }
     }
 
@@ -1284,22 +1345,22 @@ export const runImportChunk = createServerFn({ method: "POST" })
       _entity_id: data.id,
       _before: null,
       _after: null,
-      _metadata: { inserted, updated, skipped, failed, chunk_size: items.length },
+      _metadata: { inserted, updated, skipped, failed, imagesWritten, reviewsWritten, chunk_size: items.length },
     });
 
-    const { data: cur } = await supabase
-      .from("import_batches")
-      .select("inserted_items, updated_items, skipped_items, failed_items, processed_items")
-      .eq("id", data.id)
-      .maybeSingle();
+    const { data: allItemsForCounts } = await supabase
+      .from("import_batch_items")
+      .select("status, processed_at")
+      .eq("import_batch_id", data.id);
+    const statusRows = (allItemsForCounts ?? []) as Array<{ status: string; processed_at: string | null }>;
     await supabase
       .from("import_batches")
       .update({
-        inserted_items: (cur?.inserted_items ?? 0) + inserted,
-        updated_items: (cur?.updated_items ?? 0) + updated,
-        skipped_items: (cur?.skipped_items ?? 0) + skipped,
-        failed_items: (cur?.failed_items ?? 0) + failed,
-        processed_items: (cur?.processed_items ?? 0) + items.length,
+        inserted_items: statusRows.filter((row) => row.status === "inserted").length,
+        updated_items: statusRows.filter((row) => row.status === "updated").length,
+        skipped_items: statusRows.filter((row) => row.status === "skipped").length,
+        failed_items: statusRows.filter((row) => row.status === "failed").length,
+        processed_items: statusRows.filter((row) => row.processed_at != null).length,
       })
       .eq("id", data.id);
 
@@ -1312,6 +1373,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
 
     const done = !remaining || remaining === 0;
     if (done) await finalizeExecute(supabase, data.id);
+    await clearImportLock(supabase, data.id, lockOwner);
 
     return {
       ok: true,
@@ -1357,6 +1419,19 @@ export const enqueueBatchTranslations = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
+    const { data: batch, error: batchError } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, status, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (batchError) throw new Response(batchError.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot enqueue translations for batch with ${batch.failed_items ?? 0} failed and ${batch.invalid_items ?? 0} invalid items.`,
+        { status: 409 },
+      );
+    }
     const { data: rows } = await supabase
       .from("business_import_provenance")
       .select("business_id")
@@ -1381,6 +1456,44 @@ export const enqueueBatchTranslations = createServerFn({ method: "POST" })
     return { ok: true, enqueued, failed, businesses: businessIds.length };
   });
 
+export const skipBatchTranslations = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch, error } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Response(error.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot skip translations for a batch with ${batch.failed_items ?? 0} failed and ${
+          batch.invalid_items ?? 0
+        } invalid items.`,
+        { status: 409 },
+      );
+    }
+    if (batch.stage !== "translations") {
+      throw new Response(`Cannot skip translations in stage ${batch.stage}`, { status: 400 });
+    }
+    await advanceStage(supabase, data.id, "images");
+    await supabase.rpc("record_audit", {
+      _action: "import.translations.skip",
+      _entity_type: "import_batch",
+      _entity_id: data.id,
+      _before: null,
+      _after: null,
+      _metadata: { reason: "manual_skip" },
+    });
+    return { ok: true };
+  });
+
 export const markImagesStageDone = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
   .inputValidator((i: { id: string }) => {
@@ -1389,6 +1502,24 @@ export const markImagesStageDone = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
+    const { data: batch, error } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Response(error.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot advance images for a batch with ${batch.failed_items ?? 0} failed and ${
+          batch.invalid_items ?? 0
+        } invalid items.`,
+        { status: 409 },
+      );
+    }
+    if (batch.stage !== "images") {
+      throw new Response(`Cannot advance images in stage ${batch.stage}`, { status: 400 });
+    }
     // Images pipeline is Blocked by configuration (R2). We only advance the
     // stage; jobs remain in the queue table and are processed independently.
     await advanceStage(supabase, data.id, "publish");
@@ -1405,6 +1536,19 @@ export const publishImportBatch = createServerFn({ method: "POST" })
   })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
+    const { data: batch, error: batchError } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, status, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (batchError) throw new Response(batchError.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot publish batch with ${batch.failed_items ?? 0} failed and ${batch.invalid_items ?? 0} invalid items.`,
+        { status: 409 },
+      );
+    }
     const { data: rows } = await supabase
       .from("business_import_provenance")
       .select("business_id")
@@ -1533,6 +1677,14 @@ async function markItem(
   await supabase.from("import_batch_items").update(patch).eq("id", id);
 }
 
+async function clearImportLock(supabase: Sb, id: string, lockOwner: string) {
+  await supabase
+    .from("import_batches")
+    .update({ processing_lock_at: null, processing_lock_by: null })
+    .eq("id", id)
+    .eq("processing_lock_by", lockOwner);
+}
+
 async function recordProvenance(
   supabase: Sb,
   businessId: string,
@@ -1541,6 +1693,10 @@ async function recordProvenance(
   action: "insert" | "update" | "noop",
   fields: string[],
 ) {
+  await supabase
+    .from("business_import_provenance")
+    .delete()
+    .eq("import_batch_item_id", itemId);
   await supabase.from("business_import_provenance").insert({
     business_id: businessId,
     import_batch_id: batchId,
@@ -1584,8 +1740,8 @@ function slugify(name: string, placeId: string): string {
 /**
  * Re-extract and upsert business_images rows for every item in a batch that
  * already has a linked business_id. Used to backfill after fixing the
- * normalizer (e.g., accept bare URL strings). Idempotent via
- * onConflict=(business_id, source_url).
+ * normalizer (e.g., accept bare URL strings or Google photo references).
+ * Idempotent via onConflict=(business_id, source_fingerprint).
  */
 export const reprocessBatchImages = createServerFn({ method: "POST" })
   .middleware([requireAdmin])
@@ -1612,26 +1768,38 @@ export const reprocessBatchImages = createServerFn({ method: "POST" })
       const images = normalizeImages(unwrapped);
       if (images.length === 0) continue;
       itemsWithImages++;
+      if (images.some((img) => img.isCover)) {
+        const { error: coverResetErr } = await supabase
+          .from("business_images")
+          .update({ is_cover: false })
+          .eq("business_id", it.business_id as string)
+          .eq("source_type", "google_places");
+        if (coverResetErr) throw new Error(`image_cover_reset_failed: ${coverResetErr.message}`);
+      }
       for (const img of images) {
         const { error: imgErr } = await supabase.from("business_images").upsert(
           {
             business_id: it.business_id as string,
+            place_id: String(unwrapped.place_id ?? unwrapped.placeId ?? unwrapped.id ?? ""),
             source_url: img.sourceUrl,
+            source_fingerprint: img.sourceFingerprint,
+            source_metadata: img.sourceMetadata,
             source_provider: "google",
             source_type: "google_places",
             sort_order: img.sortOrder,
             is_cover: img.isCover,
             google_photo_category: img.googleCategory,
             google_photo_labels: img.googleLabels ?? [],
-            storage_status: "pending",
+            storage_status: img.sourceUrl ? "external_only" : "pending",
             width: img.width ?? null,
             height: img.height ?? null,
             image_type: img.isCover ? "cover" : "gallery",
             deleted_at: null,
           },
-          { onConflict: "business_id,source_url" },
+          { onConflict: "business_id,source_fingerprint" },
         );
-        if (!imgErr) imagesUpserted++;
+        if (imgErr) throw new Error(`image_upsert_failed: ${imgErr.message}`);
+        imagesUpserted++;
       }
     }
 
@@ -1696,7 +1864,8 @@ export const reprocessBatchReviews = createServerFn({ method: "POST" })
           },
           { onConflict: "business_id,source,source_fingerprint" },
         );
-        if (!rErr) reviewsUpserted++;
+        if (rErr) throw new Error(`review_upsert_failed: ${rErr.message}`);
+        reviewsUpserted++;
       }
     }
 

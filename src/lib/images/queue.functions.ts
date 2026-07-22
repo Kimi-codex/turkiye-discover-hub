@@ -187,7 +187,7 @@ export const listImageRecords = createServerFn({ method: "GET" })
     let q = sb
       .from("business_images")
       .select(
-        "id, business_id, source_url, r2_key, storage_status, source_type, source_provider, created_at, is_cover, businesses(name, source)",
+        "id, business_id, place_id, source_url, source_metadata, source_fingerprint, r2_key, storage_status, source_type, source_provider, created_at, is_cover, businesses(name, source)",
       )
       .is("deleted_at", null)
       .order("created_at", { ascending: false })
@@ -215,7 +215,10 @@ export const listImageRecords = createServerFn({ method: "GET" })
       (r: {
         id: string;
         business_id: string;
+        place_id: string;
         source_url: string | null;
+        source_metadata: unknown;
+        source_fingerprint: string | null;
         r2_key: string | null;
         storage_status: string;
         source_type: string;

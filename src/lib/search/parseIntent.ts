@@ -92,7 +92,7 @@ export function normalize(input: string): string {
     .toLocaleLowerCase("tr")
     .replace(/[\u064B-\u065F\u0670]/g, "") // Arabic diacritics
     .replace(/[’'`´]/g, " ")
-    .replace(/[.,;:!?()\[\]{}"]/g, " ")
+    .replace(/[.,;:!?()[\]{}"]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }

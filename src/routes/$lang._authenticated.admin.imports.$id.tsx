@@ -7,6 +7,7 @@ import {
   computeImportPreview,
   confirmImportMappings,
   enqueueBatchTranslations,
+  skipBatchTranslations,
   getImportBatch,
   markImagesStageDone,
   publishImportBatch,
@@ -28,6 +29,7 @@ import type { MappingRow } from "@/lib/import/schema-detector";
 export const Route = createFileRoute("/$lang/_authenticated/admin/imports/$id")({
   ssr: false,
   component: ImportDetailPage,
+  errorComponent: ImportDetailError,
   validateSearch: (s: Record<string, unknown>): { tab?: TabId } => {
     const t = s?.tab as string | undefined;
     return t && TAB_IDS.includes(t as TabId) ? { tab: t as TabId } : {};
@@ -47,6 +49,12 @@ const TAB_IDS = [
   "logs",
 ] as const;
 type TabId = (typeof TAB_IDS)[number];
+
+type ProposedDiff = {
+  fields: Array<Record<string, unknown>>;
+  changedCount: number;
+  blockedCount: number;
+};
 
 const STAGE_ORDER = [
   "upload",
@@ -167,6 +175,16 @@ function ImportDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const skipTranslationsMut = useMutation({
+    mutationFn: () => skipBatchTranslations({ data: { id } }),
+    onSuccess: async () => {
+      toast.info("Skipped translations");
+      await invalidate();
+      setTab("images");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   const imagesDoneMut = useMutation({
     mutationFn: () => markImagesStageDone({ data: { id } }),
     onSuccess: async () => {
@@ -232,6 +250,25 @@ function ImportDetailPage() {
     onError: (e: Error) => toast.error(e.message),
   });
 
+  const reprocessImagesFn = useServerFn(reprocessBatchImages);
+  const reprocessReviewsFn = useServerFn(reprocessBatchReviews);
+  const reprocessAllMut = useMutation({
+    mutationFn: async () => {
+      const [imgs, revs] = await Promise.all([
+        reprocessImagesFn({ data: { batchId: id } }),
+        reprocessReviewsFn({ data: { batchId: id } }),
+      ]);
+      return { imgs, revs };
+    },
+    onSuccess: async ({ imgs, revs }) => {
+      toast.success(
+        `Reprocessed: ${imgs.imagesUpserted} images · ${revs.reviewsUpserted} reviews across ${imgs.itemsScanned} items`,
+      );
+      await qc.invalidateQueries({ queryKey: ["admin"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
   if (q.isLoading) return <div className="p-6 text-sm text-muted-foreground">Loading…</div>;
   if (q.error) return <div className="p-6 text-sm text-destructive">{(q.error as Error).message}</div>;
   const batch = q.data!.batch as Record<string, unknown>;
@@ -280,25 +317,6 @@ function ImportDetailPage() {
   };
   const isLocked = (t: TabId) => !!lockedReason[t];
 
-  const reprocessImagesFn = useServerFn(reprocessBatchImages);
-  const reprocessReviewsFn = useServerFn(reprocessBatchReviews);
-  const reprocessAllMut = useMutation({
-    mutationFn: async () => {
-      const [imgs, revs] = await Promise.all([
-        reprocessImagesFn({ data: { batchId: id } }),
-        reprocessReviewsFn({ data: { batchId: id } }),
-      ]);
-      return { imgs, revs };
-    },
-    onSuccess: async ({ imgs, revs }) => {
-      toast.success(
-        `Reprocessed: ${imgs.imagesUpserted} images · ${revs.reviewsUpserted} reviews across ${imgs.itemsScanned} items`,
-      );
-      await qc.invalidateQueries({ queryKey: ["admin"] });
-    },
-    onError: (e: Error) => toast.error(e.message),
-  });
-
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3">
@@ -331,6 +349,7 @@ function ImportDetailPage() {
         hasAnalyzedItems={hasAnalyzedItems}
         storageExists={storageExists}
         isFmApproved={isFmApproved}
+        hasPreviewHash={!!batch.preview_hash}
         onDetect={() => detectMut.mutate()}
         onApproveMapping={() => approveMappingMut.mutate()}
         onAnalyze={() => analyzeMut.mutate()}
@@ -338,10 +357,12 @@ function ImportDetailPage() {
         onPreview={() => previewMut.mutate()}
         onRun={() => runMut.mutate()}
         onTranslations={() => translationsMut.mutate()}
+        onSkipTranslations={() => skipTranslationsMut.mutate()}
         onImagesDone={() => imagesDoneMut.mutate()}
         onPublish={() => publishMut.mutate()}
         detecting={detectMut.isPending}
         approving={approveMappingMut.isPending}
+        running={runMut.isPending}
       />
 
       <StageProgress currentStage={stage} />
@@ -383,6 +404,7 @@ function ImportDetailPage() {
           }}
           autoRunning={autoRun}
           onTranslations={() => translationsMut.mutate()}
+          onSkipTranslations={() => skipTranslationsMut.mutate()}
           onImagesDone={() => imagesDoneMut.mutate()}
           onPublish={() => publishMut.mutate()}
           onCancel={() => cancelMut.mutate()}
@@ -457,9 +479,33 @@ function ImportDetailPage() {
           />
         )
       )}
-      {currentTab === "translations" && <TranslationsTab provenance={provenance} />}
+      {currentTab === "translations" && (
+        <TranslationsTab
+          provenance={provenance}
+          onSkip={() => skipTranslationsMut.mutate()}
+          skipping={skipTranslationsMut.isPending}
+        />
+      )}
       {currentTab === "images" && <ImagesTab provenance={provenance} batchId={id} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
+    </div>
+  );
+}
+
+function ImportDetailError({ error }: { error: unknown }) {
+  const message =
+    error instanceof Error
+      ? error.message
+      : error instanceof Response
+        ? `${error.status} ${error.statusText}`
+        : String(error ?? "Unknown route error");
+  return (
+    <div className="rounded-xl border border-destructive/40 bg-destructive/5 p-6 text-sm">
+      <div className="font-medium text-destructive">Import detail page failed</div>
+      <div className="mt-2 whitespace-pre-wrap break-all text-xs text-destructive">{message}</div>
+      <div className="mt-3 text-xs text-muted-foreground">
+        The batch was not modified by this page-render error.
+      </div>
     </div>
   );
 }
@@ -469,6 +515,7 @@ function NextAction(props: {
   hasAnalyzedItems: boolean;
   storageExists: boolean;
   isFmApproved: boolean;
+  hasPreviewHash: boolean;
   onDetect: () => void;
   onApproveMapping: () => void;
   onAnalyze: () => void;
@@ -476,10 +523,12 @@ function NextAction(props: {
   onPreview: () => void;
   onRun: () => void;
   onTranslations: () => void;
+  onSkipTranslations: () => void;
   onImagesDone: () => void;
   onPublish: () => void;
   detecting: boolean;
   approving: boolean;
+  running: boolean;
 }) {
   const { stage, storageExists, isFmApproved } = props;
   let label = "";
@@ -512,18 +561,29 @@ function NextAction(props: {
     label = "Confirm category mappings";
     description = "First resolve every pending label in Category mappings; this button then unlocks validation.";
     onClick = props.onConfirmMapping;
-  } else if (stage === "validation" || stage === "preview") {
+  } else if (stage === "validation") {
     label = "Compute import preview";
     description = "Diff every record against the database (inserts / updates / noops).";
     onClick = props.onPreview;
+  } else if (stage === "preview") {
+    if (props.hasPreviewHash) {
+      label = props.running ? "Running chunk…" : "Run next execute chunk";
+      description = "Write the previewed records to the database. This batch has 40 rows, so one chunk should finish it.";
+      onClick = props.onRun;
+      disabled = props.running;
+    } else {
+      label = "Compute import preview";
+      description = "Preview hash is missing; recompute the import preview before executing.";
+      onClick = props.onPreview;
+    }
   } else if (stage === "execute") {
     label = "Run next execute chunk";
     description = "Write the next batch of approved records to the database.";
     onClick = props.onRun;
   } else if (stage === "translations") {
-    label = "Enqueue translations";
-    description = "Queue TR/EN/AR translation jobs for imported businesses.";
-    onClick = props.onTranslations;
+    label = "Skip translations";
+    description = "Do not enqueue translation jobs for this controlled import; advance to images.";
+    onClick = props.onSkipTranslations;
   } else if (stage === "images") {
     label = "Advance images stage";
     description = "Image pipeline is Blocked; advance past this stage to publish.";
@@ -615,6 +675,7 @@ function OverviewTab(props: {
   onAutoRun: () => void;
   autoRunning: boolean;
   onTranslations: () => void;
+  onSkipTranslations: () => void;
   onImagesDone: () => void;
   onPublish: () => void;
   onCancel: () => void;
@@ -702,7 +763,12 @@ function OverviewTab(props: {
           </>
         )}
         {stage === "translations" && (
-          <Button onClick={props.onTranslations}>Enqueue translations → images</Button>
+          <>
+            <Button onClick={props.onSkipTranslations}>Skip translations → images</Button>
+            <Button variant="outline" onClick={props.onTranslations}>
+              Enqueue translations → images
+            </Button>
+          </>
         )}
         {stage === "images" && (
           <Button onClick={props.onImagesDone}>Mark images stage done → publish</Button>
@@ -926,8 +992,8 @@ function ImportTab({
         <div className="space-y-2">
           {updates.map((it) => {
             const id = String(it.id);
-            const diff = (it.proposed_diff as { fields: Array<Record<string, unknown>>; changedCount: number; blockedCount: number } | null) ?? null;
-            const approved = (it.approved_fields as string[]) ?? [];
+            const diff = asProposedDiff(it.proposed_diff);
+            const approved = asStringArray(it.approved_fields);
             const open = openId === id;
             return (
               <div key={id} className="rounded-lg border">
@@ -957,7 +1023,7 @@ function ImportTab({
                         </tr>
                       </thead>
                       <tbody>
-                        {(diff.fields ?? []).map((f, i) => {
+                        {diff.fields.map((f, i) => {
                           const field = String(f.field);
                           const st = String(f.status);
                           const isChanged = st === "changed";
@@ -1020,14 +1086,31 @@ function ImportTab({
   );
 }
 
-function TranslationsTab({ provenance }: { provenance: Array<Record<string, unknown>> }) {
+function TranslationsTab({
+  provenance,
+  onSkip,
+  skipping,
+}: {
+  provenance: Array<Record<string, unknown>>;
+  onSkip: () => void;
+  skipping: boolean;
+}) {
   return (
     <div className="rounded-xl border bg-card p-4 text-sm">
       <div className="mb-1 font-medium">Translations stage</div>
       <p className="text-xs text-muted-foreground">
-        Enqueued Lovable AI translation jobs for {provenance.length} touched businesses.
-        Check <Link to="." className="underline">Translations admin</Link> for job progress.
+        This controlled import is verifying source data, images, reviews, and category links.
+        Translation jobs are intentionally not required for this pass.
       </p>
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <Button size="sm" onClick={onSkip} disabled={skipping}>
+          {skipping ? "Skipping…" : "Skip translations → images"}
+        </Button>
+        <span className="text-xs text-muted-foreground">
+          Advances {provenance.length} touched businesses to the images stage without creating
+          translation jobs.
+        </span>
+      </div>
     </div>
   );
 }
@@ -1140,6 +1223,26 @@ function StatusChip({ status }: { status: string }) {
         ? "bg-destructive/10 text-destructive"
         : "bg-muted text-muted-foreground";
   return <span className={`rounded px-1.5 py-0.5 text-[11px] ${tone}`}>{status}</span>;
+}
+
+function asStringArray(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((v): v is string => typeof v === "string");
+}
+
+function asProposedDiff(value: unknown): ProposedDiff | null {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return null;
+  const obj = value as Record<string, unknown>;
+  return {
+    fields: Array.isArray(obj.fields)
+      ? obj.fields.filter(
+          (field): field is Record<string, unknown> =>
+            !!field && typeof field === "object" && !Array.isArray(field),
+        )
+      : [],
+    changedCount: typeof obj.changedCount === "number" ? obj.changedCount : 0,
+    blockedCount: typeof obj.blockedCount === "number" ? obj.blockedCount : 0,
+  };
 }
 
 function ItemTable({

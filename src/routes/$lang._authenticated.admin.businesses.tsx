@@ -189,7 +189,7 @@ function BusinessesPage() {
                       </Button>
                       <Button asChild size="sm" variant="outline">
                         <Link
-                          to="/$lang/_authenticated/admin/businesses/$id"
+                          to="/$lang/admin/businesses/$id"
                           params={{ lang, id: b.id }}
                         >
                           Edit

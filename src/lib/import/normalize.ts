@@ -2,7 +2,7 @@
  * Pure normalizers for Google Places JSON → domain-shaped business rows.
  * No I/O. Deterministic. Missing place_id → invalid.
  */
-import { createHash } from "crypto";
+import { sha256Hex } from "@/lib/utils/sha256";
 
 export interface NormalizedOpeningHour {
   dayOfWeek: number;
@@ -13,7 +13,10 @@ export interface NormalizedOpeningHour {
 }
 
 export interface NormalizedImage {
-  sourceUrl: string;
+  sourceUrl: string | null;
+  sourceReference: string | null;
+  sourceFingerprint: string;
+  sourceMetadata: Record<string, unknown>;
   width?: number;
   height?: number;
   googleCategory:
@@ -41,6 +44,8 @@ export interface NormalizedReview {
   reviewLanguage: string | null;
   reviewDate: string | null;
 }
+
+export const MAX_IMPORTED_GOOGLE_REVIEWS = 15;
 
 export interface NormalizedBusiness {
   placeId: string;
@@ -201,24 +206,42 @@ export function classifyImage(photo: Record<string, unknown>): NormalizedImage["
 export function normalizeImages(raw: Record<string, unknown>): NormalizedImage[] {
   const photos = (raw.photos ?? raw.images ?? raw.imageUrls) as unknown[] | undefined;
   if (!Array.isArray(photos) || photos.length === 0) return [];
+  const placeId = String(raw.place_id ?? raw.placeId ?? raw.id ?? "");
   const items: NormalizedImage[] = [];
   photos.forEach((rawP, i) => {
     // Support bare URL strings as well as photo objects.
     const p: Record<string, unknown> =
       typeof rawP === "string" ? { url: rawP } : (rawP as Record<string, unknown>);
-    const url =
+    const candidate =
       (typeof p.url === "string" && p.url) ||
-      (typeof p.photo_reference === "string" && (p.photo_reference as string)) ||
       (typeof p.source === "string" && (p.source as string)) ||
       (typeof p.src === "string" && (p.src as string)) ||
+      (typeof p.image_url === "string" && (p.image_url as string)) ||
+      (typeof p.original_url === "string" && (p.original_url as string)) ||
       null;
-    if (!url || !/^https?:\/\//i.test(url)) return;
+    const sourceUrl = candidate && /^https?:\/\//i.test(candidate) ? candidate : null;
+    const sourceReference =
+      (typeof p.photo_reference === "string" && (p.photo_reference as string)) ||
+      (typeof p.photoReference === "string" && (p.photoReference as string)) ||
+      (typeof p.name === "string" && (p.name as string)) ||
+      (!sourceUrl && candidate ? candidate : null) ||
+      null;
+    if (!sourceUrl && !sourceReference) return;
     const googleCategory = classifyImage(p);
     const labels = Array.isArray(p.categories)
       ? (p.categories as unknown[]).filter((x): x is string => typeof x === "string")
       : undefined;
+    const sourceMetadata = {
+      source_reference: sourceReference,
+      original_index: i,
+      raw: p,
+    };
+    const sourceFingerprint = sha256Hex(`${placeId}|${sourceUrl ?? ""}|${sourceReference ?? ""}|${i}`);
     items.push({
-      sourceUrl: url,
+      sourceUrl,
+      sourceReference,
+      sourceFingerprint,
+      sourceMetadata,
       width: pickNumber(p.width) ?? undefined,
       height: pickNumber(p.height) ?? undefined,
       googleCategory,
@@ -280,6 +303,7 @@ export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview
   if (!Array.isArray(reviews)) return [];
   const placeId = (raw.place_id as string) ?? (raw.id as string) ?? "";
   return reviews
+    .slice(0, MAX_IMPORTED_GOOGLE_REVIEWS)
     .map((r) => {
       const rating = pickNumber(r.rating ?? r.stars ?? r.score);
       const author = String(r.author_name ?? r.author ?? r.user_name ?? r.name ?? "").trim();
@@ -290,17 +314,27 @@ export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview
         (typeof r.time === "number"
           ? new Date((r.time as number) * 1000).toISOString()
           : null) ??
+        (typeof r.iso_date === "string" ? r.iso_date : null) ??
+        (typeof (r.raw as Record<string, unknown> | undefined)?.iso_date === "string"
+          ? ((r.raw as Record<string, unknown>).iso_date as string)
+          : null) ??
         (typeof r.review_date === "string" ? r.review_date : null) ??
         (typeof r.date === "string" ? r.date : null) ??
         (typeof r.published_at === "string" ? r.published_at : null) ??
         null;
       const external =
         (typeof r.review_id === "string" && r.review_id) ||
+        (typeof r.reviewId === "string" && r.reviewId) ||
         (typeof r.id === "string" && r.id) ||
+        (typeof (r.raw as Record<string, unknown> | undefined)?.review_id === "string"
+          ? ((r.raw as Record<string, unknown>).review_id as string)
+          : null) ||
         null;
-      const fingerprint = createHash("sha256")
-        .update(`${placeId}|${author}|${dateRaw ?? ""}|${text.slice(0, 200)}`)
-        .digest("hex");
+      const user = r.user as Record<string, unknown> | undefined;
+      const rawUser = (r.raw as Record<string, unknown> | undefined)?.user as
+        | Record<string, unknown>
+        | undefined;
+      const fingerprint = sha256Hex(`${placeId}|${author}|${dateRaw ?? ""}|${text.slice(0, 200)}`);
       const clampedRating = rating !== null ? Math.max(1, Math.min(5, Math.round(rating))) : 5;
       return {
         externalReviewId: external,
@@ -310,6 +344,8 @@ export function normalizeReviews(raw: Record<string, unknown>): NormalizedReview
           (typeof r.profile_photo_url === "string" && r.profile_photo_url) ||
           (typeof r.author_avatar_url === "string" && r.author_avatar_url) ||
           (typeof r.avatar === "string" && r.avatar) ||
+          (typeof user?.thumbnail === "string" && user.thumbnail) ||
+          (typeof rawUser?.thumbnail === "string" && rawUser.thumbnail) ||
           null,
         rating: clampedRating,
         reviewText: text,

@@ -12,7 +12,7 @@
  * we can look up business_translations.source_content_hash and reuse the
  * stored translation without calling the provider.
  */
-import { createHash } from "crypto";
+import { sha256Hex } from "@/lib/utils/sha256";
 
 /** Bump when the prompt contract or provider expectations change. */
 export const TRANSLATION_PROMPT_VERSION = "v1";
@@ -43,5 +43,5 @@ export function computeSourceHash(input: HashInput): string {
     input.field,
     input.promptVersion ?? TRANSLATION_PROMPT_VERSION,
   ].join("\u0001");
-  return createHash("sha256").update(payload).digest("hex");
+  return sha256Hex(payload);
 }

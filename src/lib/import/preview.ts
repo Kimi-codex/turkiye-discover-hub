@@ -10,8 +10,8 @@
  * protected from imports and reported as `blocked_by_curation` rather
  * than "update".
  */
-import { createHash } from "crypto";
 import type { NormalizedBusiness } from "./normalize";
+import { sha256Hex } from "@/lib/utils/sha256";
 
 /** Fields the importer is allowed to write. Anything outside is ignored. */
 export const IMPORTABLE_FIELDS = [
@@ -133,5 +133,5 @@ export function computePreviewHash(input: {
         return acc;
       }, {}),
   };
-  return createHash("sha256").update(JSON.stringify(norm)).digest("hex");
+  return sha256Hex(JSON.stringify(norm));
 }

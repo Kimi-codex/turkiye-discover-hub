@@ -248,7 +248,7 @@ export const createClaimEvidenceUpload = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    const safe = data.fileName.replace(/[^\w.\-]+/g, "_").slice(-120);
+    const safe = data.fileName.replace(/[^\w.-]+/g, "_").slice(-120);
     const path = `claims/${context.userId}/${Date.now()}_${safe}`;
     const { data: signed, error } = await supabase.storage
       .from("owner-uploads")
@@ -283,7 +283,7 @@ export const createOwnerImageUpload = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
     await assertOwns(supabase, data.businessId);
-    const safe = data.fileName.replace(/[^\w.\-]+/g, "_").slice(-120);
+    const safe = data.fileName.replace(/[^\w.-]+/g, "_").slice(-120);
     const path = `${data.businessId}/${Date.now()}_${context.userId}_${safe}`;
     const { data: signed, error } = await supabase.storage
       .from("owner-uploads")
