@@ -10,9 +10,11 @@ import { translate, useLocale, useT, type Locale } from "@/lib/i18n";
 import {
   parseDirectorySearchIntent,
   pickClarifyingQuestion,
+  type ParsedIntent,
   type InterpretationChip,
 } from "@/lib/search/parseIntent";
 import { normalizePublicSearchFilters } from "@/lib/search/search-filters";
+import { removePublicSearchChip } from "@/lib/search/search-url-state";
 import type { SearchFilters, SortOption } from "@/types/domain";
 
 interface SearchParams {
@@ -81,12 +83,12 @@ const searchDictQuery = () =>
     staleTime: 5 * 60_000,
   });
 
-function toFilters(params: SearchParams): SearchFilters {
+function toFilters(params: SearchParams, intent?: ParsedIntent): SearchFilters {
   return normalizePublicSearchFilters({
-    query: params.q,
-    category: params.category,
-    city: params.city,
-    district: params.district,
+    query: intent?.remainingQuery ?? params.q,
+    category: params.category ?? intent?.matchedCategorySlug,
+    city: params.city ?? intent?.matchedCitySlug,
+    district: params.district ?? intent?.matchedDistrictSlug,
     rating: params.rating,
     openNow: false,
     priceLevel: params.priceLevel,
@@ -103,12 +105,11 @@ const searchQuery = (filters: SearchFilters) =>
 
 export const Route = createFileRoute("/$lang/search")({
   validateSearch,
-  loaderDeps: ({ search }) => ({ filters: toFilters(search) }),
-  loader: async ({ context, deps }) => {
-    await Promise.all([
-      context.queryClient.ensureQueryData(searchDictQuery()),
-      context.queryClient.ensureQueryData(searchQuery(deps.filters)),
-    ]);
+  loaderDeps: ({ search }) => ({ search }),
+  loader: async ({ context, deps, params }) => {
+    const dict = await context.queryClient.ensureQueryData(searchDictQuery());
+    const intent = parseDirectorySearchIntent(deps.search.q, params.lang as Locale, dict);
+    await context.queryClient.ensureQueryData(searchQuery(toFilters(deps.search, intent)));
   },
   head: ({ params }) => {
     const locale = params.lang as Locale;
@@ -148,7 +149,7 @@ function SearchPage() {
   // Merge URL params with parsed intent (URL wins if user explicitly set anything).
   const effectiveFilters: SearchFilters = useMemo(() => {
     return normalizePublicSearchFilters({
-      query: params.q,
+      query: intent.remainingQuery,
       category: params.category ?? intent.matchedCategorySlug,
       city: params.city ?? intent.matchedCitySlug,
       district: params.district ?? intent.matchedDistrictSlug,
@@ -173,6 +174,15 @@ function SearchPage() {
   );
   const showRelaxed = !!relaxedFilters && relaxedData && relaxedData.total > 0;
   const displayed = showRelaxed ? relaxedData : data;
+  const hasActiveSearch = Boolean(
+    params.q ||
+      params.category ||
+      params.city ||
+      params.district ||
+      params.rating ||
+      params.priceLevel ||
+      params.audience,
+  );
 
   const chips: InterpretationChip[] = intent.interpretation;
   const clarifyQuestion = pickClarifyingQuestion(intent);
@@ -186,7 +196,7 @@ function SearchPage() {
     navigate({
       to: "/$lang/search",
       params: { lang: locale },
-      search: (prev: Record<string, unknown>) => ({ ...validateSearch(prev), [chip.urlParam]: null, page: 1 }),
+      search: (prev: Record<string, unknown>) => removePublicSearchChip(validateSearch(prev), chip, intent) as unknown as SearchParams,
     });
   }
 
@@ -233,7 +243,7 @@ function SearchPage() {
 
       <div className="mt-8">
         {displayed.items.length === 0 ? (
-          <EmptyState />
+          hasActiveSearch ? <EmptyState /> : <CleanSearchState />
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {displayed.items.map((b, i) => (
@@ -254,6 +264,16 @@ function EmptyState() {
       <p className="mt-2 text-sm text-muted-foreground">
         {t("search.no_results.desc")}
       </p>
+    </div>
+  );
+}
+
+function CleanSearchState() {
+  const t = useT();
+  return (
+    <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
+      <h2 className="text-lg font-semibold">{t("search.button")}</h2>
+      <p className="mt-2 text-sm text-muted-foreground">{t("home.subtitle")}</p>
     </div>
   );
 }
