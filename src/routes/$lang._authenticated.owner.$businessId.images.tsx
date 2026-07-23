@@ -31,18 +31,26 @@ function OwnerImagesTab() {
   });
   const [selectedCover, setSelectedCover] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<Set<string>>(new Set());
+  const visibleImageCount = (biz.data?.images ?? []).filter((img: any) => !img.deleted_at).length;
 
   const upload = useMutation({
     mutationFn: async (file: File) => {
-      const { path } = await createUpload({ data: { businessId, fileName: file.name } });
-      const { data: signed } = { data: null }; void signed;
-      // Actually PUT: reuse createOwnerImageUpload response
+      if (!["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type)) {
+        throw new Error("Use JPEG, PNG, WebP, or AVIF images.");
+      }
+      if (file.size > 8 * 1024 * 1024) {
+        throw new Error("Images must be 8 MB or smaller.");
+      }
+      if (visibleImageCount >= 30) {
+        throw new Error("This business already has the maximum number of images.");
+      }
       const up = await createUpload({ data: { businessId, fileName: file.name } });
-      await fetch(up.uploadUrl, {
+      const response = await fetch(up.uploadUrl, {
         method: "PUT",
         headers: { "content-type": file.type || "application/octet-stream" },
         body: file,
       });
+      if (!response.ok) throw new Error("Upload failed");
       await registerImg({
         data: {
           businessId,
@@ -51,7 +59,7 @@ function OwnerImagesTab() {
           title: file.name,
         },
       });
-      return path;
+      return up.path;
     },
     onSuccess: () => {
       toast.success("Uploaded — pending admin approval");

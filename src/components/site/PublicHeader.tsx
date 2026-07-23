@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { LogOut, User as UserIcon } from "lucide-react";
+import { Bell, LogOut, User as UserIcon } from "lucide-react";
 import { useNavigate } from "@tanstack/react-router";
 import { LocaleLink } from "./LocaleLink";
 import { LanguageSwitcher } from "./LanguageSwitcher";
@@ -72,6 +72,22 @@ export function PublicHeader({
     enabled: !!user?.id,
     staleTime: 60_000,
   });
+  const { data: unreadNotifications = 0 } = useQuery({
+    queryKey: ["user-notifications-unread", user?.id ?? "guest"],
+    queryFn: async () => {
+      if (!user?.id) return 0;
+      const { data, error } = await (supabase as any)
+        .from("user_notifications")
+        .select("id")
+        .eq("user_id", user.id)
+        .is("read_at", null)
+        .limit(99);
+      if (error) return 0;
+      return data?.length ?? 0;
+    },
+    enabled: !!user?.id,
+    staleTime: 30_000,
+  });
 
   const isAdmin = roles.includes("admin");
   const isOwner = roles.includes("business_owner") || hasBusinessMembership;
@@ -140,6 +156,19 @@ export function PublicHeader({
               <DropdownMenuContent align="end" className="min-w-[12rem]">
                 <DropdownMenuItem asChild>
                   <LocaleLink to="/account">{t("header.account")}</LocaleLink>
+                </DropdownMenuItem>
+                <DropdownMenuItem asChild>
+                  <LocaleLink to="/account/notifications" className="flex items-center justify-between gap-3">
+                    <span className="inline-flex items-center gap-2">
+                      <Bell className="h-4 w-4" />
+                      {t("notifications.title")}
+                    </span>
+                    {unreadNotifications > 0 ? (
+                      <span className="rounded-full bg-destructive px-1.5 py-0.5 text-[10px] font-semibold text-destructive-foreground">
+                        {unreadNotifications}
+                      </span>
+                    ) : null}
+                  </LocaleLink>
                 </DropdownMenuItem>
                 {isOwner && (
                   <DropdownMenuItem asChild>

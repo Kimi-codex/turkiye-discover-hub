@@ -186,7 +186,7 @@ function SearchPage() {
     navigate({
       to: "/$lang/search",
       params: { lang: locale },
-      search: (prev) => ({ ...validateSearch(prev), [chip.urlParam]: null, page: 1 }),
+      search: (prev: Record<string, unknown>) => ({ ...validateSearch(prev), [chip.urlParam]: null, page: 1 }),
     });
   }
 
@@ -195,7 +195,7 @@ function SearchPage() {
     navigate({
       to: "/$lang/search",
       params: { lang: locale },
-      search: (prev) => ({ ...validateSearch(prev), clarify: answer, page: 1 }),
+      search: (prev: Record<string, unknown>) => ({ ...validateSearch(prev), clarify: answer, page: 1 }),
     });
   }
 

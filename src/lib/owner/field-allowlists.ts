@@ -25,13 +25,20 @@ export type BusinessFieldKey = (typeof BUSINESS_FIELD_KEYS)[number];
 const priceLevel = z
   .union([z.literal(null), z.number().int().min(0).max(4)])
   .optional();
+const phone = z
+  .string()
+  .trim()
+  .max(40)
+  .regex(/^[+()0-9 .-]*$/)
+  .optional()
+  .nullable();
 
 export const businessFieldsSchema = z
   .object({
     name: z.string().trim().min(1).max(200).optional(),
     description: z.string().trim().max(4000).optional().nullable(),
-    phone: z.string().trim().max(40).optional().nullable(),
-    international_phone: z.string().trim().max(40).optional().nullable(),
+    phone,
+    international_phone: phone,
     email: z.string().trim().email().max(255).optional().nullable(),
     website: z.string().trim().url().max(500).optional().nullable(),
     formatted_address: z.string().trim().max(500).optional().nullable(),
@@ -39,6 +46,17 @@ export const businessFieldsSchema = z
     price_level: priceLevel,
   })
   .strict();
+
+export const categoryRequestSchema = z
+  .object({
+    primary_category_id: z.string().uuid().nullable(),
+    category_ids: z.array(z.string().uuid()).max(8),
+  })
+  .strict()
+  .refine(
+    (v) => v.primary_category_id === null || v.category_ids.includes(v.primary_category_id),
+    { message: "primary category must be included in category_ids" },
+  );
 
 // ── opening_hours ───────────────────────────────────────────
 const timeStr = z.string().regex(/^([01]\d|2[0-3]):[0-5]\d$/).nullable();
@@ -122,6 +140,7 @@ export const imageRequestSchema = z
 
 export const REQUEST_TYPES = [
   "business_fields",
+  "categories",
   "opening_hours",
   "services",
   "attributes",
@@ -134,6 +153,8 @@ export function schemaFor(type: RequestType) {
   switch (type) {
     case "business_fields":
       return businessFieldsSchema;
+    case "categories":
+      return categoryRequestSchema;
     case "opening_hours":
       return openingHoursSchema;
     case "services":

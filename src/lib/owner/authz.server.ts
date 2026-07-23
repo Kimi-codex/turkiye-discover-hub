@@ -58,3 +58,42 @@ export async function assertOwns(
   }
   return res;
 }
+
+export type BusinessMemberAuthzOk = {
+  ok: true;
+  user_id: string;
+  business_id: string;
+  business_status: string;
+  role: "owner" | "manager";
+  member_status: "active";
+};
+
+export async function assertBusinessMember(
+  supabase: Sb,
+  businessId: string,
+  roles: Array<"owner" | "manager"> = ["owner", "manager"],
+): Promise<BusinessMemberAuthzOk> {
+  if (!businessId || typeof businessId !== "string") {
+    throw new Response("Bad request", { status: 400 });
+  }
+  const { data, error } = await supabase.rpc("business_member_authz", {
+    _business_id: businessId,
+    _roles: roles,
+  });
+  if (error) {
+    console.error("[business_member_authz] rpc error", error);
+    throw new Response("Forbidden", { status: 403 });
+  }
+  const res = data as BusinessMemberAuthzOk | { ok: false; code?: string } | null;
+  if (!res || !res.ok) {
+    const code = res?.code ?? "NOT_MEMBER";
+    const status =
+      code === "NOT_AUTHENTICATED"
+        ? 401
+        : code === "BUSINESS_MISSING"
+          ? 404
+          : 403;
+    throw new Response(code, { status });
+  }
+  return res;
+}

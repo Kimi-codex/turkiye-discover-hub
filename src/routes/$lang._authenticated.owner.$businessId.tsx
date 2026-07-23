@@ -18,6 +18,7 @@ const tabs = [
   { to: "/attributes", label: "Attributes" },
   { to: "/translations", label: "Translations" },
   { to: "/images", label: "Images" },
+  { to: "/team", label: "Team" },
   { to: "/reviews", label: "Reviews" },
 ];
 

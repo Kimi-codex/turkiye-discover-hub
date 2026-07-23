@@ -6,10 +6,11 @@ import {
   getOwnedBusiness,
   submitChangeRequest,
 } from "@/lib/owner/owner.functions";
-import { businessFieldsSchema } from "@/lib/owner/field-allowlists";
+import { businessFieldsSchema, categoryRequestSchema } from "@/lib/owner/field-allowlists";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { toast } from "sonner";
 
@@ -34,6 +35,7 @@ function ProfileEditor() {
     queryFn: () => fetchBiz({ data: { businessId } }),
   });
   const [f, setF] = useState<Fields | null>(null);
+  const [categoryId, setCategoryId] = useState<string>("");
   useEffect(() => {
     if (biz.data && !f) {
       const b = biz.data.business as Record<string, unknown>;
@@ -48,6 +50,7 @@ function ProfileEditor() {
         neighborhood: (b.neighborhood as string) ?? "",
         price_level: b.price_level == null ? "" : String(b.price_level),
       });
+      setCategoryId(((b.primary_category_id as string | null) ?? "") || "none");
     }
   }, [biz.data, f]);
 
@@ -80,6 +83,24 @@ function ProfileEditor() {
     onError: (e) => toast.error(String(e instanceof Error ? e.message : e)),
   });
 
+  const categoryMutation = useMutation({
+    mutationFn: async () => {
+      const normalized = categoryId === "none" ? null : categoryId;
+      const current = ((biz.data!.business as Record<string, unknown>).primary_category_id as string | null) ?? null;
+      if (normalized === current) throw new Error("No changes");
+      const payload = categoryRequestSchema.parse({
+        primary_category_id: normalized,
+        category_ids: normalized ? [normalized] : [],
+      });
+      return submit({ data: { businessId, requestType: "categories", payload } });
+    },
+    onSuccess: () => {
+      toast.success("Category submitted for review");
+      qc.invalidateQueries({ queryKey: ["owner:crs", businessId] });
+    },
+    onError: (e) => toast.error(String(e instanceof Error ? e.message : e)),
+  });
+
   if (!f) return <div className="text-sm text-muted-foreground">Loading…</div>;
   const bind = (k: keyof Fields) => ({
     value: f[k], onChange: (e: { target: { value: string } }) => setF({ ...f, [k]: e.target.value }),
@@ -94,6 +115,38 @@ function ProfileEditor() {
         Changes are submitted as a request. An admin must approve them before they go live.
       </p>
       <div className="grid gap-3 sm:grid-cols-2">
+        <div className="sm:col-span-2">
+          <Label>Category</Label>
+          <div className="mt-1 flex gap-2">
+            <Select value={categoryId} onValueChange={setCategoryId}>
+              <SelectTrigger>
+                <SelectValue placeholder="Select category" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="none">No category</SelectItem>
+                {((biz.data?.categories ?? []) as any[]).map((cat) => {
+                  const label =
+                    (cat.category_translations ?? []).find((tr: any) => tr.language_code === "en")?.name ??
+                    (cat.category_translations ?? [])[0]?.name ??
+                    cat.slug;
+                  return (
+                    <SelectItem key={cat.id} value={cat.id}>
+                      {label}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => categoryMutation.mutate()}
+              disabled={categoryMutation.isPending}
+            >
+              Submit category
+            </Button>
+          </div>
+        </div>
         <div><Label>Name</Label><Input {...bind("name")} /></div>
         <div><Label>Neighborhood</Label><Input {...bind("neighborhood")} /></div>
         <div className="sm:col-span-2"><Label>Description</Label><Textarea rows={4} {...bind("description")} /></div>

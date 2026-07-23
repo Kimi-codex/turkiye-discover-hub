@@ -12,6 +12,23 @@ import { lovable } from "@/integrations/lovable/index";
 import { useAuth } from "@/hooks/use-auth";
 import { useT, useLocaleContext } from "@/lib/i18n";
 
+function authErrorMessage(message: string, t: ReturnType<typeof useT>): string {
+  const lower = message.toLowerCase();
+  if (lower.includes("already") || lower.includes("registered") || lower.includes("exists")) {
+    return t("auth.error_already_registered");
+  }
+  if (lower.includes("invalid email") || lower.includes("email")) {
+    return t("auth.error_invalid_email");
+  }
+  if (lower.includes("password")) {
+    return t("auth.password_too_short");
+  }
+  if (lower.includes("rate") || lower.includes("too many")) {
+    return t("auth.error_rate_limited");
+  }
+  return t("auth.error_generic");
+}
+
 export const Route = createFileRoute("/$lang/auth")({
   head: () => ({
     meta: [
@@ -34,9 +51,28 @@ function AuthPage() {
   const [registrationIntent, setRegistrationIntent] = useState<"explore" | "business">("explore");
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [signupComplete, setSignupComplete] = useState(false);
 
   useEffect(() => {
-    if (!loading && user) navigate({ to: `/${locale}/account`, replace: true });
+    if (!loading && user) {
+      Promise.all([
+        supabase.from("user_roles").select("role").eq("user_id", user.id),
+        (supabase as any)
+          .from("business_members")
+          .select("id")
+          .eq("user_id", user.id)
+          .eq("status", "active")
+          .in("role", ["owner", "manager"])
+          .limit(1),
+      ]).then(([roles, memberships]) => {
+        const isAdmin = (roles.data ?? []).some((row: { role: string }) => row.role === "admin");
+        const hasBusiness = (memberships.data ?? []).length > 0;
+        navigate({
+          to: isAdmin ? `/${locale}/admin` : hasBusiness ? `/${locale}/owner` : `/${locale}/account`,
+          replace: true,
+        });
+      });
+    }
   }, [user, loading, navigate, locale]);
 
   async function handleSignIn(e: React.FormEvent) {
@@ -44,7 +80,7 @@ function AuthPage() {
     setBusy(true);
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(authErrorMessage(error.message, t));
     toast.success(t("auth.signed_in"));
   }
 
@@ -83,8 +119,11 @@ function AuthPage() {
       },
     });
     setBusy(false);
-    if (error) return toast.error(error.message);
+    if (error) return toast.error(authErrorMessage(error.message, t));
     // Generic message: never expose whether admin was granted.
+    setSignupComplete(true);
+    setPassword("");
+    setConfirmPassword("");
     toast.success(t("auth.check_email"));
   }
 
@@ -105,6 +144,13 @@ function AuthPage() {
         <h1 className="text-3xl font-bold tracking-tight">{t("auth.title")}</h1>
         <p className="mt-2 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
       </div>
+
+      {signupComplete ? (
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
+          <h2 className="font-semibold text-foreground">{t("auth.account_created")}</h2>
+          <p className="mt-1 text-muted-foreground">{t("auth.check_email")}</p>
+        </div>
+      ) : null}
 
       <Button
         type="button"

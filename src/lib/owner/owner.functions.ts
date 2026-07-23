@@ -13,7 +13,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
-import { assertOwns } from "./authz.server";
+import { assertBusinessMember, assertOwns } from "./authz.server";
 import {
   REQUEST_TYPES,
   schemaFor,
@@ -25,6 +25,7 @@ import {
 type Sb = any;
 
 const uuid = z.string().uuid();
+const allowedOwnerImageTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
 
 // ─────────────────────────── Overview ──────────────────────────
 
@@ -40,7 +41,7 @@ export const listMyBusinesses = createServerFn({ method: "GET" })
       )
       .eq("user_id", context.userId)
       .eq("status", "active")
-      .eq("role", "owner")
+      .in("role", ["owner", "manager"])
       .order("created_at", { ascending: false });
 
     if (!membership.error) {
@@ -74,8 +75,8 @@ export const getOwnedBusiness = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
-    const [biz, hours, services, attrs, images, trans] = await Promise.all([
+    await assertBusinessMember(supabase, data.businessId);
+    const [biz, hours, services, attrs, images, trans, catLinks, cats] = await Promise.all([
       supabase.from("businesses").select("*").eq("id", data.businessId).single(),
       supabase
         .from("business_opening_hours")
@@ -91,6 +92,15 @@ export const getOwnedBusiness = createServerFn({ method: "GET" })
         .is("deleted_at", null)
         .order("sort_order", { ascending: true }),
       supabase.from("business_translations").select("*").eq("business_id", data.businessId),
+      supabase
+        .from("business_category_links")
+        .select("category_id, is_primary")
+        .eq("business_id", data.businessId),
+      supabase
+        .from("categories")
+        .select("id, slug, category_translations(language_code, name)")
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true }),
     ]);
     if (biz.error) throw new Response(biz.error.message, { status: 500 });
     const business = biz.data
@@ -107,6 +117,8 @@ export const getOwnedBusiness = createServerFn({ method: "GET" })
       attributes: attrs.data ?? [],
       images: images.data ?? [],
       translations: trans.data ?? [],
+      categoryLinks: catLinks.data ?? [],
+      categories: cats.data ?? [],
     };
   });
 
@@ -126,7 +138,7 @@ export const submitChangeRequest = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     // Strict payload validation per type — unknown keys rejected.
     const parsed = schemaFor(data.requestType).parse(data.payload);
 
@@ -172,7 +184,7 @@ export const listMyChangeRequests = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     const { data: rows, error } = await supabase
       .from("business_change_requests")
       .select("*")
@@ -203,7 +215,7 @@ export const withdrawChangeRequest = createServerFn({ method: "POST" })
     if (cr.status !== "pending")
       throw new Response("Only pending requests can be withdrawn", { status: 409 });
     // Belt-and-braces: still assert ownership at the time of withdrawal.
-    await assertOwns(supabase, cr.business_id);
+    await assertBusinessMember(supabase, cr.business_id);
     const { error } = await supabase
       .from("business_change_requests")
       .update({ status: "withdrawn", reviewed_at: new Date().toISOString() })
@@ -311,7 +323,7 @@ export const createOwnerImageUpload = createServerFn({ method: "POST" })
   }))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     const safe = data.fileName.replace(/[^\w.-]+/g, "_").slice(-120);
     const path = `${context.userId}/businesses/${data.businessId}/${Date.now()}_${safe}`;
     const { data: signed, error } = await supabase.storage
@@ -336,7 +348,19 @@ export const registerOwnerImage = createServerFn({ method: "POST" })
   )
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
+    if (!allowedOwnerImageTypes.has(data.contentType)) {
+      throw new Response("Unsupported image type", { status: 400 });
+    }
+    const { count, error: countError } = await supabase
+      .from("business_images")
+      .select("id", { count: "exact", head: true })
+      .eq("business_id", data.businessId)
+      .is("deleted_at", null);
+    if (countError) throw new Response(countError.message, { status: 500 });
+    if ((count ?? 0) >= 30) {
+      throw new Response("Maximum image count reached", { status: 409 });
+    }
     // Register the image row (pending status; not shown publicly until
     // storage_status='uploaded' AND is_cover/sort_order approved by admin).
     const { data: img, error } = await supabase
@@ -369,7 +393,7 @@ export const listOwnedReviews = createServerFn({ method: "GET" })
   }))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     const [rev, rep] = await Promise.all([
       supabase
         .from("reviews")
@@ -400,7 +424,7 @@ export const submitReviewReply = createServerFn({ method: "POST" })
   .inputValidator((i: z.input<typeof replySchema>) => replySchema.parse(i))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     // Verify review belongs to this business (belt-and-braces).
     const { data: r, error: rErr } = await supabase
       .from("reviews")
@@ -454,7 +478,7 @@ export const withdrawReviewReply = createServerFn({ method: "POST" })
       throw new Response("Forbidden", { status: 403 });
     if (rep.status !== "pending_review")
       throw new Response("Only pending replies can be withdrawn", { status: 409 });
-    await assertOwns(supabase, rep.business_id);
+    await assertBusinessMember(supabase, rep.business_id);
     const { error } = await supabase
       .from("review_replies")
       .update({ status: "superseded" })
@@ -479,7 +503,7 @@ export const ownerSubmitReport = createServerFn({ method: "POST" })
   .inputValidator((i: z.input<typeof reportSchema>) => reportSchema.parse(i))
   .handler(async ({ data, context }) => {
     const supabase = context.supabase as Sb;
-    await assertOwns(supabase, data.businessId);
+    await assertBusinessMember(supabase, data.businessId);
     const { data: row, error } = await supabase
       .from("reports")
       .insert({
@@ -526,4 +550,168 @@ export const markNotificationRead = createServerFn({ method: "POST" })
       .eq("user_id", context.userId);
     if (error) throw new Response(error.message, { status: 400 });
     return { ok: true };
+  });
+
+export const listUserNotifications = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase as Sb;
+    const { data, error } = await supabase
+      .from("user_notifications")
+      .select("*")
+      .eq("user_id", context.userId)
+      .order("created_at", { ascending: false })
+      .limit(200);
+    if (error) throw new Response(error.message, { status: 500 });
+    const unread = (data ?? []).filter((n: { read_at: string | null }) => !n.read_at).length;
+    return { rows: data ?? [], unread };
+  });
+
+export const markUserNotificationRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { id: string }) => ({ id: uuid.parse(i.id) }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { error } = await supabase
+      .from("user_notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("id", data.id)
+      .eq("user_id", context.userId);
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
+  });
+
+export const markAllUserNotificationsRead = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const supabase = context.supabase as Sb;
+    const { error } = await supabase
+      .from("user_notifications")
+      .update({ read_at: new Date().toISOString() })
+      .eq("user_id", context.userId)
+      .is("read_at", null);
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
+  });
+
+const email = z.string().trim().email().max(255).transform((v) => v.toLowerCase());
+
+export const listBusinessTeam = createServerFn({ method: "GET" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { businessId: string }) => ({
+    businessId: uuid.parse(i.businessId),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    await assertOwns(supabase, data.businessId);
+    const { data: rows, error } = await (supabase as any).rpc("list_business_team", {
+      _business_id: data.businessId,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return rows as {
+      members: Array<{
+        membership_id: string;
+        user_id: string;
+        email: string | null;
+        role: "owner" | "manager";
+        status: string;
+        is_primary: boolean;
+        created_at: string;
+      }>;
+      invitations: Array<{
+        id: string;
+        email: string;
+        role: "manager";
+        status: string;
+        token: string | null;
+        expires_at: string;
+        created_at: string;
+        accepted_at: string | null;
+        canceled_at: string | null;
+      }>;
+    };
+  });
+
+export const inviteBusinessManager = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { businessId: string; email: string }) => ({
+    businessId: uuid.parse(i.businessId),
+    email: email.parse(i.email),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    await assertOwns(supabase, data.businessId);
+    const { data: row, error } = await (supabase as any).rpc("invite_business_manager", {
+      _business_id: data.businessId,
+      _email: data.email,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return { row };
+  });
+
+export const cancelBusinessTeamInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { businessId: string; invitationId: string }) => ({
+    businessId: uuid.parse(i.businessId),
+    invitationId: uuid.parse(i.invitationId),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    await assertOwns(supabase, data.businessId);
+    const { error } = await (supabase as any).rpc("cancel_business_team_invitation", {
+      _business_id: data.businessId,
+      _invitation_id: data.invitationId,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
+  });
+
+export const regenerateBusinessTeamInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { businessId: string; invitationId: string }) => ({
+    businessId: uuid.parse(i.businessId),
+    invitationId: uuid.parse(i.invitationId),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    await assertOwns(supabase, data.businessId);
+    const { data: row, error } = await (supabase as any).rpc("regenerate_business_team_invitation", {
+      _business_id: data.businessId,
+      _invitation_id: data.invitationId,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return { row };
+  });
+
+export const removeBusinessManager = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { businessId: string; memberId: string }) => ({
+    businessId: uuid.parse(i.businessId),
+    memberId: uuid.parse(i.memberId),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    await assertOwns(supabase, data.businessId);
+    const { error } = await (supabase as any).rpc("remove_business_manager", {
+      _business_id: data.businessId,
+      _member_id: data.memberId,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return { ok: true };
+  });
+
+export const acceptBusinessTeamInvitation = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((i: { invitationId: string; token: string }) => ({
+    invitationId: uuid.parse(i.invitationId),
+    token: uuid.parse(i.token),
+  }))
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: row, error } = await (supabase as any).rpc("accept_business_team_invitation", {
+      _invitation_id: data.invitationId,
+      _token: data.token,
+    });
+    if (error) throw new Response(error.message, { status: 400 });
+    return { row };
   });
