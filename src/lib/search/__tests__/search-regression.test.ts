@@ -5,6 +5,7 @@ import {
   removeConsumedIntentTerm,
 } from "../parseIntent";
 import { removePublicSearchChip } from "../search-url-state";
+import { fixMojibake } from "@/lib/i18n";
 
 const categories: Category[] = [
   {
@@ -83,5 +84,82 @@ describe("public search regression behavior", () => {
     );
     expect(next).toEqual({ city: "istanbul", district: "kadikoy", rating: 4, sort: "most_reviewed" });
     expect(next.page).toBeUndefined();
+  });
+
+  it("sets descriptiveIntent=true when category is matched", () => {
+    const intent = parseDirectorySearchIntent("مطعم غالي", "ar", dict);
+    expect(intent.matchedCategorySlug).toBe("restaurants");
+    expect(intent.descriptiveIntent).toBe(true);
+  });
+
+  it("sets descriptiveIntent=false when no structured match found", () => {
+    const intent = parseDirectorySearchIntent("غالي", "ar", dict);
+    expect(intent.matchedCategorySlug).toBeNull();
+    expect(intent.descriptiveIntent).toBe(false);
+  });
+
+  it("does not use remaining query as filter when descriptiveIntent is true", () => {
+    const { intent, chip } = categoryChip("مطعم غالي");
+    expect(intent.descriptiveIntent).toBe(true);
+    expect(intent.remainingQuery).toBe("غالي");
+  });
+
+  it("parses Arabic mixed descriptor without hardcoded word list dependency", () => {
+    const intent = parseDirectorySearchIntent("مطعم غالي", "ar", dict);
+    expect(intent.matchedCategorySlug).toBe("restaurants");
+    expect(intent.descriptiveIntent).toBe(true);
+    expect(intent.remainingQuery).toBe("غالي");
+  });
+
+  it("parses Turkish search with city and category", () => {
+    const citiesWithIstanbul: City[] = [{
+      id: "city-1", slug: "istanbul", countryId: "tr",
+      latitude: 0, longitude: 0, imageUrl: null, isFeatured: true, isActive: true,
+      sortOrder: 1, name: { tr: "İstanbul", en: "Istanbul", ar: "إسطنبول" },
+    }];
+    const intent = parseDirectorySearchIntent("İstanbul restoran", "tr", { categories, cities: citiesWithIstanbul, districts });
+    expect(intent.matchedCitySlug).toBe("istanbul");
+    expect(intent.matchedCategorySlug).toBe("restaurants");
+    expect(intent.descriptiveIntent).toBe(true);
+  });
+
+  it("parses English combined query as descriptive intent", () => {
+    const intent = parseDirectorySearchIntent("fancy restaurant", "en", dict);
+    expect(intent.matchedCategorySlug).toBe("restaurants");
+    expect(intent.descriptiveIntent).toBe(true);
+  });
+
+  it("uses raw query as filter when no structured intent", () => {
+    const intent = parseDirectorySearchIntent("Hilton Istanbul", "en", dict);
+    expect(intent.matchedCategorySlug).toBeNull();
+    expect(intent.matchedCitySlug).toBeNull();
+    expect(intent.descriptiveIntent).toBe(false);
+    expect(intent.remainingQuery).toBeTruthy();
+  });
+});
+
+describe("fixMojibake encoding repair", () => {
+  it("repairs classic Turkish double-encoding mojibake", () => {
+    expect(fixMojibake("TÃ¼rkiye")).toBe("Türkiye");
+    expect(fixMojibake("BaÅŸakÅŸehir")).toBe("Başakşehir");
+    expect(fixMojibake("KadÄ±kÃ¶y")).toBe("Kadıköy");
+  });
+
+  it("passes through already-correct Unicode strings", () => {
+    expect(fixMojibake("Türkiye")).toBe("Türkiye");
+    expect(fixMojibake("Başakşehir")).toBe("Başakşehir");
+    expect(fixMojibake("Kadıköy")).toBe("Kadıköy");
+    expect(fixMojibake("İstanbul")).toBe("İstanbul");
+  });
+
+  it("passes through Arabic text unchanged", () => {
+    expect(fixMojibake("مرحبا بالعالم")).toBe("مرحبا بالعالم");
+    expect(fixMojibake("إسطنبول")).toBe("إسطنبول");
+  });
+
+  it("handles empty and short strings gracefully", () => {
+    expect(fixMojibake("")).toBe("");
+    expect(fixMojibake("a")).toBe("a");
+    expect(fixMojibake("123")).toBe("123");
   });
 });

@@ -18,6 +18,11 @@ export interface ParsedIntent {
   audienceIntent: "family" | null;
   remainingKeywords: string[];
   remainingQuery: string;
+  /** When true, the remaining query consists only of soft descriptors
+   *  (adjectives, sentiment, quality words — NOT proper nouns or
+   *  business-name-like tokens).  These should influence ranking, not
+   *  act as mandatory ILIKE filters that eliminate all results. */
+  descriptiveIntent: boolean;
   confidence: "high" | "medium" | "low";
   interpretation: InterpretationChip[];
 }
@@ -288,6 +293,9 @@ export function parseDirectorySearchIntent(query: string, locale: Locale, dict: 
   if (priceLevel !== null) interpretation.push({ key: `price-${priceLevel}`, label: "$".repeat(priceLevel), urlParam: "priceLevel" });
   if (audienceIntent === "family") interpretation.push({ key: "audience-family", label: locale === "tr" ? "Aile dostu" : locale === "ar" ? "عائلي" : "Family-friendly", urlParam: "audience" });
 
+  const structuredMatchFound = matchedCategory !== null || matchedCity !== null;
+  const descriptiveIntent = structuredMatchFound;
+
   return {
     rawQuery: raw,
     normalizedQuery: norm,
@@ -305,6 +313,7 @@ export function parseDirectorySearchIntent(query: string, locale: Locale, dict: 
     audienceIntent,
     remainingKeywords: remaining,
     remainingQuery: remaining.join(" "),
+    descriptiveIntent,
     confidence,
     interpretation,
   };

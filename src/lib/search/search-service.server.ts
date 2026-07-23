@@ -13,6 +13,7 @@ import type {
   SearchResult,
 } from "@/types/domain";
 import { normalizePublicSearchFilters, sortColumn } from "./search-filters";
+import { fixMojibake } from "@/lib/i18n";
 
 type TranslationRow = { language_code: string; name: string | null };
 
@@ -44,7 +45,7 @@ function toLocalizedString(rows: TranslationRow[] | null | undefined): Localized
   const out: LocalizedString = {};
   for (const r of rows ?? []) {
     if (r.language_code === "ar" || r.language_code === "en" || r.language_code === "tr") {
-      out[r.language_code as Locale] = r.name ?? "";
+      out[r.language_code as Locale] = fixMojibake(r.name ?? "");
     }
   }
   return out;
@@ -98,7 +99,7 @@ function mapDistrict(row: any): District {
 function mapBusiness(row: any): Business {
   const originalLanguage = normalizeLanguage(row.original_language);
   const description: LocalizedString = {};
-  if (row.description) description[originalLanguage] = row.description;
+  if (row.description) description[originalLanguage] = fixMojibake(row.description);
   for (const translation of row.business_translations ?? []) {
     if (
       translation.translation_status === "approved" &&
@@ -107,7 +108,7 @@ function mapBusiness(row: any): Business {
         translation.language_code === "tr") &&
       translation.translated_description
     ) {
-      description[translation.language_code as Locale] = translation.translated_description;
+      description[translation.language_code as Locale] = fixMojibake(translation.translated_description);
     }
   }
 
@@ -166,7 +167,7 @@ function mapBusiness(row: any): Business {
   return {
     id: row.id,
     placeId: row.place_id,
-    name: row.name,
+    name: fixMojibake(row.name),
     slug: row.slug,
     originalLanguage,
     description,
@@ -174,7 +175,7 @@ function mapBusiness(row: any): Business {
     categories: categories.length ? categories : [primaryCategory],
     city: row.city ? mapCity(row.city) : ({} as City),
     district: row.district ? mapDistrict(row.district) : null,
-    address: row.formatted_address ?? "",
+    address: fixMojibake(row.formatted_address ?? ""),
     latitude: Number(row.latitude ?? 0),
     longitude: Number(row.longitude ?? 0),
     phone: row.phone ?? null,

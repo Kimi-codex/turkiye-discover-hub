@@ -83,9 +83,15 @@ const searchDictQuery = () =>
     staleTime: 5 * 60_000,
   });
 
+function queryForFilters(params: SearchParams, intent?: ParsedIntent): string {
+  if (!intent) return params.q;
+  if (intent.descriptiveIntent) return "";
+  return intent.remainingQuery;
+}
+
 function toFilters(params: SearchParams, intent?: ParsedIntent): SearchFilters {
   return normalizePublicSearchFilters({
-    query: intent?.remainingQuery ?? params.q,
+    query: queryForFilters(params, intent),
     category: params.category ?? intent?.matchedCategorySlug,
     city: params.city ?? intent?.matchedCitySlug,
     district: params.district ?? intent?.matchedDistrictSlug,
@@ -147,9 +153,11 @@ function SearchPage() {
   );
 
   // Merge URL params with parsed intent (URL wins if user explicitly set anything).
+  // When descriptiveIntent is true the remaining query is only a descriptor
+  // (e.g. "fancy", "غالي") — do NOT apply it as a mandatory ILIKE filter.
   const effectiveFilters: SearchFilters = useMemo(() => {
     return normalizePublicSearchFilters({
-      query: intent.remainingQuery,
+      query: intent.descriptiveIntent ? "" : intent.remainingQuery,
       category: params.category ?? intent.matchedCategorySlug,
       city: params.city ?? intent.matchedCitySlug,
       district: params.district ?? intent.matchedDistrictSlug,

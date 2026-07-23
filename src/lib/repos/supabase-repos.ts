@@ -19,6 +19,7 @@ import type {
   SearchFilters,
   SearchResult,
 } from "@/types/domain";
+import { fixMojibake } from "@/lib/i18n";
 import type {
   BusinessRepository,
   CategoryRepository,
@@ -32,7 +33,7 @@ function toLocalizedString(rows: TranslationRow[] | null | undefined): Localized
   const out: LocalizedString = {};
   for (const r of rows ?? []) {
     if (r.language_code === "ar" || r.language_code === "en" || r.language_code === "tr") {
-      out[r.language_code as Locale] = r.name ?? "";
+      out[r.language_code as Locale] = fixMojibake(r.name ?? "");
     }
   }
   return out;
@@ -196,14 +197,14 @@ function mapBusiness(row: any): Business {
 
   // Description as LocalizedString: original language + approved translations
   const description: LocalizedString = {};
-  if (row.description) description[orig] = row.description;
+  if (row.description) description[orig] = fixMojibake(row.description);
   for (const t of row.business_translations ?? []) {
     if (
       t.translation_status === "approved" &&
       (t.language_code === "ar" || t.language_code === "en" || t.language_code === "tr") &&
       t.translated_description
     ) {
-      description[t.language_code as Locale] = t.translated_description;
+      description[t.language_code as Locale] = fixMojibake(t.translated_description);
     }
   }
 
@@ -273,7 +274,7 @@ function mapBusiness(row: any): Business {
   return {
     id: row.id,
     placeId: row.place_id,
-    name: row.name,
+    name: fixMojibake(row.name),
     slug: row.slug,
     originalLanguage: orig,
     description,
@@ -281,7 +282,7 @@ function mapBusiness(row: any): Business {
     categories: categories.length ? categories : [primaryCategory],
     city,
     district,
-    address: row.formatted_address ?? "",
+    address: fixMojibake(row.formatted_address ?? ""),
     latitude: Number(row.latitude ?? 0),
     longitude: Number(row.longitude ?? 0),
     phone: row.phone ?? null,
