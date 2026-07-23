@@ -38,6 +38,22 @@ CREATE TRIGGER business_member_invitations_set_updated_at
 
 ALTER TABLE public.business_member_invitations ENABLE ROW LEVEL SECURITY;
 
+ALTER TABLE public.business_change_requests
+  DROP CONSTRAINT IF EXISTS bcr_request_type_check;
+
+ALTER TABLE public.business_change_requests
+  ADD CONSTRAINT bcr_request_type_check CHECK (
+    request_type IN (
+      'business_fields',
+      'categories',
+      'opening_hours',
+      'services',
+      'attributes',
+      'translations',
+      'image_request'
+    )
+  );
+
 DROP POLICY IF EXISTS business_member_invitations_admin_all ON public.business_member_invitations;
 CREATE POLICY business_member_invitations_admin_all ON public.business_member_invitations
   FOR ALL TO authenticated
@@ -483,12 +499,12 @@ GRANT EXECUTE ON FUNCTION public.cancel_business_team_invitation(uuid, uuid) TO 
 GRANT EXECUTE ON FUNCTION public.accept_business_team_invitation(uuid, uuid) TO authenticated;
 GRANT EXECUTE ON FUNCTION public.remove_business_manager(uuid, uuid) TO authenticated;
 
-CREATE OR REPLACE FUNCTION public._bcr_field_allowlist(_request_type text)
+CREATE OR REPLACE FUNCTION public._bcr_field_allowlist(_type text)
 RETURNS text[]
 LANGUAGE sql
 IMMUTABLE
 AS $$
-  SELECT CASE _request_type
+  SELECT CASE _type
     WHEN 'business_fields' THEN ARRAY[
       'name','description','phone','international_phone','email','website',
       'formatted_address','neighborhood','price_level'
