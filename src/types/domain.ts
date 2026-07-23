@@ -178,6 +178,7 @@ export interface SearchFilters {
   priceLevel: number | null;
   sort: SortOption;
   page: number;
+  pageSize?: number;
 }
 
 export interface SearchResult {

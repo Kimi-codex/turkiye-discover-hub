@@ -4,6 +4,7 @@
  * All reads use the anon Data API client with RLS enforced.
  */
 import { supabase } from "@/integrations/supabase/client";
+import { searchPublishedBusinessesFn } from "@/lib/search/search.functions";
 import type {
   Business,
   BusinessImage,
@@ -17,7 +18,6 @@ import type {
   Review,
   SearchFilters,
   SearchResult,
-  SortOption,
 } from "@/types/domain";
 import type {
   BusinessRepository,
@@ -306,79 +306,9 @@ function mapBusiness(row: any): Business {
   };
 }
 
-function sortColumn(sort: SortOption): { column: string; ascending: boolean } {
-  switch (sort) {
-    case "highest_rated":
-      return { column: "rating", ascending: false };
-    case "most_reviewed":
-      return { column: "review_count", ascending: false };
-    case "recently_added":
-      return { column: "created_at", ascending: false };
-    case "name":
-      return { column: "name", ascending: true };
-    case "recommended":
-    default:
-      return { column: "rating", ascending: false };
-  }
-}
-
-async function idForCategorySlug(slug: string): Promise<string | null> {
-  const { data } = await supabase.from("categories").select("id").eq("slug", slug).maybeSingle();
-  return data?.id ?? null;
-}
-async function idForCitySlug(slug: string): Promise<string | null> {
-  const { data } = await supabase.from("cities").select("id").eq("slug", slug).maybeSingle();
-  return data?.id ?? null;
-}
-
 class SupabaseBusinessRepository implements BusinessRepository {
   async list(filters: Partial<SearchFilters>): Promise<SearchResult> {
-    const pageSize = 12;
-    const page = Math.max(1, filters.page ?? 1);
-    const { column, ascending } = sortColumn(filters.sort ?? "recommended");
-
-    let query = supabase
-      .from("businesses")
-      .select(BUSINESS_SELECT, { count: "exact" })
-      .eq("status", "published");
-
-    if (filters.query) {
-      query = query.ilike("name", `%${filters.query}%`);
-    }
-    if (filters.city) {
-      const cityId = await idForCitySlug(filters.city);
-      if (cityId) query = query.eq("city_id", cityId);
-      else return { items: [], total: 0, page, pageSize };
-    }
-    if (filters.district) {
-      // District slug alone — resolved via joined district row on read; skip strict filter if no city.
-      const { data: d } = await supabase
-        .from("districts")
-        .select("id")
-        .eq("slug", filters.district)
-        .maybeSingle();
-      if (d?.id) query = query.eq("district_id", d.id);
-    }
-    if (filters.category) {
-      const catId = await idForCategorySlug(filters.category);
-      if (catId) query = query.eq("primary_category_id", catId);
-      else return { items: [], total: 0, page, pageSize };
-    }
-    if (filters.rating) query = query.gte("rating", filters.rating);
-    if (filters.priceLevel) query = query.eq("price_level", filters.priceLevel);
-    query = query.order(column, { ascending, nullsFirst: false });
-
-    const from = (page - 1) * pageSize;
-    query = query.range(from, from + pageSize - 1);
-
-    const { data, error, count } = await query;
-    if (error) throw error;
-    return {
-      items: (data ?? []).map(mapBusiness),
-      total: count ?? 0,
-      page,
-      pageSize,
-    };
+    return searchPublishedBusinessesFn({ data: filters });
   }
 
   async getBySlug(slug: string): Promise<Business | null> {
@@ -405,31 +335,23 @@ class SupabaseBusinessRepository implements BusinessRepository {
   }
 
   async getByCategory(categorySlug: string, limit = 8): Promise<Business[]> {
-    const catId = await idForCategorySlug(categorySlug);
-    if (!catId) return [];
-    const { data, error } = await supabase
-      .from("businesses")
-      .select(BUSINESS_SELECT)
-      .eq("status", "published")
-      .eq("primary_category_id", catId)
-      .order("rating", { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map(mapBusiness);
+    const result = await this.list({
+      category: categorySlug,
+      sort: "recommended",
+      page: 1,
+      pageSize: limit,
+    });
+    return result.items;
   }
 
   async getByCity(citySlug: string, limit = 8): Promise<Business[]> {
-    const cityId = await idForCitySlug(citySlug);
-    if (!cityId) return [];
-    const { data, error } = await supabase
-      .from("businesses")
-      .select(BUSINESS_SELECT)
-      .eq("status", "published")
-      .eq("city_id", cityId)
-      .order("rating", { ascending: false })
-      .limit(limit);
-    if (error) throw error;
-    return (data ?? []).map(mapBusiness);
+    const result = await this.list({
+      city: citySlug,
+      sort: "recommended",
+      page: 1,
+      pageSize: limit,
+    });
+    return result.items;
   }
 
   async getSimilar(business: Business, limit = 4): Promise<Business[]> {

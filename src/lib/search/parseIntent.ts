@@ -34,6 +34,13 @@ export interface SearchDictionary {
   districts: District[];
 }
 
+const CATEGORY_ALIASES: Record<string, string[]> = {
+  hotels: ["hotel", "hotels", "otel", "oteller", "فندق", "فنادق"],
+  clinics: ["clinic", "clinics", "klinik", "klinikler", "عيادة", "عيادات"],
+  restaurants: ["restaurant", "restaurants", "restoran", "restoranlar", "مطعم", "مطاعم"],
+  cafes: ["cafe", "cafes", "kafe", "kafeler", "مقهى", "مقاهي"],
+};
+
 const RATING_WORDS = [
   "best",
   "top",
@@ -91,8 +98,8 @@ export function normalize(input: string): string {
     .normalize("NFKC")
     .toLocaleLowerCase("tr")
     .replace(/[\u064B-\u065F\u0670]/g, "") // Arabic diacritics
-    .replace(/[’'`´]/g, " ")
-    .replace(/[.,;:!?()[\]{}"]/g, " ")
+    .replace(/[’'`]/g, " ")
+    .replace(/[.,;:!()[\]{}"]/g, " ")
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -137,6 +144,7 @@ function findMatch<T extends Named>(
   for (const item of items) {
     const labels = new Set<string>();
     labels.add(item.slug.replace(/-/g, " "));
+    for (const alias of CATEGORY_ALIASES[item.slug] ?? []) labels.add(alias);
     for (const l of ["tr", "en", "ar"] as Locale[]) {
       const v = item.name[l];
       if (v) labels.add(v);

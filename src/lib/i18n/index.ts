@@ -28,7 +28,7 @@ export function dirFor(locale: Locale): "rtl" | "ltr" {
   return isRtl(locale) ? "rtl" : "ltr";
 }
 
-/** Look up a localized field, falling back through locale → en → tr → first available. */
+/** Look up a localized field, falling back through locale -> en -> tr -> first available. */
 export function pickLocalized(
   value: LocalizedString | undefined,
   locale: Locale,
@@ -46,7 +46,7 @@ export function pickLocalized(
 export function translate(
   locale: Locale,
   key: MessageKey,
-  vars?: Record<string, string | number>,
+  vars: Record<string, string | number> = {},
 ): string {
   const dict =
     (messages[locale] as Record<string, string>) ??

@@ -12,6 +12,7 @@ import {
   pickClarifyingQuestion,
   type InterpretationChip,
 } from "@/lib/search/parseIntent";
+import { normalizePublicSearchFilters } from "@/lib/search/search-filters";
 import type { SearchFilters, SortOption } from "@/types/domain";
 
 interface SearchParams {
@@ -81,17 +82,17 @@ const searchDictQuery = () =>
   });
 
 function toFilters(params: SearchParams): SearchFilters {
-  return {
+  return normalizePublicSearchFilters({
     query: params.q,
     category: params.category,
     city: params.city,
     district: params.district,
     rating: params.rating,
     openNow: false,
-    priceLevel: params.priceLevel as SearchFilters["priceLevel"],
+    priceLevel: params.priceLevel,
     sort: params.sort,
     page: params.page,
-  };
+  });
 }
 
 const searchQuery = (filters: SearchFilters) =>
@@ -111,7 +112,7 @@ export const Route = createFileRoute("/$lang/search")({
   },
   head: ({ params }) => {
     const locale = params.lang as Locale;
-    const title = `${translate(locale, "search.your_results")} — ${translate(locale, "home.badge")}`;
+    const title = `${translate(locale, "search.your_results")} ? ${translate(locale, "home.badge")}`;
     const desc = translate(locale, "home.subtitle");
     return {
       meta: [
@@ -146,18 +147,17 @@ function SearchPage() {
 
   // Merge URL params with parsed intent (URL wins if user explicitly set anything).
   const effectiveFilters: SearchFilters = useMemo(() => {
-    return {
+    return normalizePublicSearchFilters({
       query: params.q,
       category: params.category ?? intent.matchedCategorySlug,
       city: params.city ?? intent.matchedCitySlug,
       district: params.district ?? intent.matchedDistrictSlug,
       rating: params.rating ?? (intent.ratingIntent === "top" ? 4.3 : null),
       openNow: false,
-      priceLevel: (params.priceLevel ??
-        intent.priceLevel) as SearchFilters["priceLevel"],
+      priceLevel: params.priceLevel ?? intent.priceLevel,
       sort: params.sort,
       page: params.page,
-    };
+    });
   }, [params, intent]);
 
   const { data } = useSuspenseQuery(searchQuery(effectiveFilters));
