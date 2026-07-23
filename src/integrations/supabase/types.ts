@@ -235,9 +235,9 @@ export type Database = {
           r2_url: string | null
           retry_count: number
           sort_order: number
+          source_fingerprint: string | null
           source_metadata: Json
           source_provider: string
-          source_fingerprint: string | null
           source_title: string | null
           source_type: string
           source_url: string | null
@@ -268,9 +268,9 @@ export type Database = {
           r2_url?: string | null
           retry_count?: number
           sort_order?: number
+          source_fingerprint?: string | null
           source_metadata?: Json
           source_provider?: string
-          source_fingerprint?: string | null
           source_title?: string | null
           source_type?: string
           source_url?: string | null
@@ -301,9 +301,9 @@ export type Database = {
           r2_url?: string | null
           retry_count?: number
           sort_order?: number
+          source_fingerprint?: string | null
           source_metadata?: Json
           source_provider?: string
-          source_fingerprint?: string | null
           source_title?: string | null
           source_type?: string
           source_url?: string | null
@@ -370,6 +370,440 @@ export type Database = {
             columns: ["import_batch_item_id"]
             isOneToOne: false
             referencedRelation: "import_batch_items"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_member_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          business_id: string
+          canceled_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_id: string
+          canceled_at?: string | null
+          created_at?: string
+          email: string
+          expires_at?: string
+          id?: string
+          invited_by: string
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          business_id?: string
+          canceled_at?: string | null
+          created_at?: string
+          email?: string
+          expires_at?: string
+          id?: string
+          invited_by?: string
+          role?: string
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_member_invitations_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_members: {
+        Row: {
+          approved_by: string | null
+          business_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          is_primary: boolean
+          revoked_at: string | null
+          role: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          approved_by?: string | null
+          business_id: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          is_primary?: boolean
+          revoked_at?: string | null
+          role: string
+          status?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          approved_by?: string | null
+          business_id?: string
+          created_at?: string
+          id?: string
+          invited_by?: string | null
+          is_primary?: boolean
+          revoked_at?: string | null
+          role?: string
+          status?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_members_business_id_fkey"
+            columns: ["business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_onboarding_documents: {
+        Row: {
+          created_at: string
+          document_type: string
+          id: string
+          mime_type: string | null
+          original_filename: string | null
+          replaced_by: string | null
+          size_bytes: number | null
+          status: string
+          storage_bucket: string
+          storage_path: string
+          submission_id: string
+          updated_at: string
+          uploaded_by: string
+        }
+        Insert: {
+          created_at?: string
+          document_type: string
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          replaced_by?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          submission_id: string
+          updated_at?: string
+          uploaded_by: string
+        }
+        Update: {
+          created_at?: string
+          document_type?: string
+          id?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          replaced_by?: string | null
+          size_bytes?: number | null
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          submission_id?: string
+          updated_at?: string
+          uploaded_by?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_documents_replaced_by_fkey"
+            columns: ["replaced_by"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_documents_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_onboarding_events: {
+        Row: {
+          actor_id: string | null
+          created_at: string
+          event_type: string
+          id: string
+          message_key: string | null
+          message_params: Json
+          metadata: Json
+          submission_id: string
+          visibility: string
+        }
+        Insert: {
+          actor_id?: string | null
+          created_at?: string
+          event_type: string
+          id?: string
+          message_key?: string | null
+          message_params?: Json
+          metadata?: Json
+          submission_id: string
+          visibility?: string
+        }
+        Update: {
+          actor_id?: string | null
+          created_at?: string
+          event_type?: string
+          id?: string
+          message_key?: string | null
+          message_params?: Json
+          metadata?: Json
+          submission_id?: string
+          visibility?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_events_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_onboarding_images: {
+        Row: {
+          approved_business_image_id: string | null
+          created_at: string
+          height: number | null
+          id: string
+          image_type: string
+          mime_type: string | null
+          original_filename: string | null
+          size_bytes: number | null
+          sort_order: number
+          status: string
+          storage_bucket: string
+          storage_path: string
+          submission_id: string
+          updated_at: string
+          uploaded_by: string
+          width: number | null
+        }
+        Insert: {
+          approved_business_image_id?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          image_type?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
+          sort_order?: number
+          status?: string
+          storage_bucket?: string
+          storage_path: string
+          submission_id: string
+          updated_at?: string
+          uploaded_by: string
+          width?: number | null
+        }
+        Update: {
+          approved_business_image_id?: string | null
+          created_at?: string
+          height?: number | null
+          id?: string
+          image_type?: string
+          mime_type?: string | null
+          original_filename?: string | null
+          size_bytes?: number | null
+          sort_order?: number
+          status?: string
+          storage_bucket?: string
+          storage_path?: string
+          submission_id?: string
+          updated_at?: string
+          uploaded_by?: string
+          width?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_images_approved_business_image_id_fkey"
+            columns: ["approved_business_image_id"]
+            isOneToOne: false
+            referencedRelation: "business_images"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_images_approved_business_image_id_fkey"
+            columns: ["approved_business_image_id"]
+            isOneToOne: false
+            referencedRelation: "business_images_public"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_images_submission_id_fkey"
+            columns: ["submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      business_onboarding_submissions: {
+        Row: {
+          address: Json
+          admin_decision: string | null
+          admin_notes_private: string | null
+          applicant_business_email: string | null
+          applicant_full_name: string | null
+          applicant_id: string
+          applicant_message_key: string | null
+          applicant_message_params: Json
+          applicant_phone: string | null
+          applicant_role: string | null
+          approved_business_id: string | null
+          attributes: Json
+          business_description_localized: Json
+          business_name_localized: Json
+          categories: Json
+          commercial_registration_country: string | null
+          commercial_registration_expires_at: string | null
+          commercial_registration_issued_at: string | null
+          commercial_registration_legal_name: string | null
+          commercial_registration_number: string | null
+          contact: Json
+          created_at: string
+          declaration_accepted_at: string | null
+          id: string
+          locale_draft: string | null
+          onboarding_content: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          services_localized: Json
+          social_links: Json
+          source_submission_id: string | null
+          status: string
+          submission_type: string
+          submitted_at: string | null
+          target_business_id: string | null
+          updated_at: string
+          version: number
+        }
+        Insert: {
+          address?: Json
+          admin_decision?: string | null
+          admin_notes_private?: string | null
+          applicant_business_email?: string | null
+          applicant_full_name?: string | null
+          applicant_id: string
+          applicant_message_key?: string | null
+          applicant_message_params?: Json
+          applicant_phone?: string | null
+          applicant_role?: string | null
+          approved_business_id?: string | null
+          attributes?: Json
+          business_description_localized?: Json
+          business_name_localized?: Json
+          categories?: Json
+          commercial_registration_country?: string | null
+          commercial_registration_expires_at?: string | null
+          commercial_registration_issued_at?: string | null
+          commercial_registration_legal_name?: string | null
+          commercial_registration_number?: string | null
+          contact?: Json
+          created_at?: string
+          declaration_accepted_at?: string | null
+          id?: string
+          locale_draft?: string | null
+          onboarding_content?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          services_localized?: Json
+          social_links?: Json
+          source_submission_id?: string | null
+          status?: string
+          submission_type: string
+          submitted_at?: string | null
+          target_business_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Update: {
+          address?: Json
+          admin_decision?: string | null
+          admin_notes_private?: string | null
+          applicant_business_email?: string | null
+          applicant_full_name?: string | null
+          applicant_id?: string
+          applicant_message_key?: string | null
+          applicant_message_params?: Json
+          applicant_phone?: string | null
+          applicant_role?: string | null
+          approved_business_id?: string | null
+          attributes?: Json
+          business_description_localized?: Json
+          business_name_localized?: Json
+          categories?: Json
+          commercial_registration_country?: string | null
+          commercial_registration_expires_at?: string | null
+          commercial_registration_issued_at?: string | null
+          commercial_registration_legal_name?: string | null
+          commercial_registration_number?: string | null
+          contact?: Json
+          created_at?: string
+          declaration_accepted_at?: string | null
+          id?: string
+          locale_draft?: string | null
+          onboarding_content?: Json
+          reviewed_at?: string | null
+          reviewed_by?: string | null
+          services_localized?: Json
+          social_links?: Json
+          source_submission_id?: string | null
+          status?: string
+          submission_type?: string
+          submitted_at?: string | null
+          target_business_id?: string | null
+          updated_at?: string
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "business_onboarding_submissions_approved_business_id_fkey"
+            columns: ["approved_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_submissions_source_submission_id_fkey"
+            columns: ["source_submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "business_onboarding_submissions_target_business_id_fkey"
+            columns: ["target_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
             referencedColumns: ["id"]
           },
         ]
@@ -1483,6 +1917,42 @@ export type Database = {
           },
         ]
       }
+      platform_locales: {
+        Row: {
+          code: string
+          created_at: string
+          direction: string
+          english_name: string
+          is_enabled: boolean
+          is_public: boolean
+          native_name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          direction: string
+          english_name: string
+          is_enabled?: boolean
+          is_public?: boolean
+          native_name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          direction?: string
+          english_name?: string
+          is_enabled?: boolean
+          is_public?: boolean
+          native_name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
@@ -1491,7 +1961,10 @@ export type Database = {
           id: string
           phone: string | null
           preferred_language: string
+          registration_intent: string
           status: string
+          terms_accepted_at: string | null
+          terms_version: string | null
           updated_at: string
         }
         Insert: {
@@ -1501,7 +1974,10 @@ export type Database = {
           id: string
           phone?: string | null
           preferred_language?: string
+          registration_intent?: string
           status?: string
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           updated_at?: string
         }
         Update: {
@@ -1511,7 +1987,10 @@ export type Database = {
           id?: string
           phone?: string | null
           preferred_language?: string
+          registration_intent?: string
           status?: string
+          terms_accepted_at?: string | null
+          terms_version?: string | null
           updated_at?: string
         }
         Relationships: []
@@ -1813,6 +2292,60 @@ export type Database = {
           },
         ]
       }
+      user_notifications: {
+        Row: {
+          created_at: string
+          id: string
+          kind: string
+          message_key: string
+          message_params: Json
+          read_at: string | null
+          related_business_id: string | null
+          related_submission_id: string | null
+          title_key: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          kind: string
+          message_key: string
+          message_params?: Json
+          read_at?: string | null
+          related_business_id?: string | null
+          related_submission_id?: string | null
+          title_key: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          kind?: string
+          message_key?: string
+          message_params?: Json
+          read_at?: string | null
+          related_business_id?: string | null
+          related_submission_id?: string | null
+          title_key?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_notifications_related_business_id_fkey"
+            columns: ["related_business_id"]
+            isOneToOne: false
+            referencedRelation: "businesses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "user_notifications_related_submission_id_fkey"
+            columns: ["related_submission_id"]
+            isOneToOne: false
+            referencedRelation: "business_onboarding_submissions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1898,6 +2431,10 @@ export type Database = {
     }
     Functions: {
       _bcr_field_allowlist: { Args: { _type: string }; Returns: string[] }
+      _business_member_is_owner: {
+        Args: { _business_id: string; _user_id: string }
+        Returns: boolean
+      }
       _try_bootstrap_first_admin: {
         Args: {
           _email_confirmed_at: string
@@ -1906,17 +2443,153 @@ export type Database = {
         }
         Returns: boolean
       }
+      accept_business_team_invitation: {
+        Args: { _invitation_id: string; _token: string }
+        Returns: {
+          approved_by: string | null
+          business_id: string
+          created_at: string
+          id: string
+          invited_by: string | null
+          is_primary: boolean
+          revoked_at: string | null
+          role: string
+          status: string
+          updated_at: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_members"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       apply_business_change_request: {
         Args: {
-          _admin_notes: string
-          _approve: Json
-          _reject: Json
+          _admin_notes?: string
+          _approve?: Json
+          _reject?: Json
           _request_id: string
         }
         Returns: Json
       }
+      approve_existing_business_onboarding_submission: {
+        Args: {
+          _applicant_message_key?: string
+          _applicant_message_params?: Json
+          _private_notes?: string
+          _submission_id: string
+        }
+        Returns: {
+          address: Json
+          admin_decision: string | null
+          admin_notes_private: string | null
+          applicant_business_email: string | null
+          applicant_full_name: string | null
+          applicant_id: string
+          applicant_message_key: string | null
+          applicant_message_params: Json
+          applicant_phone: string | null
+          applicant_role: string | null
+          approved_business_id: string | null
+          attributes: Json
+          business_description_localized: Json
+          business_name_localized: Json
+          categories: Json
+          commercial_registration_country: string | null
+          commercial_registration_expires_at: string | null
+          commercial_registration_issued_at: string | null
+          commercial_registration_legal_name: string | null
+          commercial_registration_number: string | null
+          contact: Json
+          created_at: string
+          declaration_accepted_at: string | null
+          id: string
+          locale_draft: string | null
+          onboarding_content: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          services_localized: Json
+          social_links: Json
+          source_submission_id: string | null
+          status: string
+          submission_type: string
+          submitted_at: string | null
+          target_business_id: string | null
+          updated_at: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_onboarding_submissions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      approve_new_business_onboarding_submission: {
+        Args: {
+          _applicant_message_key?: string
+          _applicant_message_params?: Json
+          _private_notes?: string
+          _submission_id: string
+        }
+        Returns: {
+          address: Json
+          admin_decision: string | null
+          admin_notes_private: string | null
+          applicant_business_email: string | null
+          applicant_full_name: string | null
+          applicant_id: string
+          applicant_message_key: string | null
+          applicant_message_params: Json
+          applicant_phone: string | null
+          applicant_role: string | null
+          approved_business_id: string | null
+          attributes: Json
+          business_description_localized: Json
+          business_name_localized: Json
+          categories: Json
+          commercial_registration_country: string | null
+          commercial_registration_expires_at: string | null
+          commercial_registration_issued_at: string | null
+          commercial_registration_legal_name: string | null
+          commercial_registration_number: string | null
+          contact: Json
+          created_at: string
+          declaration_accepted_at: string | null
+          id: string
+          locale_draft: string | null
+          onboarding_content: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          services_localized: Json
+          social_links: Json
+          source_submission_id: string | null
+          status: string
+          submission_type: string
+          submitted_at: string | null
+          target_business_id: string | null
+          updated_at: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_onboarding_submissions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       approve_ownership_claim: { Args: { _claim_id: string }; Returns: Json }
       bootstrap_admin: { Args: { _target_user: string }; Returns: Json }
+      business_member_authz: {
+        Args: { _business_id: string; _roles?: string[] }
+        Returns: Json
+      }
+      cancel_business_team_invitation: {
+        Args: { _business_id: string; _invitation_id: string }
+        Returns: undefined
+      }
       claim_next_image_jobs: {
         Args: { _lease_seconds?: number; _limit?: number; _worker: string }
         Returns: {
@@ -1950,9 +2623,59 @@ export type Database = {
         }
         Returns: boolean
       }
+      invite_business_manager: {
+        Args: { _business_id: string; _email: string }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          business_id: string
+          canceled_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_member_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       is_suspended: { Args: { _user: string }; Returns: boolean }
+      list_business_team: { Args: { _business_id: string }; Returns: Json }
+      mark_user_notification_read: {
+        Args: { _notification_id: string }
+        Returns: {
+          created_at: string
+          id: string
+          kind: string
+          message_key: string
+          message_params: Json
+          read_at: string | null
+          related_business_id: string | null
+          related_submission_id: string | null
+          title_key: string
+          user_id: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "user_notifications"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
       owner_authz: { Args: { _business_id: string }; Returns: Json }
       owner_has_business: { Args: { _user: string }; Returns: boolean }
+      prepare_business_onboarding_document_replacement: {
+        Args: { _document_type: string; _submission_id: string }
+        Returns: undefined
+      }
       reap_stale_image_jobs: { Args: never; Returns: number }
       record_audit: {
         Args: {
@@ -1964,6 +2687,42 @@ export type Database = {
           _metadata: Json
         }
         Returns: string
+      }
+      regenerate_business_team_invitation: {
+        Args: { _business_id: string; _invitation_id: string }
+        Returns: {
+          accepted_at: string | null
+          accepted_by: string | null
+          business_id: string
+          canceled_at: string | null
+          created_at: string
+          email: string
+          expires_at: string
+          id: string
+          invited_by: string
+          role: string
+          status: string
+          token: string
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_member_invitations"
+          isOneToOne: true
+          isSetofReturn: false
+        }
+      }
+      remove_business_manager: {
+        Args: { _business_id: string; _member_id: string }
+        Returns: undefined
+      }
+      remove_business_onboarding_document: {
+        Args: { _document_id: string; _storage_path: string }
+        Returns: undefined
+      }
+      remove_business_onboarding_image: {
+        Args: { _image_id: string; _storage_path: string }
+        Returns: undefined
       }
       revoke_ownership: {
         Args: { _business_id: string; _reason: string }
@@ -1977,6 +2736,54 @@ export type Database = {
           _target_user: string
         }
         Returns: Json
+      }
+      submit_business_onboarding_submission: {
+        Args: { _submission_id: string }
+        Returns: {
+          address: Json
+          admin_decision: string | null
+          admin_notes_private: string | null
+          applicant_business_email: string | null
+          applicant_full_name: string | null
+          applicant_id: string
+          applicant_message_key: string | null
+          applicant_message_params: Json
+          applicant_phone: string | null
+          applicant_role: string | null
+          approved_business_id: string | null
+          attributes: Json
+          business_description_localized: Json
+          business_name_localized: Json
+          categories: Json
+          commercial_registration_country: string | null
+          commercial_registration_expires_at: string | null
+          commercial_registration_issued_at: string | null
+          commercial_registration_legal_name: string | null
+          commercial_registration_number: string | null
+          contact: Json
+          created_at: string
+          declaration_accepted_at: string | null
+          id: string
+          locale_draft: string | null
+          onboarding_content: Json
+          reviewed_at: string | null
+          reviewed_by: string | null
+          services_localized: Json
+          social_links: Json
+          source_submission_id: string | null
+          status: string
+          submission_type: string
+          submitted_at: string | null
+          target_business_id: string | null
+          updated_at: string
+          version: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "business_onboarding_submissions"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
     }
     Enums: {
