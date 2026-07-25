@@ -156,8 +156,11 @@ function AuthPage() {
   async function handleGoogle() {
     setBusy(true);
     try {
+      // Return to /{locale}/auth so the post-login useEffect (which routes
+      // admins → /admin, owners → /owner, everyone else → /account) fires
+      // immediately instead of stranding the user on "/".
       const res = await lovable.auth.signInWithOAuth("google", {
-        redirect_uri: window.location.origin,
+        redirect_uri: `${window.location.origin}/${locale}/auth`,
       });
       if (res.error) {
         toast.error(res.error.message ?? t("auth.google_failed"));
