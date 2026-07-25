@@ -11,6 +11,24 @@ import { useT, useLocaleContext, type MessageKey } from "@/lib/i18n";
 import { LocaleLink } from "@/components/site/LocaleLink";
 import { getBusinessImageUrl } from "@/lib/images/storage";
 
+type CoverRow = { source_url: string | null; r2_url: string | null; is_cover: boolean; sort_order: number } | undefined;
+
+function coverUrlFromRow(cover: CoverRow, businessId: string): string {
+  if (!cover) return getBusinessImageUrl(null);
+  return getBusinessImageUrl({
+    id: "",
+    businessId,
+    placeId: "",
+    sourceUrl: cover.source_url ?? null,
+    r2Key: null,
+    r2Url: cover.r2_url ?? null,
+    storageStatus: "external_only",
+    imageType: "cover",
+    isCover: true,
+    sortOrder: 0,
+  });
+}
+
 export const Route = createFileRoute("/$lang/_authenticated/account")({
   head: () => ({
     meta: [{ title: "Hesabım · TurkeyDirect" }, { name: "robots", content: "noindex" }],
@@ -288,28 +306,14 @@ function AccountPage() {
               const cover =
                 (b.business_images ?? []).find((i: any) => i.is_cover) ??
                 (b.business_images ?? [])[0];
-              const img = getBusinessImageUrl(
-                cover
-                  ? {
-                      id: "",
-                      businessId: b.id,
-                      placeId: "",
-                      sourceUrl: cover.source_url ?? null,
-                      r2Key: null,
-                      r2Url: cover.r2_url ?? null,
-                      storageStatus: "external_only",
-                      imageType: "cover",
-                      isCover: true,
-                      sortOrder: 0,
-                    }
-                  : null,
-              );
+              const img = coverUrlFromRow(cover, b.id);
               return (
                 <li
                   key={b.id}
                   className="flex gap-3 overflow-hidden rounded-xl border bg-card"
                 >
                   <img src={img} alt="" className="h-24 w-24 shrink-0 object-cover" />
+
                   <div className="flex flex-1 flex-col p-3">
                     <LocaleLink
                       to={`/place/${b.slug}`}
