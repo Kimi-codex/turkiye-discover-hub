@@ -9,67 +9,67 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
-import { Route as IndexRouteImport } from './routes/index'
 import { Route as LangRouteImport } from './routes/$lang'
+import { Route as IndexRouteImport } from './routes/index'
 import { Route as LangIndexRouteImport } from './routes/$lang.index'
-import { Route as LangSlugRouteImport } from './routes/$lang.$slug'
-import { Route as LangAuthenticatedRouteImport } from './routes/$lang._authenticated'
-import { Route as LangAuthRouteImport } from './routes/$lang.auth'
 import { Route as LangSearchRouteImport } from './routes/$lang.search'
-import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
-import { Route as LangAuthenticatedAccountRouteImport } from './routes/$lang._authenticated.account'
-import { Route as LangAuthenticatedAdminRouteImport } from './routes/$lang._authenticated.admin'
-import { Route as LangAuthenticatedOwnerRouteImport } from './routes/$lang._authenticated.owner'
+import { Route as LangAuthRouteImport } from './routes/$lang.auth'
+import { Route as LangAuthenticatedRouteImport } from './routes/$lang._authenticated'
+import { Route as LangSlugRouteImport } from './routes/$lang.$slug'
 import { Route as LangPlaceSlugRouteImport } from './routes/$lang.place.$slug'
-import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
-import { Route as LangAuthenticatedAccountNotificationsRouteImport } from './routes/$lang._authenticated.account.notifications'
-import { Route as LangAuthenticatedAccountSettingsRouteImport } from './routes/$lang._authenticated.account.settings'
-import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
-import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
-import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$lang._authenticated.admin.businesses'
-import { Route as LangAuthenticatedAdminCategoriesRouteImport } from './routes/$lang._authenticated.admin.categories'
-import { Route as LangAuthenticatedAdminCategoryMappingsRouteImport } from './routes/$lang._authenticated.admin.category-mappings'
-import { Route as LangAuthenticatedAdminChangeRequestsRouteImport } from './routes/$lang._authenticated.admin.change-requests'
-import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
-import { Route as LangAuthenticatedAdminImagesRouteImport } from './routes/$lang._authenticated.admin.images'
-import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
-import { Route as LangAuthenticatedAdminOnboardingRouteImport } from './routes/$lang._authenticated.admin.onboarding'
-import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
-import { Route as LangAuthenticatedAdminReplyModerationRouteImport } from './routes/$lang._authenticated.admin.reply-moderation'
-import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
-import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
-import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
-import { Route as LangAuthenticatedAdminTranslationsRouteImport } from './routes/$lang._authenticated.admin.translations'
-import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
+import { Route as LangAuthenticatedOwnerRouteImport } from './routes/$lang._authenticated.owner'
+import { Route as LangAuthenticatedAdminRouteImport } from './routes/$lang._authenticated.admin'
+import { Route as LangAuthenticatedAccountRouteImport } from './routes/$lang._authenticated.account'
+import { Route as LangCitySlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$categorySlug'
 import { Route as LangAuthenticatedOwnerIndexRouteImport } from './routes/$lang._authenticated.owner.index'
-import { Route as LangAuthenticatedOwnerBusinessIdRouteImport } from './routes/$lang._authenticated.owner.$businessId'
-import { Route as LangAuthenticatedOwnerClaimRouteImport } from './routes/$lang._authenticated.owner.claim'
-import { Route as LangAuthenticatedOwnerNotificationsRouteImport } from './routes/$lang._authenticated.owner.notifications'
-import { Route as LangAuthenticatedOwnerOnboardingRouteImport } from './routes/$lang._authenticated.owner.onboarding'
+import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
 import { Route as ApiPublicHooksImageTickRouteImport } from './routes/api/public/hooks/image-tick'
-import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
-import { Route as LangAuthenticatedAdminChangeRequestsIdRouteImport } from './routes/$lang._authenticated.admin.change-requests.$id'
-import { Route as LangAuthenticatedAdminImportsIndexRouteImport } from './routes/$lang._authenticated.admin.imports.index'
-import { Route as LangAuthenticatedAdminImportsIdRouteImport } from './routes/$lang._authenticated.admin.imports.$id'
+import { Route as LangAuthenticatedOwnerOnboardingRouteImport } from './routes/$lang._authenticated.owner.onboarding'
+import { Route as LangAuthenticatedOwnerNotificationsRouteImport } from './routes/$lang._authenticated.owner.notifications'
+import { Route as LangAuthenticatedOwnerClaimRouteImport } from './routes/$lang._authenticated.owner.claim'
+import { Route as LangAuthenticatedOwnerBusinessIdRouteImport } from './routes/$lang._authenticated.owner.$businessId'
+import { Route as LangAuthenticatedAdminUsersRouteImport } from './routes/$lang._authenticated.admin.users'
+import { Route as LangAuthenticatedAdminTranslationsRouteImport } from './routes/$lang._authenticated.admin.translations'
+import { Route as LangAuthenticatedAdminSettingsRouteImport } from './routes/$lang._authenticated.admin.settings'
+import { Route as LangAuthenticatedAdminReviewsRouteImport } from './routes/$lang._authenticated.admin.reviews'
+import { Route as LangAuthenticatedAdminReportsRouteImport } from './routes/$lang._authenticated.admin.reports'
+import { Route as LangAuthenticatedAdminReplyModerationRouteImport } from './routes/$lang._authenticated.admin.reply-moderation'
+import { Route as LangAuthenticatedAdminOwnershipClaimsRouteImport } from './routes/$lang._authenticated.admin.ownership-claims'
+import { Route as LangAuthenticatedAdminOnboardingRouteImport } from './routes/$lang._authenticated.admin.onboarding'
+import { Route as LangAuthenticatedAdminImportsRouteImport } from './routes/$lang._authenticated.admin.imports'
+import { Route as LangAuthenticatedAdminImagesRouteImport } from './routes/$lang._authenticated.admin.images'
+import { Route as LangAuthenticatedAdminCitiesRouteImport } from './routes/$lang._authenticated.admin.cities'
+import { Route as LangAuthenticatedAdminChangeRequestsRouteImport } from './routes/$lang._authenticated.admin.change-requests'
+import { Route as LangAuthenticatedAdminCategoryMappingsRouteImport } from './routes/$lang._authenticated.admin.category-mappings'
+import { Route as LangAuthenticatedAdminCategoriesRouteImport } from './routes/$lang._authenticated.admin.categories'
+import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$lang._authenticated.admin.businesses'
+import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
+import { Route as LangAuthenticatedAccountSettingsRouteImport } from './routes/$lang._authenticated.account.settings'
+import { Route as LangAuthenticatedAccountNotificationsRouteImport } from './routes/$lang._authenticated.account.notifications'
+import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 import { Route as LangAuthenticatedOwnerBusinessIdIndexRouteImport } from './routes/$lang._authenticated.owner.$businessId.index'
-import { Route as LangAuthenticatedOwnerBusinessIdAttributesRouteImport } from './routes/$lang._authenticated.owner.$businessId.attributes'
-import { Route as LangAuthenticatedOwnerBusinessIdHoursRouteImport } from './routes/$lang._authenticated.owner.$businessId.hours'
-import { Route as LangAuthenticatedOwnerBusinessIdImagesRouteImport } from './routes/$lang._authenticated.owner.$businessId.images'
-import { Route as LangAuthenticatedOwnerBusinessIdProfileRouteImport } from './routes/$lang._authenticated.owner.$businessId.profile'
-import { Route as LangAuthenticatedOwnerBusinessIdReviewsRouteImport } from './routes/$lang._authenticated.owner.$businessId.reviews'
-import { Route as LangAuthenticatedOwnerBusinessIdServicesRouteImport } from './routes/$lang._authenticated.owner.$businessId.services'
-import { Route as LangAuthenticatedOwnerBusinessIdTeamRouteImport } from './routes/$lang._authenticated.owner.$businessId.team'
-import { Route as LangAuthenticatedOwnerBusinessIdTranslationsRouteImport } from './routes/$lang._authenticated.owner.$businessId.translations'
+import { Route as LangAuthenticatedAdminImportsIndexRouteImport } from './routes/$lang._authenticated.admin.imports.index'
 import { Route as LangAuthenticatedOwnerTeamInviteInvitationIdRouteImport } from './routes/$lang._authenticated.owner.team-invite.$invitationId'
+import { Route as LangAuthenticatedOwnerBusinessIdTranslationsRouteImport } from './routes/$lang._authenticated.owner.$businessId.translations'
+import { Route as LangAuthenticatedOwnerBusinessIdTeamRouteImport } from './routes/$lang._authenticated.owner.$businessId.team'
+import { Route as LangAuthenticatedOwnerBusinessIdServicesRouteImport } from './routes/$lang._authenticated.owner.$businessId.services'
+import { Route as LangAuthenticatedOwnerBusinessIdReviewsRouteImport } from './routes/$lang._authenticated.owner.$businessId.reviews'
+import { Route as LangAuthenticatedOwnerBusinessIdProfileRouteImport } from './routes/$lang._authenticated.owner.$businessId.profile'
+import { Route as LangAuthenticatedOwnerBusinessIdImagesRouteImport } from './routes/$lang._authenticated.owner.$businessId.images'
+import { Route as LangAuthenticatedOwnerBusinessIdHoursRouteImport } from './routes/$lang._authenticated.owner.$businessId.hours'
+import { Route as LangAuthenticatedOwnerBusinessIdAttributesRouteImport } from './routes/$lang._authenticated.owner.$businessId.attributes'
+import { Route as LangAuthenticatedAdminImportsIdRouteImport } from './routes/$lang._authenticated.admin.imports.$id'
+import { Route as LangAuthenticatedAdminChangeRequestsIdRouteImport } from './routes/$lang._authenticated.admin.change-requests.$id'
+import { Route as LangAuthenticatedAdminBusinessesIdRouteImport } from './routes/$lang._authenticated.admin.businesses.$id'
 
-const IndexRoute = IndexRouteImport.update({
-  id: '/',
-  path: '/',
-  getParentRoute: () => rootRouteImport,
-} as any)
 const LangRoute = LangRouteImport.update({
   id: '/$lang',
   path: '/$lang',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const IndexRoute = IndexRouteImport.update({
+  id: '/',
+  path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
 const LangIndexRoute = LangIndexRouteImport.update({
@@ -77,13 +77,9 @@ const LangIndexRoute = LangIndexRouteImport.update({
   path: '/',
   getParentRoute: () => LangRoute,
 } as any)
-const LangSlugRoute = LangSlugRouteImport.update({
-  id: '/$slug',
-  path: '/$slug',
-  getParentRoute: () => LangRoute,
-} as any)
-const LangAuthenticatedRoute = LangAuthenticatedRouteImport.update({
-  id: '/_authenticated',
+const LangSearchRoute = LangSearchRouteImport.update({
+  id: '/search',
+  path: '/search',
   getParentRoute: () => LangRoute,
 } as any)
 const LangAuthRoute = LangAuthRouteImport.update({
@@ -91,157 +87,41 @@ const LangAuthRoute = LangAuthRouteImport.update({
   path: '/auth',
   getParentRoute: () => LangRoute,
 } as any)
-const LangSearchRoute = LangSearchRouteImport.update({
-  id: '/search',
-  path: '/search',
+const LangAuthenticatedRoute = LangAuthenticatedRouteImport.update({
+  id: '/_authenticated',
   getParentRoute: () => LangRoute,
 } as any)
-const LangCitySlugCategorySlugRoute =
-  LangCitySlugCategorySlugRouteImport.update({
-    id: '/$citySlug/$categorySlug',
-    path: '/$citySlug/$categorySlug',
-    getParentRoute: () => LangRoute,
-  } as any)
-const LangAuthenticatedAccountRoute =
-  LangAuthenticatedAccountRouteImport.update({
-    id: '/account',
-    path: '/account',
-    getParentRoute: () => LangAuthenticatedRoute,
-  } as any)
-const LangAuthenticatedAdminRoute = LangAuthenticatedAdminRouteImport.update({
-  id: '/admin',
-  path: '/admin',
-  getParentRoute: () => LangAuthenticatedRoute,
-} as any)
-const LangAuthenticatedOwnerRoute = LangAuthenticatedOwnerRouteImport.update({
-  id: '/owner',
-  path: '/owner',
-  getParentRoute: () => LangAuthenticatedRoute,
+const LangSlugRoute = LangSlugRouteImport.update({
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => LangRoute,
 } as any)
 const LangPlaceSlugRoute = LangPlaceSlugRouteImport.update({
   id: '/place/$slug',
   path: '/place/$slug',
   getParentRoute: () => LangRoute,
 } as any)
-const LangCitySlugDistrictSlugCategorySlugRoute =
-  LangCitySlugDistrictSlugCategorySlugRouteImport.update({
-    id: '/$citySlug/$districtSlug/$categorySlug',
-    path: '/$citySlug/$districtSlug/$categorySlug',
+const LangAuthenticatedOwnerRoute = LangAuthenticatedOwnerRouteImport.update({
+  id: '/owner',
+  path: '/owner',
+  getParentRoute: () => LangAuthenticatedRoute,
+} as any)
+const LangAuthenticatedAdminRoute = LangAuthenticatedAdminRouteImport.update({
+  id: '/admin',
+  path: '/admin',
+  getParentRoute: () => LangAuthenticatedRoute,
+} as any)
+const LangAuthenticatedAccountRoute =
+  LangAuthenticatedAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
+    getParentRoute: () => LangAuthenticatedRoute,
+  } as any)
+const LangCitySlugCategorySlugRoute =
+  LangCitySlugCategorySlugRouteImport.update({
+    id: '/$citySlug/$categorySlug',
+    path: '/$citySlug/$categorySlug',
     getParentRoute: () => LangRoute,
-  } as any)
-const LangAuthenticatedAccountNotificationsRoute =
-  LangAuthenticatedAccountNotificationsRouteImport.update({
-    id: '/notifications',
-    path: '/notifications',
-    getParentRoute: () => LangAuthenticatedAccountRoute,
-  } as any)
-const LangAuthenticatedAccountSettingsRoute =
-  LangAuthenticatedAccountSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => LangAuthenticatedAccountRoute,
-  } as any)
-const LangAuthenticatedAdminIndexRoute =
-  LangAuthenticatedAdminIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminAuditLogsRoute =
-  LangAuthenticatedAdminAuditLogsRouteImport.update({
-    id: '/audit-logs',
-    path: '/audit-logs',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminBusinessesRoute =
-  LangAuthenticatedAdminBusinessesRouteImport.update({
-    id: '/businesses',
-    path: '/businesses',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminCategoriesRoute =
-  LangAuthenticatedAdminCategoriesRouteImport.update({
-    id: '/categories',
-    path: '/categories',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminCategoryMappingsRoute =
-  LangAuthenticatedAdminCategoryMappingsRouteImport.update({
-    id: '/category-mappings',
-    path: '/category-mappings',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminChangeRequestsRoute =
-  LangAuthenticatedAdminChangeRequestsRouteImport.update({
-    id: '/change-requests',
-    path: '/change-requests',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminCitiesRoute =
-  LangAuthenticatedAdminCitiesRouteImport.update({
-    id: '/cities',
-    path: '/cities',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminImagesRoute =
-  LangAuthenticatedAdminImagesRouteImport.update({
-    id: '/images',
-    path: '/images',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminImportsRoute =
-  LangAuthenticatedAdminImportsRouteImport.update({
-    id: '/imports',
-    path: '/imports',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminOnboardingRoute =
-  LangAuthenticatedAdminOnboardingRouteImport.update({
-    id: '/onboarding',
-    path: '/onboarding',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminOwnershipClaimsRoute =
-  LangAuthenticatedAdminOwnershipClaimsRouteImport.update({
-    id: '/ownership-claims',
-    path: '/ownership-claims',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminReplyModerationRoute =
-  LangAuthenticatedAdminReplyModerationRouteImport.update({
-    id: '/reply-moderation',
-    path: '/reply-moderation',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminReportsRoute =
-  LangAuthenticatedAdminReportsRouteImport.update({
-    id: '/reports',
-    path: '/reports',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminReviewsRoute =
-  LangAuthenticatedAdminReviewsRouteImport.update({
-    id: '/reviews',
-    path: '/reviews',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminSettingsRoute =
-  LangAuthenticatedAdminSettingsRouteImport.update({
-    id: '/settings',
-    path: '/settings',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminTranslationsRoute =
-  LangAuthenticatedAdminTranslationsRouteImport.update({
-    id: '/translations',
-    path: '/translations',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
-  } as any)
-const LangAuthenticatedAdminUsersRoute =
-  LangAuthenticatedAdminUsersRouteImport.update({
-    id: '/users',
-    path: '/users',
-    getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
 const LangAuthenticatedOwnerIndexRoute =
   LangAuthenticatedOwnerIndexRouteImport.update({
@@ -249,16 +129,21 @@ const LangAuthenticatedOwnerIndexRoute =
     path: '/',
     getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
-const LangAuthenticatedOwnerBusinessIdRoute =
-  LangAuthenticatedOwnerBusinessIdRouteImport.update({
-    id: '/$businessId',
-    path: '/$businessId',
-    getParentRoute: () => LangAuthenticatedOwnerRoute,
+const LangAuthenticatedAdminIndexRoute =
+  LangAuthenticatedAdminIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
-const LangAuthenticatedOwnerClaimRoute =
-  LangAuthenticatedOwnerClaimRouteImport.update({
-    id: '/claim',
-    path: '/claim',
+const ApiPublicHooksImageTickRoute = ApiPublicHooksImageTickRouteImport.update({
+  id: '/api/public/hooks/image-tick',
+  path: '/api/public/hooks/image-tick',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LangAuthenticatedOwnerOnboardingRoute =
+  LangAuthenticatedOwnerOnboardingRouteImport.update({
+    id: '/onboarding',
+    path: '/onboarding',
     getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
 const LangAuthenticatedOwnerNotificationsRoute =
@@ -267,40 +152,131 @@ const LangAuthenticatedOwnerNotificationsRoute =
     path: '/notifications',
     getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
-const LangAuthenticatedOwnerOnboardingRoute =
-  LangAuthenticatedOwnerOnboardingRouteImport.update({
-    id: '/onboarding',
-    path: '/onboarding',
+const LangAuthenticatedOwnerClaimRoute =
+  LangAuthenticatedOwnerClaimRouteImport.update({
+    id: '/claim',
+    path: '/claim',
     getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
-const ApiPublicHooksImageTickRoute = ApiPublicHooksImageTickRouteImport.update({
-  id: '/api/public/hooks/image-tick',
-  path: '/api/public/hooks/image-tick',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const LangAuthenticatedAdminBusinessesIdRoute =
-  LangAuthenticatedAdminBusinessesIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => LangAuthenticatedAdminBusinessesRoute,
+const LangAuthenticatedOwnerBusinessIdRoute =
+  LangAuthenticatedOwnerBusinessIdRouteImport.update({
+    id: '/$businessId',
+    path: '/$businessId',
+    getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
-const LangAuthenticatedAdminChangeRequestsIdRoute =
-  LangAuthenticatedAdminChangeRequestsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => LangAuthenticatedAdminChangeRequestsRoute,
+const LangAuthenticatedAdminUsersRoute =
+  LangAuthenticatedAdminUsersRouteImport.update({
+    id: '/users',
+    path: '/users',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
-const LangAuthenticatedAdminImportsIndexRoute =
-  LangAuthenticatedAdminImportsIndexRouteImport.update({
-    id: '/',
-    path: '/',
-    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
+const LangAuthenticatedAdminTranslationsRoute =
+  LangAuthenticatedAdminTranslationsRouteImport.update({
+    id: '/translations',
+    path: '/translations',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
   } as any)
-const LangAuthenticatedAdminImportsIdRoute =
-  LangAuthenticatedAdminImportsIdRouteImport.update({
-    id: '/$id',
-    path: '/$id',
-    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
+const LangAuthenticatedAdminSettingsRoute =
+  LangAuthenticatedAdminSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminReviewsRoute =
+  LangAuthenticatedAdminReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminReportsRoute =
+  LangAuthenticatedAdminReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminReplyModerationRoute =
+  LangAuthenticatedAdminReplyModerationRouteImport.update({
+    id: '/reply-moderation',
+    path: '/reply-moderation',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminOwnershipClaimsRoute =
+  LangAuthenticatedAdminOwnershipClaimsRouteImport.update({
+    id: '/ownership-claims',
+    path: '/ownership-claims',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminOnboardingRoute =
+  LangAuthenticatedAdminOnboardingRouteImport.update({
+    id: '/onboarding',
+    path: '/onboarding',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminImportsRoute =
+  LangAuthenticatedAdminImportsRouteImport.update({
+    id: '/imports',
+    path: '/imports',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminImagesRoute =
+  LangAuthenticatedAdminImagesRouteImport.update({
+    id: '/images',
+    path: '/images',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCitiesRoute =
+  LangAuthenticatedAdminCitiesRouteImport.update({
+    id: '/cities',
+    path: '/cities',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminChangeRequestsRoute =
+  LangAuthenticatedAdminChangeRequestsRouteImport.update({
+    id: '/change-requests',
+    path: '/change-requests',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCategoryMappingsRoute =
+  LangAuthenticatedAdminCategoryMappingsRouteImport.update({
+    id: '/category-mappings',
+    path: '/category-mappings',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminCategoriesRoute =
+  LangAuthenticatedAdminCategoriesRouteImport.update({
+    id: '/categories',
+    path: '/categories',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminBusinessesRoute =
+  LangAuthenticatedAdminBusinessesRouteImport.update({
+    id: '/businesses',
+    path: '/businesses',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAdminAuditLogsRoute =
+  LangAuthenticatedAdminAuditLogsRouteImport.update({
+    id: '/audit-logs',
+    path: '/audit-logs',
+    getParentRoute: () => LangAuthenticatedAdminRoute,
+  } as any)
+const LangAuthenticatedAccountSettingsRoute =
+  LangAuthenticatedAccountSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
+    getParentRoute: () => LangAuthenticatedAccountRoute,
+  } as any)
+const LangAuthenticatedAccountNotificationsRoute =
+  LangAuthenticatedAccountNotificationsRouteImport.update({
+    id: '/notifications',
+    path: '/notifications',
+    getParentRoute: () => LangAuthenticatedAccountRoute,
+  } as any)
+const LangCitySlugDistrictSlugCategorySlugRoute =
+  LangCitySlugDistrictSlugCategorySlugRouteImport.update({
+    id: '/$citySlug/$districtSlug/$categorySlug',
+    path: '/$citySlug/$districtSlug/$categorySlug',
+    getParentRoute: () => LangRoute,
   } as any)
 const LangAuthenticatedOwnerBusinessIdIndexRoute =
   LangAuthenticatedOwnerBusinessIdIndexRouteImport.update({
@@ -308,40 +284,22 @@ const LangAuthenticatedOwnerBusinessIdIndexRoute =
     path: '/',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
-const LangAuthenticatedOwnerBusinessIdAttributesRoute =
-  LangAuthenticatedOwnerBusinessIdAttributesRouteImport.update({
-    id: '/attributes',
-    path: '/attributes',
-    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+const LangAuthenticatedAdminImportsIndexRoute =
+  LangAuthenticatedAdminImportsIndexRouteImport.update({
+    id: '/',
+    path: '/',
+    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
   } as any)
-const LangAuthenticatedOwnerBusinessIdHoursRoute =
-  LangAuthenticatedOwnerBusinessIdHoursRouteImport.update({
-    id: '/hours',
-    path: '/hours',
-    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+const LangAuthenticatedOwnerTeamInviteInvitationIdRoute =
+  LangAuthenticatedOwnerTeamInviteInvitationIdRouteImport.update({
+    id: '/team-invite/$invitationId',
+    path: '/team-invite/$invitationId',
+    getParentRoute: () => LangAuthenticatedOwnerRoute,
   } as any)
-const LangAuthenticatedOwnerBusinessIdImagesRoute =
-  LangAuthenticatedOwnerBusinessIdImagesRouteImport.update({
-    id: '/images',
-    path: '/images',
-    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
-  } as any)
-const LangAuthenticatedOwnerBusinessIdProfileRoute =
-  LangAuthenticatedOwnerBusinessIdProfileRouteImport.update({
-    id: '/profile',
-    path: '/profile',
-    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
-  } as any)
-const LangAuthenticatedOwnerBusinessIdReviewsRoute =
-  LangAuthenticatedOwnerBusinessIdReviewsRouteImport.update({
-    id: '/reviews',
-    path: '/reviews',
-    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
-  } as any)
-const LangAuthenticatedOwnerBusinessIdServicesRoute =
-  LangAuthenticatedOwnerBusinessIdServicesRouteImport.update({
-    id: '/services',
-    path: '/services',
+const LangAuthenticatedOwnerBusinessIdTranslationsRoute =
+  LangAuthenticatedOwnerBusinessIdTranslationsRouteImport.update({
+    id: '/translations',
+    path: '/translations',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
 const LangAuthenticatedOwnerBusinessIdTeamRoute =
@@ -350,17 +308,59 @@ const LangAuthenticatedOwnerBusinessIdTeamRoute =
     path: '/team',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
-const LangAuthenticatedOwnerBusinessIdTranslationsRoute =
-  LangAuthenticatedOwnerBusinessIdTranslationsRouteImport.update({
-    id: '/translations',
-    path: '/translations',
+const LangAuthenticatedOwnerBusinessIdServicesRoute =
+  LangAuthenticatedOwnerBusinessIdServicesRouteImport.update({
+    id: '/services',
+    path: '/services',
     getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
   } as any)
-const LangAuthenticatedOwnerTeamInviteInvitationIdRoute =
-  LangAuthenticatedOwnerTeamInviteInvitationIdRouteImport.update({
-    id: '/team-invite/$invitationId',
-    path: '/team-invite/$invitationId',
-    getParentRoute: () => LangAuthenticatedOwnerRoute,
+const LangAuthenticatedOwnerBusinessIdReviewsRoute =
+  LangAuthenticatedOwnerBusinessIdReviewsRouteImport.update({
+    id: '/reviews',
+    path: '/reviews',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdProfileRoute =
+  LangAuthenticatedOwnerBusinessIdProfileRouteImport.update({
+    id: '/profile',
+    path: '/profile',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdImagesRoute =
+  LangAuthenticatedOwnerBusinessIdImagesRouteImport.update({
+    id: '/images',
+    path: '/images',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdHoursRoute =
+  LangAuthenticatedOwnerBusinessIdHoursRouteImport.update({
+    id: '/hours',
+    path: '/hours',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedOwnerBusinessIdAttributesRoute =
+  LangAuthenticatedOwnerBusinessIdAttributesRouteImport.update({
+    id: '/attributes',
+    path: '/attributes',
+    getParentRoute: () => LangAuthenticatedOwnerBusinessIdRoute,
+  } as any)
+const LangAuthenticatedAdminImportsIdRoute =
+  LangAuthenticatedAdminImportsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminImportsRoute,
+  } as any)
+const LangAuthenticatedAdminChangeRequestsIdRoute =
+  LangAuthenticatedAdminChangeRequestsIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminChangeRequestsRoute,
+  } as any)
+const LangAuthenticatedAdminBusinessesIdRoute =
+  LangAuthenticatedAdminBusinessesIdRouteImport.update({
+    id: '/$id',
+    path: '/$id',
+    getParentRoute: () => LangAuthenticatedAdminBusinessesRoute,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -685,18 +685,18 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
-    '/': {
-      id: '/'
-      path: '/'
-      fullPath: '/'
-      preLoaderRoute: typeof IndexRouteImport
-      parentRoute: typeof rootRouteImport
-    }
     '/$lang': {
       id: '/$lang'
       path: '/$lang'
       fullPath: '/$lang'
       preLoaderRoute: typeof LangRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/': {
+      id: '/'
+      path: '/'
+      fullPath: '/'
+      preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/$lang/': {
@@ -706,18 +706,11 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangIndexRouteImport
       parentRoute: typeof LangRoute
     }
-    '/$lang/$slug': {
-      id: '/$lang/$slug'
-      path: '/$slug'
-      fullPath: '/$lang/$slug'
-      preLoaderRoute: typeof LangSlugRouteImport
-      parentRoute: typeof LangRoute
-    }
-    '/$lang/_authenticated': {
-      id: '/$lang/_authenticated'
-      path: ''
-      fullPath: '/$lang'
-      preLoaderRoute: typeof LangAuthenticatedRouteImport
+    '/$lang/search': {
+      id: '/$lang/search'
+      path: '/search'
+      fullPath: '/$lang/search'
+      preLoaderRoute: typeof LangSearchRouteImport
       parentRoute: typeof LangRoute
     }
     '/$lang/auth': {
@@ -727,25 +720,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthRouteImport
       parentRoute: typeof LangRoute
     }
-    '/$lang/search': {
-      id: '/$lang/search'
-      path: '/search'
-      fullPath: '/$lang/search'
-      preLoaderRoute: typeof LangSearchRouteImport
+    '/$lang/_authenticated': {
+      id: '/$lang/_authenticated'
+      path: ''
+      fullPath: '/$lang'
+      preLoaderRoute: typeof LangAuthenticatedRouteImport
       parentRoute: typeof LangRoute
     }
-    '/$lang/$citySlug/$categorySlug': {
-      id: '/$lang/$citySlug/$categorySlug'
-      path: '/$citySlug/$categorySlug'
-      fullPath: '/$lang/$citySlug/$categorySlug'
-      preLoaderRoute: typeof LangCitySlugCategorySlugRouteImport
+    '/$lang/$slug': {
+      id: '/$lang/$slug'
+      path: '/$slug'
+      fullPath: '/$lang/$slug'
+      preLoaderRoute: typeof LangSlugRouteImport
       parentRoute: typeof LangRoute
     }
-    '/$lang/_authenticated/account': {
-      id: '/$lang/_authenticated/account'
-      path: '/account'
-      fullPath: '/$lang/account'
-      preLoaderRoute: typeof LangAuthenticatedAccountRouteImport
+    '/$lang/place/$slug': {
+      id: '/$lang/place/$slug'
+      path: '/place/$slug'
+      fullPath: '/$lang/place/$slug'
+      preLoaderRoute: typeof LangPlaceSlugRouteImport
+      parentRoute: typeof LangRoute
+    }
+    '/$lang/_authenticated/owner': {
+      id: '/$lang/_authenticated/owner'
+      path: '/owner'
+      fullPath: '/$lang/owner'
+      preLoaderRoute: typeof LangAuthenticatedOwnerRouteImport
       parentRoute: typeof LangAuthenticatedRoute
     }
     '/$lang/_authenticated/admin': {
@@ -755,159 +755,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedAdminRouteImport
       parentRoute: typeof LangAuthenticatedRoute
     }
-    '/$lang/_authenticated/owner': {
-      id: '/$lang/_authenticated/owner'
-      path: '/owner'
-      fullPath: '/$lang/owner'
-      preLoaderRoute: typeof LangAuthenticatedOwnerRouteImport
+    '/$lang/_authenticated/account': {
+      id: '/$lang/_authenticated/account'
+      path: '/account'
+      fullPath: '/$lang/account'
+      preLoaderRoute: typeof LangAuthenticatedAccountRouteImport
       parentRoute: typeof LangAuthenticatedRoute
     }
-    '/$lang/place/$slug': {
-      id: '/$lang/place/$slug'
-      path: '/place/$slug'
-      fullPath: '/$lang/place/$slug'
-      preLoaderRoute: typeof LangPlaceSlugRouteImport
+    '/$lang/$citySlug/$categorySlug': {
+      id: '/$lang/$citySlug/$categorySlug'
+      path: '/$citySlug/$categorySlug'
+      fullPath: '/$lang/$citySlug/$categorySlug'
+      preLoaderRoute: typeof LangCitySlugCategorySlugRouteImport
       parentRoute: typeof LangRoute
-    }
-    '/$lang/$citySlug/$districtSlug/$categorySlug': {
-      id: '/$lang/$citySlug/$districtSlug/$categorySlug'
-      path: '/$citySlug/$districtSlug/$categorySlug'
-      fullPath: '/$lang/$citySlug/$districtSlug/$categorySlug'
-      preLoaderRoute: typeof LangCitySlugDistrictSlugCategorySlugRouteImport
-      parentRoute: typeof LangRoute
-    }
-    '/$lang/_authenticated/account/notifications': {
-      id: '/$lang/_authenticated/account/notifications'
-      path: '/notifications'
-      fullPath: '/$lang/account/notifications'
-      preLoaderRoute: typeof LangAuthenticatedAccountNotificationsRouteImport
-      parentRoute: typeof LangAuthenticatedAccountRoute
-    }
-    '/$lang/_authenticated/account/settings': {
-      id: '/$lang/_authenticated/account/settings'
-      path: '/settings'
-      fullPath: '/$lang/account/settings'
-      preLoaderRoute: typeof LangAuthenticatedAccountSettingsRouteImport
-      parentRoute: typeof LangAuthenticatedAccountRoute
-    }
-    '/$lang/_authenticated/admin/': {
-      id: '/$lang/_authenticated/admin/'
-      path: '/'
-      fullPath: '/$lang/admin/'
-      preLoaderRoute: typeof LangAuthenticatedAdminIndexRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/audit-logs': {
-      id: '/$lang/_authenticated/admin/audit-logs'
-      path: '/audit-logs'
-      fullPath: '/$lang/admin/audit-logs'
-      preLoaderRoute: typeof LangAuthenticatedAdminAuditLogsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/businesses': {
-      id: '/$lang/_authenticated/admin/businesses'
-      path: '/businesses'
-      fullPath: '/$lang/admin/businesses'
-      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/categories': {
-      id: '/$lang/_authenticated/admin/categories'
-      path: '/categories'
-      fullPath: '/$lang/admin/categories'
-      preLoaderRoute: typeof LangAuthenticatedAdminCategoriesRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/category-mappings': {
-      id: '/$lang/_authenticated/admin/category-mappings'
-      path: '/category-mappings'
-      fullPath: '/$lang/admin/category-mappings'
-      preLoaderRoute: typeof LangAuthenticatedAdminCategoryMappingsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/change-requests': {
-      id: '/$lang/_authenticated/admin/change-requests'
-      path: '/change-requests'
-      fullPath: '/$lang/admin/change-requests'
-      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/cities': {
-      id: '/$lang/_authenticated/admin/cities'
-      path: '/cities'
-      fullPath: '/$lang/admin/cities'
-      preLoaderRoute: typeof LangAuthenticatedAdminCitiesRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/images': {
-      id: '/$lang/_authenticated/admin/images'
-      path: '/images'
-      fullPath: '/$lang/admin/images'
-      preLoaderRoute: typeof LangAuthenticatedAdminImagesRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/imports': {
-      id: '/$lang/_authenticated/admin/imports'
-      path: '/imports'
-      fullPath: '/$lang/admin/imports'
-      preLoaderRoute: typeof LangAuthenticatedAdminImportsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/onboarding': {
-      id: '/$lang/_authenticated/admin/onboarding'
-      path: '/onboarding'
-      fullPath: '/$lang/admin/onboarding'
-      preLoaderRoute: typeof LangAuthenticatedAdminOnboardingRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/ownership-claims': {
-      id: '/$lang/_authenticated/admin/ownership-claims'
-      path: '/ownership-claims'
-      fullPath: '/$lang/admin/ownership-claims'
-      preLoaderRoute: typeof LangAuthenticatedAdminOwnershipClaimsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/reply-moderation': {
-      id: '/$lang/_authenticated/admin/reply-moderation'
-      path: '/reply-moderation'
-      fullPath: '/$lang/admin/reply-moderation'
-      preLoaderRoute: typeof LangAuthenticatedAdminReplyModerationRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/reports': {
-      id: '/$lang/_authenticated/admin/reports'
-      path: '/reports'
-      fullPath: '/$lang/admin/reports'
-      preLoaderRoute: typeof LangAuthenticatedAdminReportsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/reviews': {
-      id: '/$lang/_authenticated/admin/reviews'
-      path: '/reviews'
-      fullPath: '/$lang/admin/reviews'
-      preLoaderRoute: typeof LangAuthenticatedAdminReviewsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/settings': {
-      id: '/$lang/_authenticated/admin/settings'
-      path: '/settings'
-      fullPath: '/$lang/admin/settings'
-      preLoaderRoute: typeof LangAuthenticatedAdminSettingsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/translations': {
-      id: '/$lang/_authenticated/admin/translations'
-      path: '/translations'
-      fullPath: '/$lang/admin/translations'
-      preLoaderRoute: typeof LangAuthenticatedAdminTranslationsRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
-    }
-    '/$lang/_authenticated/admin/users': {
-      id: '/$lang/_authenticated/admin/users'
-      path: '/users'
-      fullPath: '/$lang/admin/users'
-      preLoaderRoute: typeof LangAuthenticatedAdminUsersRouteImport
-      parentRoute: typeof LangAuthenticatedAdminRoute
     }
     '/$lang/_authenticated/owner/': {
       id: '/$lang/_authenticated/owner/'
@@ -916,18 +776,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerIndexRouteImport
       parentRoute: typeof LangAuthenticatedOwnerRoute
     }
-    '/$lang/_authenticated/owner/$businessId': {
-      id: '/$lang/_authenticated/owner/$businessId'
-      path: '/$businessId'
-      fullPath: '/$lang/owner/$businessId'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerRoute
+    '/$lang/_authenticated/admin/': {
+      id: '/$lang/_authenticated/admin/'
+      path: '/'
+      fullPath: '/$lang/admin/'
+      preLoaderRoute: typeof LangAuthenticatedAdminIndexRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
     }
-    '/$lang/_authenticated/owner/claim': {
-      id: '/$lang/_authenticated/owner/claim'
-      path: '/claim'
-      fullPath: '/$lang/owner/claim'
-      preLoaderRoute: typeof LangAuthenticatedOwnerClaimRouteImport
+    '/api/public/hooks/image-tick': {
+      id: '/api/public/hooks/image-tick'
+      path: '/api/public/hooks/image-tick'
+      fullPath: '/api/public/hooks/image-tick'
+      preLoaderRoute: typeof ApiPublicHooksImageTickRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/$lang/_authenticated/owner/onboarding': {
+      id: '/$lang/_authenticated/owner/onboarding'
+      path: '/onboarding'
+      fullPath: '/$lang/owner/onboarding'
+      preLoaderRoute: typeof LangAuthenticatedOwnerOnboardingRouteImport
       parentRoute: typeof LangAuthenticatedOwnerRoute
     }
     '/$lang/_authenticated/owner/notifications': {
@@ -937,47 +804,152 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerNotificationsRouteImport
       parentRoute: typeof LangAuthenticatedOwnerRoute
     }
-    '/$lang/_authenticated/owner/onboarding': {
-      id: '/$lang/_authenticated/owner/onboarding'
-      path: '/onboarding'
-      fullPath: '/$lang/owner/onboarding'
-      preLoaderRoute: typeof LangAuthenticatedOwnerOnboardingRouteImport
+    '/$lang/_authenticated/owner/claim': {
+      id: '/$lang/_authenticated/owner/claim'
+      path: '/claim'
+      fullPath: '/$lang/owner/claim'
+      preLoaderRoute: typeof LangAuthenticatedOwnerClaimRouteImport
       parentRoute: typeof LangAuthenticatedOwnerRoute
     }
-    '/api/public/hooks/image-tick': {
-      id: '/api/public/hooks/image-tick'
-      path: '/api/public/hooks/image-tick'
-      fullPath: '/api/public/hooks/image-tick'
-      preLoaderRoute: typeof ApiPublicHooksImageTickRouteImport
-      parentRoute: typeof rootRouteImport
+    '/$lang/_authenticated/owner/$businessId': {
+      id: '/$lang/_authenticated/owner/$businessId'
+      path: '/$businessId'
+      fullPath: '/$lang/owner/$businessId'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerRoute
     }
-    '/$lang/_authenticated/admin/businesses/$id': {
-      id: '/$lang/_authenticated/admin/businesses/$id'
-      path: '/$id'
-      fullPath: '/$lang/admin/businesses/$id'
-      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesIdRouteImport
-      parentRoute: typeof LangAuthenticatedAdminBusinessesRoute
+    '/$lang/_authenticated/admin/users': {
+      id: '/$lang/_authenticated/admin/users'
+      path: '/users'
+      fullPath: '/$lang/admin/users'
+      preLoaderRoute: typeof LangAuthenticatedAdminUsersRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
     }
-    '/$lang/_authenticated/admin/change-requests/$id': {
-      id: '/$lang/_authenticated/admin/change-requests/$id'
-      path: '/$id'
-      fullPath: '/$lang/admin/change-requests/$id'
-      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsIdRouteImport
-      parentRoute: typeof LangAuthenticatedAdminChangeRequestsRoute
+    '/$lang/_authenticated/admin/translations': {
+      id: '/$lang/_authenticated/admin/translations'
+      path: '/translations'
+      fullPath: '/$lang/admin/translations'
+      preLoaderRoute: typeof LangAuthenticatedAdminTranslationsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
     }
-    '/$lang/_authenticated/admin/imports/': {
-      id: '/$lang/_authenticated/admin/imports/'
-      path: '/'
-      fullPath: '/$lang/admin/imports/'
-      preLoaderRoute: typeof LangAuthenticatedAdminImportsIndexRouteImport
-      parentRoute: typeof LangAuthenticatedAdminImportsRoute
+    '/$lang/_authenticated/admin/settings': {
+      id: '/$lang/_authenticated/admin/settings'
+      path: '/settings'
+      fullPath: '/$lang/admin/settings'
+      preLoaderRoute: typeof LangAuthenticatedAdminSettingsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
     }
-    '/$lang/_authenticated/admin/imports/$id': {
-      id: '/$lang/_authenticated/admin/imports/$id'
-      path: '/$id'
-      fullPath: '/$lang/admin/imports/$id'
-      preLoaderRoute: typeof LangAuthenticatedAdminImportsIdRouteImport
-      parentRoute: typeof LangAuthenticatedAdminImportsRoute
+    '/$lang/_authenticated/admin/reviews': {
+      id: '/$lang/_authenticated/admin/reviews'
+      path: '/reviews'
+      fullPath: '/$lang/admin/reviews'
+      preLoaderRoute: typeof LangAuthenticatedAdminReviewsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/reports': {
+      id: '/$lang/_authenticated/admin/reports'
+      path: '/reports'
+      fullPath: '/$lang/admin/reports'
+      preLoaderRoute: typeof LangAuthenticatedAdminReportsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/reply-moderation': {
+      id: '/$lang/_authenticated/admin/reply-moderation'
+      path: '/reply-moderation'
+      fullPath: '/$lang/admin/reply-moderation'
+      preLoaderRoute: typeof LangAuthenticatedAdminReplyModerationRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/ownership-claims': {
+      id: '/$lang/_authenticated/admin/ownership-claims'
+      path: '/ownership-claims'
+      fullPath: '/$lang/admin/ownership-claims'
+      preLoaderRoute: typeof LangAuthenticatedAdminOwnershipClaimsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/onboarding': {
+      id: '/$lang/_authenticated/admin/onboarding'
+      path: '/onboarding'
+      fullPath: '/$lang/admin/onboarding'
+      preLoaderRoute: typeof LangAuthenticatedAdminOnboardingRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/imports': {
+      id: '/$lang/_authenticated/admin/imports'
+      path: '/imports'
+      fullPath: '/$lang/admin/imports'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/images': {
+      id: '/$lang/_authenticated/admin/images'
+      path: '/images'
+      fullPath: '/$lang/admin/images'
+      preLoaderRoute: typeof LangAuthenticatedAdminImagesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/cities': {
+      id: '/$lang/_authenticated/admin/cities'
+      path: '/cities'
+      fullPath: '/$lang/admin/cities'
+      preLoaderRoute: typeof LangAuthenticatedAdminCitiesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/change-requests': {
+      id: '/$lang/_authenticated/admin/change-requests'
+      path: '/change-requests'
+      fullPath: '/$lang/admin/change-requests'
+      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/category-mappings': {
+      id: '/$lang/_authenticated/admin/category-mappings'
+      path: '/category-mappings'
+      fullPath: '/$lang/admin/category-mappings'
+      preLoaderRoute: typeof LangAuthenticatedAdminCategoryMappingsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/categories': {
+      id: '/$lang/_authenticated/admin/categories'
+      path: '/categories'
+      fullPath: '/$lang/admin/categories'
+      preLoaderRoute: typeof LangAuthenticatedAdminCategoriesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/businesses': {
+      id: '/$lang/_authenticated/admin/businesses'
+      path: '/businesses'
+      fullPath: '/$lang/admin/businesses'
+      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/admin/audit-logs': {
+      id: '/$lang/_authenticated/admin/audit-logs'
+      path: '/audit-logs'
+      fullPath: '/$lang/admin/audit-logs'
+      preLoaderRoute: typeof LangAuthenticatedAdminAuditLogsRouteImport
+      parentRoute: typeof LangAuthenticatedAdminRoute
+    }
+    '/$lang/_authenticated/account/settings': {
+      id: '/$lang/_authenticated/account/settings'
+      path: '/settings'
+      fullPath: '/$lang/account/settings'
+      preLoaderRoute: typeof LangAuthenticatedAccountSettingsRouteImport
+      parentRoute: typeof LangAuthenticatedAccountRoute
+    }
+    '/$lang/_authenticated/account/notifications': {
+      id: '/$lang/_authenticated/account/notifications'
+      path: '/notifications'
+      fullPath: '/$lang/account/notifications'
+      preLoaderRoute: typeof LangAuthenticatedAccountNotificationsRouteImport
+      parentRoute: typeof LangAuthenticatedAccountRoute
+    }
+    '/$lang/$citySlug/$districtSlug/$categorySlug': {
+      id: '/$lang/$citySlug/$districtSlug/$categorySlug'
+      path: '/$citySlug/$districtSlug/$categorySlug'
+      fullPath: '/$lang/$citySlug/$districtSlug/$categorySlug'
+      preLoaderRoute: typeof LangCitySlugDistrictSlugCategorySlugRouteImport
+      parentRoute: typeof LangRoute
     }
     '/$lang/_authenticated/owner/$businessId/': {
       id: '/$lang/_authenticated/owner/$businessId/'
@@ -986,46 +958,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdIndexRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
-    '/$lang/_authenticated/owner/$businessId/attributes': {
-      id: '/$lang/_authenticated/owner/$businessId/attributes'
-      path: '/attributes'
-      fullPath: '/$lang/owner/$businessId/attributes'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdAttributesRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    '/$lang/_authenticated/admin/imports/': {
+      id: '/$lang/_authenticated/admin/imports/'
+      path: '/'
+      fullPath: '/$lang/admin/imports/'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsIndexRouteImport
+      parentRoute: typeof LangAuthenticatedAdminImportsRoute
     }
-    '/$lang/_authenticated/owner/$businessId/hours': {
-      id: '/$lang/_authenticated/owner/$businessId/hours'
-      path: '/hours'
-      fullPath: '/$lang/owner/$businessId/hours'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdHoursRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    '/$lang/_authenticated/owner/team-invite/$invitationId': {
+      id: '/$lang/_authenticated/owner/team-invite/$invitationId'
+      path: '/team-invite/$invitationId'
+      fullPath: '/$lang/owner/team-invite/$invitationId'
+      preLoaderRoute: typeof LangAuthenticatedOwnerTeamInviteInvitationIdRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerRoute
     }
-    '/$lang/_authenticated/owner/$businessId/images': {
-      id: '/$lang/_authenticated/owner/$businessId/images'
-      path: '/images'
-      fullPath: '/$lang/owner/$businessId/images'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdImagesRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
-    }
-    '/$lang/_authenticated/owner/$businessId/profile': {
-      id: '/$lang/_authenticated/owner/$businessId/profile'
-      path: '/profile'
-      fullPath: '/$lang/owner/$businessId/profile'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdProfileRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
-    }
-    '/$lang/_authenticated/owner/$businessId/reviews': {
-      id: '/$lang/_authenticated/owner/$businessId/reviews'
-      path: '/reviews'
-      fullPath: '/$lang/owner/$businessId/reviews'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdReviewsRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
-    }
-    '/$lang/_authenticated/owner/$businessId/services': {
-      id: '/$lang/_authenticated/owner/$businessId/services'
-      path: '/services'
-      fullPath: '/$lang/owner/$businessId/services'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdServicesRouteImport
+    '/$lang/_authenticated/owner/$businessId/translations': {
+      id: '/$lang/_authenticated/owner/$businessId/translations'
+      path: '/translations'
+      fullPath: '/$lang/owner/$businessId/translations'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdTranslationsRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
     '/$lang/_authenticated/owner/$businessId/team': {
@@ -1035,19 +986,68 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdTeamRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
-    '/$lang/_authenticated/owner/$businessId/translations': {
-      id: '/$lang/_authenticated/owner/$businessId/translations'
-      path: '/translations'
-      fullPath: '/$lang/owner/$businessId/translations'
-      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdTranslationsRouteImport
+    '/$lang/_authenticated/owner/$businessId/services': {
+      id: '/$lang/_authenticated/owner/$businessId/services'
+      path: '/services'
+      fullPath: '/$lang/owner/$businessId/services'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdServicesRouteImport
       parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
     }
-    '/$lang/_authenticated/owner/team-invite/$invitationId': {
-      id: '/$lang/_authenticated/owner/team-invite/$invitationId'
-      path: '/team-invite/$invitationId'
-      fullPath: '/$lang/owner/team-invite/$invitationId'
-      preLoaderRoute: typeof LangAuthenticatedOwnerTeamInviteInvitationIdRouteImport
-      parentRoute: typeof LangAuthenticatedOwnerRoute
+    '/$lang/_authenticated/owner/$businessId/reviews': {
+      id: '/$lang/_authenticated/owner/$businessId/reviews'
+      path: '/reviews'
+      fullPath: '/$lang/owner/$businessId/reviews'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdReviewsRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/profile': {
+      id: '/$lang/_authenticated/owner/$businessId/profile'
+      path: '/profile'
+      fullPath: '/$lang/owner/$businessId/profile'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdProfileRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/images': {
+      id: '/$lang/_authenticated/owner/$businessId/images'
+      path: '/images'
+      fullPath: '/$lang/owner/$businessId/images'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdImagesRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/hours': {
+      id: '/$lang/_authenticated/owner/$businessId/hours'
+      path: '/hours'
+      fullPath: '/$lang/owner/$businessId/hours'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdHoursRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/owner/$businessId/attributes': {
+      id: '/$lang/_authenticated/owner/$businessId/attributes'
+      path: '/attributes'
+      fullPath: '/$lang/owner/$businessId/attributes'
+      preLoaderRoute: typeof LangAuthenticatedOwnerBusinessIdAttributesRouteImport
+      parentRoute: typeof LangAuthenticatedOwnerBusinessIdRoute
+    }
+    '/$lang/_authenticated/admin/imports/$id': {
+      id: '/$lang/_authenticated/admin/imports/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/imports/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminImportsIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminImportsRoute
+    }
+    '/$lang/_authenticated/admin/change-requests/$id': {
+      id: '/$lang/_authenticated/admin/change-requests/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/change-requests/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminChangeRequestsIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminChangeRequestsRoute
+    }
+    '/$lang/_authenticated/admin/businesses/$id': {
+      id: '/$lang/_authenticated/admin/businesses/$id'
+      path: '/$id'
+      fullPath: '/$lang/admin/businesses/$id'
+      preLoaderRoute: typeof LangAuthenticatedAdminBusinessesIdRouteImport
+      parentRoute: typeof LangAuthenticatedAdminBusinessesRoute
     }
   }
 }
