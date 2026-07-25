@@ -126,6 +126,22 @@ const SUGGESTIONS: Record<string, Suggestion> = {
   "images[].width": { targetTable: "business_images", targetColumn: "width", transform: "integer" },
   "images[].height": { targetTable: "business_images", targetColumn: "height", transform: "integer" },
   "images[].categories[]": { targetTable: "business_images", targetColumn: "google_photo_labels", transform: "arrayOfString" },
+  // ----- canonical forms for smart matching -----
+  "latitude": { targetTable: "businesses", targetColumn: "latitude", transform: "number" },
+  "longitude": { targetTable: "businesses", targetColumn: "longitude", transform: "number" },
+  "address": { targetTable: "businesses", targetColumn: "formatted_address", transform: "trim" },
+  "review_count": { targetTable: "businesses", targetColumn: "review_count", transform: "integer" },
+  "google_maps_url": { targetTable: "businesses", targetColumn: "google_maps_url", transform: "url" },
+  // ----- flat image fields (clinic / non-array formats) -----
+  "main_image": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  "image_1": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  "image_2": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  "image_3": { targetTable: "business_images", targetColumn: "source_url", transform: "url" },
+  // ----- import-only semantic hints (NormalizedBusiness property names) -----
+  "state": { targetTable: "businesses", targetColumn: "cityHint", transform: "trim" },
+  "city": { targetTable: "businesses", targetColumn: "districtHint", transform: "trim" },
+  "category_detail": { targetTable: "businesses", targetColumn: "primaryCategorySource", transform: "categoryLookup" },
+  "category_listing": { targetTable: "businesses", targetColumn: "categoriesSource", transform: "categoryLookup" },
 };
 
 /** Paths that MUST resolve to a target — admin cannot ignore them. */
@@ -134,6 +150,66 @@ const REQUIRED_SUGGESTIONS = new Set(
     .filter(([, s]) => s.required)
     .map(([k]) => k),
 );
+
+// -------- smart field-name matching --------
+
+function normalizeFieldName(name: string): string {
+  return name
+    .trim()
+    .replace(/([a-z0-9])([A-Z])/g, "$1_$2")
+    .replace(/([A-Z]+)([A-Z][a-z])/g, "$1_$2")
+    .toLowerCase()
+    .replace(/[\s\-\.]+/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_|_$/g, "");
+}
+
+const NORMALIZED_KEYS = new Map<string, { key: string; suggestion: Suggestion }>();
+for (const [key, suggestion] of Object.entries(SUGGESTIONS)) {
+  const nk = normalizeFieldName(key);
+  if (!NORMALIZED_KEYS.has(nk)) {
+    NORMALIZED_KEYS.set(nk, { key, suggestion });
+  }
+}
+
+const SEMANTIC_ALIASES: Record<string, string> = {
+  // Business name
+  "title": "name",
+  // Place ID variants
+  "google_place_id": "place_id",
+  "google_id": "place_id",
+  // Review count
+  "reviews": "user_ratings_total",
+  "reviews_count": "user_ratings_total",
+  // Rating
+  "review_points": "rating",
+  "review_score": "rating",
+  "stars": "rating",
+  // Address
+  "full_address": "formatted_address",
+  "street_address": "formatted_address",
+  // Coordinates
+  "lat": "latitude",
+  "lng": "longitude",
+  "lon": "longitude",
+  // Contact
+  "page_url": "google_maps_url",
+  "phone_number": "phone",
+  "telephone": "phone",
+  // Image collections (non‑array)
+  "image_urls": "main_image",
+  "imageurls": "main_image",
+};
+
+/** Normalized names that are too generic to auto‑map in layers 2‑3. */
+const AMBIGUOUS_FIELDS = new Set([
+  "id",
+  "status",
+  "type",
+  "category",
+  "location",
+  "url",
+]);
 
 interface Accumulator {
   occurrence: number;
@@ -257,7 +333,36 @@ export function suggestFieldMapping(schema: DetectedSchema): MappingRow[] {
   const rows: MappingRow[] = [];
   const seenRequired = new Set<string>();
   for (const f of schema.fields) {
-    const s = SUGGESTIONS[f.sourcePath];
+    const isContainer = f.detectedType === "object" || f.detectedType === "array";
+
+    // Layer 1 — exact match (highest confidence)
+    let s: Suggestion | undefined = SUGGESTIONS[f.sourcePath];
+    let reason: string | null = null;
+
+    // Layer 2 — normalized-name match (high confidence)
+    if (!s && !isContainer) {
+      const normalized = normalizeFieldName(f.sourcePath);
+      if (!AMBIGUOUS_FIELDS.has(normalized)) {
+        const entry = NORMALIZED_KEYS.get(normalized);
+        if (entry) {
+          s = entry.suggestion;
+          reason = "normalized alias";
+        }
+      }
+    }
+
+    // Layer 3 — semantic alias match (medium confidence)
+    if (!s && !isContainer) {
+      const normalized = normalizeFieldName(f.sourcePath);
+      if (!AMBIGUOUS_FIELDS.has(normalized)) {
+        const canonicalKey = SEMANTIC_ALIASES[normalized];
+        if (canonicalKey) {
+          s = SUGGESTIONS[canonicalKey];
+          reason = "semantic alias";
+        }
+      }
+    }
+
     if (s) {
       if (s.required) seenRequired.add(f.sourcePath);
       rows.push({
@@ -267,12 +372,9 @@ export function suggestFieldMapping(schema: DetectedSchema): MappingRow[] {
         transform: s.transform,
         status: "mapped",
         required: !!s.required,
-        reason: null,
+        reason: reason ?? (f.sourcePath in SUGGESTIONS ? "exact match" : reason),
       });
     } else {
-      // container fields (`opening_hours`, `reviews`, `photos`) are structural
-      const isContainer =
-        f.detectedType === "object" || f.detectedType === "array";
       rows.push({
         sourcePath: f.sourcePath,
         targetTable: null,
