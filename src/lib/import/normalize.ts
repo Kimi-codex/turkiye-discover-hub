@@ -409,7 +409,8 @@ export function normalizeAddress(raw: Record<string, unknown>): {
 
 export function normalizeGooglePlace(raw: Record<string, unknown>): NormalizedBusiness | null {
   const placeId = String(raw.place_id ?? raw.placeId ?? "").trim();
-  if (!placeId) return null;
+  const clinicPlaceId = String(raw.Place_id ?? "").trim();
+  const clinicName = String(raw.Title ?? "").trim();
   const name = String(raw.name ?? "").trim();
   const { lat, lng } = normalizeCoordinates(raw);
   const { primary, all } = normalizeCategory(raw);
@@ -433,8 +434,6 @@ export function normalizeGooglePlace(raw: Record<string, unknown>): NormalizedBu
   // Clinic format field handling as narrow fallbacks for existing Google Places structure
   // Preserve all existing Google Places behavior, only fill missing/null/empty clinic fields
 
-  const clinicPlaceId = String(raw.Place_id ?? "").trim();
-  const clinicName = String(raw.Title ?? "").trim();
   const clinicAddress = String(raw.Address ?? "").trim();
   const clinicState = String(raw.State ?? "").trim();
   const clinicCity = String(raw.City ?? "").trim();
