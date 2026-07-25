@@ -1,4 +1,4 @@
-import { supabaseAdmin } from "@/integrations/supabase/client.server";
+import { supabase } from "@/integrations/supabase/client";
 import type {
   Business,
   BusinessImage,
@@ -205,19 +205,62 @@ function mapBusiness(row: any): Business {
 }
 
 async function idForSlug(table: "categories" | "cities" | "districts", slug: string): Promise<string | null> {
-  const { data, error } = await supabaseAdmin.from(table).select("id").eq("slug", slug).maybeSingle();
+  const { data, error } = await supabase.from(table).select("id").eq("slug", slug).maybeSingle();
   if (error) throw error;
   return data?.id ?? null;
 }
 
-async function businessIdsForCategory(categoryId: string): Promise<string[]> {
-  const { data, error } = await supabaseAdmin
+/**
+ * Returns all published business UUIDs matching a category via EITHER
+ * primary_category_id OR business_category_links.
+ *
+ * Uses the `search_business_ids_for_category` RPC when available (robust
+ * against URL length limits). Falls back to a direct query + id.in.(...)
+ * for small result sets (URL-safe) or primary_category_id.eq for large
+ * sets (pragmatic).
+ */
+async function idsMatchingCategory(categoryId: string): Promise<string[]> {
+  // 1. Try the RPC (clean; has no URL serialisation).
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase as any).rpc(
+      "search_business_ids_for_category",
+      { p_category_id: categoryId },
+    );
+    if (!error && Array.isArray(data)) {
+      const ids = (data as Array<{ business_id: string }>)
+        .map((r) => r.business_id)
+        .filter(Boolean);
+      if (ids.length > 0) return ids;
+    }
+  } catch {
+    // RPC does not exist yet (migration not applied) – fall through.
+  }
+
+  // 2. Fallback: query business_category_links directly for linked IDs.
+  const { data: links, error: linkErr } = await supabase
     .from("business_category_links")
     .select("business_id")
     .eq("category_id", categoryId)
     .range(0, 49999);
-  if (error) throw error;
-  return [...new Set((data ?? []).map((row) => row.business_id).filter(Boolean))];
+  if (linkErr) throw linkErr;
+  const linkedIds = [...new Set((links ?? []).map((row) => row.business_id).filter(Boolean))];
+
+  if (linkedIds.length === 0) return [];
+
+  // Estimate whether URL is safe with all IDs in an id.in.(...).
+  const urlEstimate = `id.in.(${linkedIds.join(",")})`.length;
+  if (urlEstimate < 4000) return linkedIds;
+
+  // 3. Too many IDs for a URL – the RPC is the intended path.
+  //    Fall back to primary_category_id.eq only (accepting that
+  //    linked-only businesses may be missed until the RPC migration
+  //    is applied).
+  console.warn(
+    `[search] ${linkedIds.length} IDs for category ${categoryId} exceeds ` +
+      `URL safety threshold – falling back to primary_category_id.eq only`,
+  );
+  return [];
 }
 
 function escapeLike(input: string): string {
@@ -230,7 +273,7 @@ export async function searchPublishedBusinesses(filters: Partial<SearchFilters>)
   const page = normalized.page;
   const { column, ascending } = sortColumn(normalized.sort);
 
-  let query = supabaseAdmin
+  let query = supabase
     .from("businesses")
     .select(BUSINESS_SELECT, { count: "exact" })
     .eq("status", "published");
@@ -255,11 +298,11 @@ export async function searchPublishedBusinesses(filters: Partial<SearchFilters>)
   if (normalized.category) {
     const categoryId = await idForSlug("categories", normalized.category);
     if (!categoryId) return { items: [], total: 0, page, pageSize };
-    const linkedBusinessIds = await businessIdsForCategory(categoryId);
-    if (linkedBusinessIds.length === 0) {
+    const matchingIds = await idsMatchingCategory(categoryId);
+    if (matchingIds.length === 0) {
       query = query.eq("primary_category_id", categoryId);
     } else {
-      query = query.or(`primary_category_id.eq.${categoryId},id.in.(${linkedBusinessIds.join(",")})`);
+      query = query.in("id", matchingIds);
     }
   }
 
