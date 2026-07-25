@@ -121,6 +121,7 @@ export function useAccountState(): AccountState {
   const profileQ = useQuery({
     queryKey: ["account:profile", uid],
     enabled,
+    staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("profiles")
@@ -135,6 +136,7 @@ export function useAccountState(): AccountState {
   const favoritesQ = useQuery({
     queryKey: ["favorites", uid],
     enabled,
+    staleTime: 30_000,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("favorites")
@@ -143,22 +145,23 @@ export function useAccountState(): AccountState {
         )
         .order("created_at", { ascending: false });
       if (error) throw error;
-      return (data ?? []) as FavoriteRow[];
+      return (data ?? []) as unknown as FavoriteRow[];
     },
   });
 
   const notificationsQ = useQuery({
     queryKey: ["user:notifications:summary", uid],
     enabled,
+    staleTime: 10_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("user_notifications")
         .select("id, title_key, message_key, message_params, related_business_id, related_submission_id, read_at, created_at")
         .eq("user_id", uid!)
         .order("created_at", { ascending: false })
         .limit(5);
       if (error) throw error;
-      const rows = (data ?? []) as NotificationRow[];
+      const rows = (data ?? []) as unknown as NotificationRow[];
       return { rows, unread: rows.filter((r) => !r.read_at).length };
     },
   });
@@ -166,36 +169,39 @@ export function useAccountState(): AccountState {
   const onboardingQ = useQuery({
     queryKey: ["user:onboarding:summary", uid],
     enabled,
+    staleTime: 30_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("business_onboarding_submissions")
         .select("id, submission_type, status, approved_business_id, updated_at, created_at, events:business_onboarding_events(id, event_type, message_key, message_params, created_at)")
         .eq("applicant_id", uid!)
         .order("updated_at", { ascending: false })
         .limit(3);
       if (error) throw error;
-      return (data ?? []) as OnboardingRow[];
+      return (data ?? []) as unknown as OnboardingRow[];
     },
   });
 
   const membershipsQ = useQuery({
     queryKey: ["user:business-memberships", uid],
     enabled,
+    staleTime: 60_000,
     queryFn: async () => {
-      const { data, error } = await (supabase as any)
+      const { data, error } = await supabase
         .from("business_members")
         .select("role, status, businesses:business_id(id, name, slug)")
         .eq("user_id", uid!)
         .eq("status", "active")
         .in("role", ["owner", "manager"]);
       if (error) return [];
-      return (data ?? []) as MemberRow[];
+      return (data ?? []) as unknown as MemberRow[];
     },
   });
 
   const adminQ = useQuery({
     queryKey: ["account:admin", uid],
     enabled,
+    staleTime: 60_000,
     queryFn: async () => {
       const { data } = await supabase
         .from("user_roles")

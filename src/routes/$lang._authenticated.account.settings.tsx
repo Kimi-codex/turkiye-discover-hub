@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { useMutation } from "@tanstack/react-query";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { ArrowLeft, BadgeCheck, CircleAlert, Loader2, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -24,25 +24,46 @@ function AccountSettingsPage() {
   const { user } = useAuth();
   const t = useT();
   const { locale } = useLocaleContext();
+  const qc = useQueryClient();
   const [name, setName] = useState("");
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState<Locale>(locale);
+  const [initial, setInitial] = useState<{ name: string; phone: string; language: Locale } | null>(null);
 
   useEffect(() => {
     if (user?.user_metadata) {
-      setName(user.user_metadata.full_name ?? "");
-      setPhone(user.user_metadata.phone ?? "");
-      setLanguage((user.user_metadata.preferred_language as Locale) ?? locale);
+      const n = user.user_metadata.full_name ?? "";
+      const p = user.user_metadata.phone ?? "";
+      const l = (user.user_metadata.preferred_language as Locale) ?? locale;
+      setName(n);
+      setPhone(p);
+      setLanguage(l);
+      setInitial({ name: n, phone: p, language: l });
     }
   }, [user, locale]);
 
   const saveMutation = useMutation({
     mutationFn: async (data: { full_name: string; phone: string; preferred_language: Locale }) => {
-      const { error } = await supabase.auth.updateUser({ data });
-      if (error) throw error;
+      if (!user?.id) throw new Error("Not authenticated");
+      // 1. Persist to public.profiles so useAccountState (and the rest of the
+      //    app) reads the fresh values.
+      const { error: profileErr } = await supabase
+        .from("profiles")
+        .update({
+          full_name: data.full_name,
+          phone: data.phone,
+          preferred_language: data.preferred_language,
+        })
+        .eq("id", user.id);
+      if (profileErr) throw profileErr;
+      // 2. Mirror to auth.user_metadata so `user` object stays in sync.
+      const { error: authErr } = await supabase.auth.updateUser({ data });
+      if (authErr) throw authErr;
     },
     onSuccess: () => {
       toast.success(t("account.settings.saved"));
+      setInitial({ name, phone, language });
+      qc.invalidateQueries({ queryKey: ["account:profile"] });
     },
     onError: (err) => {
       toast.error(err instanceof Error ? err.message : t("account.settings.error"));
@@ -55,10 +76,9 @@ function AccountSettingsPage() {
   };
 
   const emailVerified = user?.email_confirmed_at || user?.confirmed_at;
-  const hasChanges =
-    name !== (user?.user_metadata?.full_name ?? "") ||
-    phone !== (user?.user_metadata?.phone ?? "") ||
-    language !== (user?.user_metadata?.preferred_language ?? locale);
+  const hasChanges = initial
+    ? name !== initial.name || phone !== initial.phone || language !== initial.language
+    : false;
 
   return (
     <div className="mx-auto max-w-2xl px-4 py-10">
