@@ -430,37 +430,98 @@ export function normalizeGooglePlace(raw: Record<string, unknown>): NormalizedBu
     (typeof raw.scraped_at === "string" && raw.scraped_at) ||
     null;
 
+  // Clinic format field handling as narrow fallbacks for existing Google Places structure
+  // Preserve all existing Google Places behavior, only fill missing/null/empty clinic fields
+
+  const clinicPlaceId = String(raw.Place_id ?? "").trim();
+  const clinicName = String(raw.Title ?? "").trim();
+  const clinicAddress = String(raw.Address ?? "").trim();
+  const clinicState = String(raw.State ?? "").trim();
+  const clinicCity = String(raw.City ?? "").trim();
+  const clinicLatitude = pickNumber(raw.Latitude);
+  const clinicLongitude = pickNumber(raw.Longitude);
+  const clinicPhone = String(raw.Phone ?? "").trim();
+  const clinicWebsite = String(raw.Website ?? "").trim();
+  const clinicPageUrl = String(raw.Page_URL ?? "").trim();
+  const clinicDescription = String(raw.Description ?? "").trim();
+  const clinicReviews = String(raw.Reviews ?? "").trim();
+  const clinicReviewPoints = String(raw.Review_points ?? "").trim();
+  const clinicPrimaryCategory = String(raw.Category_detail ?? "").trim();
+  const clinicListingCategory = String(raw.Category_listing ?? "").trim();
+
+  const finalPlaceId = placeId || (clinicPlaceId ? (placeId ? placeId : clinicPlaceId) : "");
+  const finalName = name || (clinicName ? (name ? name : clinicName) : "(unnamed)");
+  const finalFormattedAddress = addr.formattedAddress || clinicAddress;
+  const finalRawAddress = addr.rawAddress;
+  const finalCityHint = addr.cityHint || clinicState;
+  const finalDistrictHint = addr.districtHint || clinicCity;
+  const finalLatitude = lat ?? clinicLatitude;
+  const finalLongitude = lng ?? clinicLongitude;
+  const finalPhone = clinicPhone || normalizePhone(raw.formatted_phone_number ?? raw.phone);
+  const finalWebsite = clinicWebsite || normalizeWebsite(raw.website ?? raw.url);
+  const finalGoogleMapsUrl = clinicPageUrl.includes("google.com/maps") ? clinicPageUrl : normalizeWebsite(raw.google_maps_url);
+  const finalDescription = clinicDescription ||
+    (typeof raw.editorial_summary === "object" &&
+      raw.editorial_summary &&
+      typeof (raw.editorial_summary as Record<string, unknown>).overview === "string" &&
+      ((raw.editorial_summary as Record<string, unknown>).overview as string));
+
+  const sanitizedFinalRating = clinicReviewPoints ? parseFloat(clinicReviewPoints) : rating;
+  const sanitizedFinalRatingFinal = sanitizedFinalRating === null || (typeof sanitizedFinalRating === "number" && sanitizedFinalRating >= 0 && sanitizedFinalRating <= 5) ? sanitizedFinalRating : null;
+
+  const parsedClinicReviewCount = parseInt(clinicReviews, 10);
+  const finalReviewCount = clinicReviews
+    ? Math.max(0, Number.isFinite(parsedClinicReviewCount) ? parsedClinicReviewCount : 0)
+    : reviewCount;
+
+  const sanitizedFinalLatitude = typeof finalLatitude === "number" && isFinite(finalLatitude) ? finalLatitude : null;
+  const sanitizedFinalLongitude = typeof finalLongitude === "number" && isFinite(finalLongitude) ? finalLongitude : null;
+
+  if (!finalPlaceId) return null;
+  if (!finalName || finalName === "(unnamed)") return null;
+
+  const rawForImages: Record<string, unknown> = (() => {
+    const hasStandardImageArrays =
+      Array.isArray(raw.photos) || Array.isArray(raw.images) || Array.isArray(raw.imageUrls);
+    if (hasStandardImageArrays) return raw;
+    const clinicUrls = [
+      raw.Main_image,
+      raw.Image_1,
+      raw.Image_2,
+      raw.Image_3,
+    ]
+      .filter(
+        (v): v is string =>
+          typeof v === "string" && v.trim() !== "" && v !== "null" && v !== "None",
+      )
+      .map((url) => url.trim())
+      .filter((url, idx, array) => array.indexOf(url) === idx);
+    if (clinicUrls.length === 0) return raw;
+    return { ...raw, photos: clinicUrls.map((url) => ({ url })) };
+  })();
+
   return {
-    placeId,
-    name: name || "(unnamed)",
+    placeId: finalPlaceId,
+    name: finalName,
     originalLanguage: originalLang,
-    description:
-      (typeof raw.editorial_summary === "object" &&
-        raw.editorial_summary &&
-        typeof (raw.editorial_summary as Record<string, unknown>).overview === "string" &&
-        ((raw.editorial_summary as Record<string, unknown>).overview as string)) ||
-      (typeof raw.description === "string" && raw.description) ||
-      null,
-    primaryCategorySource: primary,
-    categoriesSource: all,
-    cityHint: addr.cityHint,
-    districtHint: addr.districtHint,
-    formattedAddress: addr.formattedAddress,
-    rawAddress: addr.rawAddress,
-    latitude: lat,
-    longitude: lng,
-    phone: normalizePhone(raw.formatted_phone_number ?? raw.phone),
+    description: finalDescription || null,
+    primaryCategorySource: clinicPrimaryCategory || primary,
+    categoriesSource: clinicListingCategory ? [clinicListingCategory] : all,
+    cityHint: finalCityHint,
+    districtHint: finalDistrictHint,
+    formattedAddress: finalFormattedAddress,
+    rawAddress: finalRawAddress,
+    latitude: sanitizedFinalLatitude,
+    longitude: sanitizedFinalLongitude,
+    phone: finalPhone,
     internationalPhone: normalizePhone(raw.international_phone_number),
-    website: normalizeWebsite(raw.website ?? raw.url),
-    googleMapsUrl:
-      (typeof raw.url === "string" && raw.url.includes("google.com/maps") && raw.url) ||
-      (typeof raw.google_maps_url === "string" && raw.google_maps_url) ||
-      null,
-    rating: rating !== null ? Math.max(0, Math.min(5, rating)) : null,
-    reviewCount,
+    website: finalWebsite,
+    googleMapsUrl: finalGoogleMapsUrl,
+    rating: sanitizedFinalRatingFinal,
+    reviewCount: finalReviewCount,
     priceLevel,
     openingHours: normalizeOpeningHours(raw),
-    images: normalizeImages(raw),
+    images: normalizeImages(rawForImages),
     reviews: normalizeReviews(raw),
     popularTimes: (raw.popular_times ?? raw.populartimes ?? null) as unknown,
     sourceUpdatedAt,

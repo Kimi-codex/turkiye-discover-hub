@@ -55,6 +55,16 @@ type Sb = any;
 const CHUNK_SIZE = 50;
 const IMPORTS_BUCKET = "imports";
 
+/**
+ * TEMPORARY TEST IMPORT LIMIT — set to >0 to restrict runImportChunk to N records.
+ * Affects ONLY the execute stage (not analysis, preview, field detection, or Stage 5 mapping).
+ * Remaining records stay untouched; batch is NOT marked complete.
+ *
+ * To disable: set to 0 (or delete/comment this constant) before importing the full file.
+ */
+const TEST_IMPORT_LIMIT =
+  process.env.NODE_ENV === "development" ? 10 : 0;
+
 /** Terminal stages that block destructive actions like delete. */
 const EXECUTED_STAGES = new Set(["execute", "translations", "images", "publish", "completed"]);
 
@@ -1009,6 +1019,30 @@ export const runImportChunk = createServerFn({ method: "POST" })
       });
     }
 
+    // TEMPORARY: test import limit — stop if N records already processed across chunks
+    if (TEST_IMPORT_LIMIT > 0) {
+      const { count: alreadyProcessed } = await supabase
+        .from("import_batch_items")
+        .select("id", { count: "exact", head: true })
+        .eq("import_batch_id", data.id)
+        .in("status", ["inserted", "updated"]);
+      if ((alreadyProcessed ?? 0) >= TEST_IMPORT_LIMIT) {
+        await clearImportLock(supabase, data.id, lockOwner);
+        return {
+          ok: true,
+          processed: 0,
+          inserted: 0,
+          updated: 0,
+          skipped: 0,
+          failed: 0,
+          reviewsWritten: 0,
+          imagesWritten: 0,
+          done: true,
+          testLimitHit: true as const,
+        };
+      }
+    }
+
     // Load next chunk of pending items whose preview_hash still matches.
     const { data: items } = await supabase
       .from("import_batch_items")
@@ -1018,7 +1052,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
       .is("processed_at", null)
       .eq("preview_hash", batch.preview_hash)
       .order("item_index")
-      .limit(CHUNK_SIZE);
+      .limit(TEST_IMPORT_LIMIT > 0 ? Math.min(TEST_IMPORT_LIMIT, CHUNK_SIZE) : CHUNK_SIZE);
 
     if (!items || items.length === 0) {
       // Nothing runnable — either done or stale.
@@ -1081,6 +1115,7 @@ export const runImportChunk = createServerFn({ method: "POST" })
     let reviewsWritten = 0;
     let imagesWritten = 0;
     for (const item of items) {
+      if (TEST_IMPORT_LIMIT > 0 && (inserted + updated + skipped + failed) >= TEST_IMPORT_LIMIT) break;
       const rp = (item.raw_payload as Record<string, unknown> | null) ?? {};
       const normalized = (rp.normalized as NormalizedBusiness | null) ?? null;
       const intent = String(item.intent ?? "insert");
