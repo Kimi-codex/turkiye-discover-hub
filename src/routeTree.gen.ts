@@ -23,6 +23,7 @@ import { Route as LangAuthenticatedOwnerRouteImport } from './routes/$lang._auth
 import { Route as LangPlaceSlugRouteImport } from './routes/$lang.place.$slug'
 import { Route as LangCitySlugDistrictSlugCategorySlugRouteImport } from './routes/$lang.$citySlug.$districtSlug.$categorySlug'
 import { Route as LangAuthenticatedAccountNotificationsRouteImport } from './routes/$lang._authenticated.account.notifications'
+import { Route as LangAuthenticatedAccountSettingsRouteImport } from './routes/$lang._authenticated.account.settings'
 import { Route as LangAuthenticatedAdminIndexRouteImport } from './routes/$lang._authenticated.admin.index'
 import { Route as LangAuthenticatedAdminAuditLogsRouteImport } from './routes/$lang._authenticated.admin.audit-logs'
 import { Route as LangAuthenticatedAdminBusinessesRouteImport } from './routes/$lang._authenticated.admin.businesses'
@@ -132,6 +133,12 @@ const LangAuthenticatedAccountNotificationsRoute =
   LangAuthenticatedAccountNotificationsRouteImport.update({
     id: '/notifications',
     path: '/notifications',
+    getParentRoute: () => LangAuthenticatedAccountRoute,
+  } as any)
+const LangAuthenticatedAccountSettingsRoute =
+  LangAuthenticatedAccountSettingsRouteImport.update({
+    id: '/settings',
+    path: '/settings',
     getParentRoute: () => LangAuthenticatedAccountRoute,
   } as any)
 const LangAuthenticatedAdminIndexRoute =
@@ -370,6 +377,7 @@ export interface FileRoutesByFullPath {
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
   '/$lang/account/notifications': typeof LangAuthenticatedAccountNotificationsRoute
+  '/$lang/account/settings': typeof LangAuthenticatedAccountSettingsRoute
   '/$lang/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
   '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
@@ -419,6 +427,7 @@ export interface FileRoutesByTo {
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
   '/$lang/account/notifications': typeof LangAuthenticatedAccountNotificationsRoute
+  '/$lang/account/settings': typeof LangAuthenticatedAccountSettingsRoute
   '/$lang/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
   '/$lang/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
@@ -471,6 +480,7 @@ export interface FileRoutesById {
   '/$lang/place/$slug': typeof LangPlaceSlugRoute
   '/$lang/$citySlug/$districtSlug/$categorySlug': typeof LangCitySlugDistrictSlugCategorySlugRoute
   '/$lang/_authenticated/account/notifications': typeof LangAuthenticatedAccountNotificationsRoute
+  '/$lang/_authenticated/account/settings': typeof LangAuthenticatedAccountSettingsRoute
   '/$lang/_authenticated/admin/audit-logs': typeof LangAuthenticatedAdminAuditLogsRoute
   '/$lang/_authenticated/admin/businesses': typeof LangAuthenticatedAdminBusinessesRouteWithChildren
   '/$lang/_authenticated/admin/categories': typeof LangAuthenticatedAdminCategoriesRoute
@@ -525,6 +535,7 @@ export interface FileRouteTypes {
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
     | '/$lang/account/notifications'
+    | '/$lang/account/settings'
     | '/$lang/admin/audit-logs'
     | '/$lang/admin/businesses'
     | '/$lang/admin/categories'
@@ -574,6 +585,7 @@ export interface FileRouteTypes {
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
     | '/$lang/account/notifications'
+    | '/$lang/account/settings'
     | '/$lang/admin/audit-logs'
     | '/$lang/admin/businesses'
     | '/$lang/admin/categories'
@@ -625,6 +637,7 @@ export interface FileRouteTypes {
     | '/$lang/place/$slug'
     | '/$lang/$citySlug/$districtSlug/$categorySlug'
     | '/$lang/_authenticated/account/notifications'
+    | '/$lang/_authenticated/account/settings'
     | '/$lang/_authenticated/admin/audit-logs'
     | '/$lang/_authenticated/admin/businesses'
     | '/$lang/_authenticated/admin/categories'
@@ -768,6 +781,13 @@ declare module '@tanstack/react-router' {
       path: '/notifications'
       fullPath: '/$lang/account/notifications'
       preLoaderRoute: typeof LangAuthenticatedAccountNotificationsRouteImport
+      parentRoute: typeof LangAuthenticatedAccountRoute
+    }
+    '/$lang/_authenticated/account/settings': {
+      id: '/$lang/_authenticated/account/settings'
+      path: '/settings'
+      fullPath: '/$lang/account/settings'
+      preLoaderRoute: typeof LangAuthenticatedAccountSettingsRouteImport
       parentRoute: typeof LangAuthenticatedAccountRoute
     }
     '/$lang/_authenticated/admin/': {
@@ -1034,12 +1054,15 @@ declare module '@tanstack/react-router' {
 
 interface LangAuthenticatedAccountRouteChildren {
   LangAuthenticatedAccountNotificationsRoute: typeof LangAuthenticatedAccountNotificationsRoute
+  LangAuthenticatedAccountSettingsRoute: typeof LangAuthenticatedAccountSettingsRoute
 }
 
 const LangAuthenticatedAccountRouteChildren: LangAuthenticatedAccountRouteChildren =
   {
     LangAuthenticatedAccountNotificationsRoute:
       LangAuthenticatedAccountNotificationsRoute,
+    LangAuthenticatedAccountSettingsRoute:
+      LangAuthenticatedAccountSettingsRoute,
   }
 
 const LangAuthenticatedAccountRouteWithChildren =

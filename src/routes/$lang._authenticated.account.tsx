@@ -1,11 +1,12 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Building2, Compass, Settings, UserRound } from "lucide-react";
+import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { Bell, Building2, Compass, Settings, UserRound, Store, ClipboardList, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/hooks/use-auth";
+import { useAccountState } from "@/hooks/use-account-state";
 import { useT, useLocaleContext, type MessageKey } from "@/lib/i18n";
 import { LocaleLink } from "@/components/site/LocaleLink";
 import { getBusinessImageUrl } from "@/lib/images/storage";
@@ -23,79 +24,22 @@ function AccountPage() {
   const t = useT();
   const qc = useQueryClient();
   const navigate = useNavigate();
-
-  const favorites = useQuery({
-    queryKey: ["favorites", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("favorites")
-        .select(
-          "business_id, created_at, businesses:business_id(id, slug, name, formatted_address, rating, review_count, business_images(source_url, r2_url, is_cover, sort_order))",
-        )
-        .order("created_at", { ascending: false });
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
+  const {
+    state,
+    profile,
+    onboarding,
+    memberships,
+    notifications,
+    favorites,
+    queries,
+  } = useAccountState();
 
   const removeFav = useMutation({
     mutationFn: async (businessId: string) => {
-      const { error } = await supabase
-        .from("favorites")
-        .delete()
-        .eq("business_id", businessId);
+      const { error } = await supabase.from("favorites").delete().eq("business_id", businessId);
       if (error) throw error;
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ["favorites"] }),
-  });
-
-  const notifications = useQuery({
-    queryKey: ["user:notifications:summary", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("user_notifications")
-        .select("id, title_key, message_key, message_params, related_business_id, related_submission_id, read_at, created_at")
-        .eq("user_id", user!.id)
-        .order("created_at", { ascending: false })
-        .limit(5);
-      if (error) throw error;
-      return {
-        rows: data ?? [],
-        unread: (data ?? []).filter((row: { read_at: string | null }) => !row.read_at).length,
-      };
-    },
-  });
-
-  const onboarding = useQuery({
-    queryKey: ["user:onboarding:summary", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("business_onboarding_submissions")
-        .select("id, submission_type, status, approved_business_id, updated_at, created_at, events:business_onboarding_events(id, event_type, message_key, message_params, created_at)")
-        .eq("applicant_id", user!.id)
-        .order("updated_at", { ascending: false })
-        .limit(3);
-      if (error) throw error;
-      return data ?? [];
-    },
-  });
-
-  const memberships = useQuery({
-    queryKey: ["user:business-memberships", user?.id],
-    enabled: !!user,
-    queryFn: async () => {
-      const { data, error } = await (supabase as any)
-        .from("business_members")
-        .select("role, status, businesses:business_id(id, name, slug)")
-        .eq("user_id", user!.id)
-        .eq("status", "active")
-        .in("role", ["owner", "manager"]);
-      if (error) return [];
-      return data ?? [];
-    },
   });
 
   async function handleSignOut() {
@@ -106,12 +50,24 @@ function AccountPage() {
     navigate({ to: `/${locale}`, replace: true });
   }
 
+  function statusBadge(status: string) {
+    return <Badge variant="outline">{t(`onboarding.status.${status}` as MessageKey)}</Badge>;
+  }
+
+  const isApplicant = state === "business_applicant";
+  const isOwner = state === "owner" || state === "manager";
+  const isExplorer = state === "explorer";
+  const isProspect = state === "business_prospect";
+
   return (
     <div className="mx-auto max-w-4xl px-4 py-10">
       <div className="flex items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold tracking-tight">{t("account.title")}</h1>
           <p className="mt-1 text-sm text-muted-foreground">{user?.email}</p>
+          {state === "admin" && (
+            <Badge variant="default" className="mt-1">{t("header.admin")}</Badge>
+          )}
         </div>
         <Button variant="outline" onClick={handleSignOut}>
           {t("auth.signout")}
@@ -129,20 +85,27 @@ function AccountPage() {
               <dt className="text-muted-foreground">{t("auth.email")}</dt>
               <dd className="truncate">{user?.email}</dd>
             </div>
-            <div className="flex justify-between gap-4">
-              <dt className="text-muted-foreground">{t("account.business_access")}</dt>
-              <dd>{memberships.data?.length ?? 0}</dd>
-            </div>
+            {isOwner && (
+              <div className="flex justify-between gap-4">
+                <dt className="text-muted-foreground">{t("account.business_access")}</dt>
+                <dd>{memberships.length}</dd>
+              </div>
+            )}
             <div className="flex justify-between gap-4">
               <dt className="text-muted-foreground">{t("nav.favorites")}</dt>
-              <dd>{favorites.data?.length ?? 0}</dd>
+              <dd>{favorites.length}</dd>
             </div>
           </dl>
           <Button asChild variant="outline" size="sm" className="mt-4">
-            <LocaleLink to="/account">
+            <LocaleLink to="/account/settings">
               <Settings className="h-4 w-4" /> {t("account.settings")}
             </LocaleLink>
           </Button>
+          {state === "admin" && (
+            <Button asChild variant="default" size="sm" className="mt-2 ml-2">
+              <LocaleLink to="/admin">{t("header.admin")}</LocaleLink>
+            </Button>
+          )}
         </div>
 
         <div className="rounded-lg border bg-card p-4">
@@ -151,13 +114,15 @@ function AccountPage() {
               <Bell className="h-4 w-4" />
               <h2 className="font-semibold">{t("notifications.title")}</h2>
             </div>
-            {notifications.data?.unread ? <Badge variant="destructive">{notifications.data.unread}</Badge> : null}
+            {notifications.unread ? <Badge variant="destructive">{notifications.unread}</Badge> : null}
           </div>
-          {(notifications.data?.rows ?? []).length === 0 ? (
+          {queries.notifications === "error" ? (
+            <p className="mt-3 text-sm text-destructive">{t("notifications.error")}</p>
+          ) : notifications.rows.length === 0 ? (
             <p className="mt-3 text-sm text-muted-foreground">{t("notifications.empty")}</p>
           ) : (
             <ul className="mt-3 space-y-2 text-sm">
-              {notifications.data!.rows.slice(0, 3).map((n: any) => (
+              {notifications.rows.slice(0, 3).map((n: any) => (
                 <li key={n.id} className="flex items-start justify-between gap-3">
                   <span className={n.read_at ? "text-muted-foreground" : "font-medium"}>
                     {t(n.title_key as MessageKey)}
@@ -172,27 +137,81 @@ function AccountPage() {
           </Button>
         </div>
 
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="h-4 w-4" />
-            <h2 className="font-semibold">{t("account.onboarding_status")}</h2>
-          </div>
-          {(onboarding.data ?? []).length === 0 ? (
-            <p className="mt-3 text-sm text-muted-foreground">{t("account.no_onboarding")}</p>
-          ) : (
+        {isApplicant && (
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="h-4 w-4" />
+              <h2 className="font-semibold">{t("account.application_status")}</h2>
+            </div>
             <ul className="mt-3 space-y-2 text-sm">
-              {onboarding.data!.map((row: any) => (
+              {onboarding.map((row: any) => (
                 <li key={row.id} className="flex items-center justify-between gap-3">
                   <span>{t(`onboarding.type.${row.submission_type}` as MessageKey)}</span>
-                  <Badge variant="outline">{t(`onboarding.status.${row.status}` as MessageKey)}</Badge>
+                  {statusBadge(row.status)}
                 </li>
               ))}
             </ul>
-          )}
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <LocaleLink to="/owner/onboarding">{t("account.add_manage_business")}</LocaleLink>
-          </Button>
-        </div>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <LocaleLink to="/owner/onboarding">{t("account.continue_application")}</LocaleLink>
+            </Button>
+          </div>
+        )}
+
+        {isProspect && (
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Store className="h-4 w-4" />
+              <h2 className="font-semibold">{t("account.start_application")}</h2>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">{t("account.start_application_desc")}</p>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <LocaleLink to="/owner/onboarding">{t("account.start_application")}</LocaleLink>
+            </Button>
+          </div>
+        )}
+
+        {isExplorer && (
+          <div className="rounded-lg border border-dashed bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Store className="h-4 w-4" />
+              <h2 className="font-semibold">{t("account.conversion_title")}</h2>
+            </div>
+            <p className="mt-3 text-sm text-muted-foreground">{t("account.conversion_description")}</p>
+            <Button asChild variant="outline" size="sm" className="mt-4">
+              <LocaleLink to="/owner/onboarding">
+                {t("account.conversion_cta")} <ArrowRight className="ml-1 h-3 w-3" />
+              </LocaleLink>
+            </Button>
+          </div>
+        )}
+
+        {isOwner && (
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-4 w-4" />
+              <h2 className="font-semibold">{t("account.manage_businesses")}</h2>
+            </div>
+            {memberships.length > 0 ? (
+              <ul className="mt-3 space-y-2 text-sm">
+                {memberships.slice(0, 5).map((m: any) => (
+                  <li key={m.businesses?.id ?? m.role} className="truncate">
+                    {m.businesses?.name ?? m.role}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p className="mt-3 text-sm text-muted-foreground">{t("owner.home.no_businesses")}</p>
+            )}
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild size="sm" variant="outline">
+                <LocaleLink to="/owner">{t("owner.dashboard")}</LocaleLink>
+              </Button>
+              <Button asChild size="sm" variant="ghost">
+                <LocaleLink to="/owner/onboarding">{t("account.add_another_business")}</LocaleLink>
+              </Button>
+            </div>
+          </div>
+        )}
 
         <div className="rounded-lg border bg-card p-4">
           <div className="flex items-center gap-2">
@@ -203,99 +222,118 @@ function AccountPage() {
             <Button asChild size="sm">
               <LocaleLink to="/search">{t("account.explore")}</LocaleLink>
             </Button>
-            {(memberships.data?.length ?? 0) > 0 ? (
+            {isOwner && (
               <Button asChild size="sm" variant="outline">
                 <LocaleLink to="/owner">{t("owner.dashboard")}</LocaleLink>
               </Button>
-            ) : null}
-            <Button asChild size="sm" variant="outline">
-              <LocaleLink to="/owner/onboarding">{t("account.add_business")}</LocaleLink>
-            </Button>
+            )}
+            {isOwner && (
+              <Button asChild size="sm" variant="outline">
+                <LocaleLink to="/owner/onboarding">{t("account.add_another_business")}</LocaleLink>
+              </Button>
+            )}
+            {(isApplicant || isProspect) && (
+              <Button asChild size="sm" variant="outline">
+                <LocaleLink to="/owner/onboarding">
+                  {isApplicant ? t("account.continue_application") : t("account.start_application")}
+                </LocaleLink>
+              </Button>
+            )}
+            {isExplorer && (
+              <Button asChild size="sm" variant="outline">
+                <LocaleLink to="/owner/onboarding">{t("account.conversion_cta")}</LocaleLink>
+              </Button>
+            )}
           </div>
         </div>
       </section>
 
-      <section className="mt-10">
-        <h2 className="text-xl font-semibold">{t("account.recent_activity")}</h2>
-        {(onboarding.data ?? []).flatMap((row: any) => row.events ?? []).length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">{t("account.no_recent_activity")}</p>
-        ) : (
-          <ul className="mt-4 divide-y rounded-lg border bg-card">
-            {(onboarding.data ?? [])
-              .flatMap((row: any) => (row.events ?? []).map((event: any) => ({ ...event, submissionId: row.id })))
-              .slice(0, 5)
-              .map((event: any) => (
-                <li key={event.id} className="flex items-center justify-between gap-4 p-3 text-sm">
-                  <span>{event.message_key ? t(event.message_key as MessageKey, event.message_params ?? undefined) : event.event_type}</span>
-                  <time className="text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString(locale)}</time>
-                </li>
-              ))}
-          </ul>
-        )}
-      </section>
+      {isApplicant && (
+        <section className="mt-10">
+          <h2 className="text-xl font-semibold">{t("account.recent_activity")}</h2>
+          {(onboarding ?? []).flatMap((row: any) => row.events ?? []).length === 0 ? (
+            <p className="mt-4 text-sm text-muted-foreground">{t("account.no_recent_activity")}</p>
+          ) : (
+            <ul className="mt-4 divide-y rounded-lg border bg-card">
+              {(onboarding ?? [])
+                .flatMap((row: any) => (row.events ?? []).map((event: any) => ({ ...event, submissionId: row.id })))
+                .slice(0, 5)
+                .map((event: any) => (
+                  <li key={event.id} className="flex items-center justify-between gap-4 p-3 text-sm">
+                    <span>{event.message_key ? t(event.message_key as MessageKey, event.message_params ?? undefined) : event.event_type}</span>
+                    <time className="text-xs text-muted-foreground">{new Date(event.created_at).toLocaleString(locale)}</time>
+                  </li>
+                ))}
+            </ul>
+          )}
+        </section>
+      )}
 
       <section className="mt-10">
         <h2 className="text-xl font-semibold">{t("nav.favorites")}</h2>
-        {favorites.isLoading && (
-          <p className="mt-4 text-sm text-muted-foreground">Loading…</p>
+        {queries.favorites === "loading" && (
+          <p className="mt-4 text-sm text-muted-foreground">{t("common.loading")}</p>
         )}
-        {!favorites.isLoading && (favorites.data?.length ?? 0) === 0 && (
-          <p className="mt-4 text-sm text-muted-foreground">
-            {t("account.no_favorites")}
-          </p>
+        {queries.favorites === "error" && (
+          <p className="mt-4 text-sm text-destructive">Could not load favorites.</p>
         )}
-        <ul className="mt-6 grid gap-4 sm:grid-cols-2">
-          {(favorites.data ?? []).map((row: any) => {
-            const b = row.businesses;
-            if (!b) return null;
-            const cover =
-              (b.business_images ?? []).find((i: any) => i.is_cover) ??
-              (b.business_images ?? [])[0];
-            const img = getBusinessImageUrl(
-              cover
-                ? {
-                    id: "",
-                    businessId: b.id,
-                    placeId: "",
-                    sourceUrl: cover.source_url ?? null,
-                    r2Key: null,
-                    r2Url: cover.r2_url ?? null,
-                    storageStatus: "external_only",
-                    imageType: "cover",
-                    isCover: true,
-                    sortOrder: 0,
-                  }
-                : null,
-            );
-            return (
-              <li
-                key={b.id}
-                className="flex gap-3 overflow-hidden rounded-xl border bg-card"
-              >
-                <img src={img} alt="" className="h-24 w-24 shrink-0 object-cover" />
-                <div className="flex flex-1 flex-col p-3">
-                  <LocaleLink
-                    to={`/place/${b.slug}`}
-                    className="font-semibold hover:underline"
-                  >
-                    {b.name}
-                  </LocaleLink>
-                  <p className="text-xs text-muted-foreground">{b.formatted_address}</p>
-                  <div className="mt-auto flex items-center justify-between">
-                    <span className="text-sm">★ {Number(b.rating ?? 0).toFixed(1)}</span>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => removeFav.mutate(b.id)}
+        {queries.favorites === "success" && favorites.length === 0 && (
+          <p className="mt-4 text-sm text-muted-foreground">{t("account.no_favorites")}</p>
+        )}
+        {favorites.length > 0 && (
+          <ul className="mt-6 grid gap-4 sm:grid-cols-2">
+            {favorites.map((row: any) => {
+              const b = row.businesses;
+              if (!b) return null;
+              const cover =
+                (b.business_images ?? []).find((i: any) => i.is_cover) ??
+                (b.business_images ?? [])[0];
+              const img = getBusinessImageUrl(
+                cover
+                  ? {
+                      id: "",
+                      businessId: b.id,
+                      placeId: "",
+                      sourceUrl: cover.source_url ?? null,
+                      r2Key: null,
+                      r2Url: cover.r2_url ?? null,
+                      storageStatus: "external_only",
+                      imageType: "cover",
+                      isCover: true,
+                      sortOrder: 0,
+                    }
+                  : null,
+              );
+              return (
+                <li
+                  key={b.id}
+                  className="flex gap-3 overflow-hidden rounded-xl border bg-card"
+                >
+                  <img src={img} alt="" className="h-24 w-24 shrink-0 object-cover" />
+                  <div className="flex flex-1 flex-col p-3">
+                    <LocaleLink
+                      to={`/place/${b.slug}`}
+                      className="font-semibold hover:underline"
                     >
-                      {t("account.remove")}
-                    </Button>
+                      {b.name}
+                    </LocaleLink>
+                    <p className="text-xs text-muted-foreground">{b.formatted_address}</p>
+                    <div className="mt-auto flex items-center justify-between">
+                      <span className="text-sm">★ {Number(b.rating ?? 0).toFixed(1)}</span>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => removeFav.mutate(b.id)}
+                      >
+                        {t("account.remove")}
+                      </Button>
+                    </div>
                   </div>
-                </div>
-              </li>
-            );
-          })}
-        </ul>
+                </li>
+              );
+            })}
+          </ul>
+        )}
       </section>
     </div>
   );

@@ -1,4 +1,4 @@
-import { Link, createFileRoute, useParams } from "@tanstack/react-router";
+import { Link, createFileRoute, redirect, useParams } from "@tanstack/react-router";
 import { useQuery } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -10,9 +10,24 @@ import { OwnerShell } from "@/components/owner/OwnerShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { useT, type MessageKey } from "@/lib/i18n";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/$lang/_authenticated/owner/")({
   ssr: false,
+  beforeLoad: async ({ params }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/$lang/auth", params: { lang: params.lang } });
+    const { data } = await supabase
+      .from("business_members")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .in("role", ["owner", "manager"])
+      .limit(1);
+    if (!data || data.length === 0) {
+      throw redirect({ to: "/$lang/account", params: { lang: params.lang } });
+    }
+  },
   component: OwnerHome,
 });
 

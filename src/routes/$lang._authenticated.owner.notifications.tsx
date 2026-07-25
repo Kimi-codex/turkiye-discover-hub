@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, redirect } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
 import {
@@ -8,9 +8,24 @@ import {
 import { OwnerShell } from "@/components/owner/OwnerShell";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { supabase } from "@/integrations/supabase/client";
 
 export const Route = createFileRoute("/$lang/_authenticated/owner/notifications")({
   ssr: false,
+  beforeLoad: async ({ params }) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) throw redirect({ to: "/$lang/auth", params: { lang: params.lang } });
+    const { data } = await supabase
+      .from("business_members")
+      .select("id")
+      .eq("user_id", user.id)
+      .eq("status", "active")
+      .in("role", ["owner", "manager"])
+      .limit(1);
+    if (!data || data.length === 0) {
+      throw redirect({ to: "/$lang/account/notifications", params: { lang: params.lang } });
+    }
+  },
   component: NotificationsPage,
 });
 

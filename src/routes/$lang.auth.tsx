@@ -3,6 +3,7 @@ import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
+import { PasswordInput } from "@/components/ui/password-input";
 import { Label } from "@/components/ui/label";
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -290,9 +291,8 @@ function AuthPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="in-pass">{t("auth.password")}</Label>
-              <Input
+              <PasswordInput
                 id="in-pass"
-                type="password"
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
@@ -341,9 +341,8 @@ function AuthPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="up-pass">{t("auth.password")}</Label>
-              <Input
+              <PasswordInput
                 id="up-pass"
-                type="password"
                 required
                 minLength={8}
                 value={password}
@@ -357,9 +356,8 @@ function AuthPage() {
             </div>
             <div className="grid gap-2">
               <Label htmlFor="up-pass-confirm">{t("auth.confirm_password")}</Label>
-              <Input
+              <PasswordInput
                 id="up-pass-confirm"
-                type="password"
                 required
                 minLength={8}
                 value={confirmPassword}

@@ -10,28 +10,37 @@ import {
 import { cn } from "@/lib/utils";
 import { useT, type MessageKey } from "@/lib/i18n";
 
-const nav = [
+const memberNav = [
   { to: "", label: "owner.nav.dashboard", icon: Home },
   { to: "/onboarding", label: "owner.nav.onboarding", icon: UserCheck },
   { to: "/notifications", label: "owner.nav.notifications", icon: Bell },
 ] as const;
 
+const applicantNav = [
+  { to: "/onboarding", label: "owner.nav.onboarding", icon: UserCheck },
+] as const;
+
 export function OwnerShell({
   children,
   businessNav,
+  variant = "member",
 }: {
   children: ReactNode;
   businessNav?: ReactNode;
+  variant?: "member" | "applicant";
 }) {
   const { lang } = useParams({ strict: false }) as { lang: string };
   const t = useT();
   const base = `/${lang ?? "tr"}/owner`;
+  const nav = variant === "applicant" ? applicantNav : memberNav;
+  const headingKey = variant === "applicant" ? "owner.applicant_portal" : "owner.portal";
+
   return (
     <div className="min-h-screen bg-background">
       <div className="mx-auto grid max-w-7xl grid-cols-1 gap-6 px-4 py-6 md:grid-cols-[240px_1fr]">
         <aside className="rounded-xl border bg-card p-3">
           <div className="mb-3 flex items-center gap-2 px-2 py-1 text-sm font-semibold">
-            <Building2 className="h-4 w-4" /> {t("owner.portal")}
+            <Building2 className="h-4 w-4" /> {t(headingKey as MessageKey)}
           </div>
           <nav className="flex flex-col gap-1">
             {nav.map((n) => (

@@ -292,7 +292,7 @@ function OnboardingPage() {
   const summaries = (submissions.data?.rows ?? []) as SubmissionSummary[];
 
   return (
-    <OwnerShell>
+    <OwnerShell variant="applicant">
       <div className="space-y-6">
         <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
