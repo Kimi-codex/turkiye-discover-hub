@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -14,6 +14,9 @@ import { useT, useLocaleContext } from "@/lib/i18n";
 
 function authErrorMessage(message: string, t: ReturnType<typeof useT>): string {
   const lower = message.toLowerCase();
+  if (lower.includes("not confirmed")) {
+    return t("auth.error_not_confirmed");
+  }
   if (lower.includes("already") || lower.includes("registered") || lower.includes("exists")) {
     return t("auth.error_already_registered");
   }
@@ -38,6 +41,8 @@ export const Route = createFileRoute("/$lang/auth")({
   component: AuthPage,
 });
 
+const RESEND_COOLDOWN_SECONDS = 60;
+
 function AuthPage() {
   const t = useT();
   const { locale } = useLocaleContext();
@@ -52,6 +57,15 @@ function AuthPage() {
   const [termsAccepted, setTermsAccepted] = useState(false);
   const [busy, setBusy] = useState(false);
   const [signupComplete, setSignupComplete] = useState(false);
+  const [signupEmail, setSignupEmail] = useState("");
+  const [resendCooldown, setResendCooldown] = useState(0);
+  const resendTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (resendTimer.current) clearInterval(resendTimer.current);
+    };
+  }, []);
 
   useEffect(() => {
     if (!loading && user) {
@@ -100,7 +114,7 @@ function AuthPage() {
     }
     setBusy(true);
     const termsAcceptedAt = new Date().toISOString();
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -120,22 +134,111 @@ function AuthPage() {
     });
     setBusy(false);
     if (error) return toast.error(authErrorMessage(error.message, t));
-    // Generic message: never expose whether admin was granted.
+    if (!data?.user) {
+      toast.error(t("auth.error_already_registered"));
+      return;
+    }
+    // If the session exists, email confirmation is disabled and the user
+    // is already signed in.  The useEffect above will redirect.
+    if (data.session) {
+      toast.success(t("auth.signed_in"));
+      return;
+    }
+    // Email confirmation is required.  Show the success screen.
     setSignupComplete(true);
+    setSignupEmail(email);
     setPassword("");
     setConfirmPassword("");
-    toast.success(t("auth.check_email"));
+    toast.success(t("auth.account_created"));
   }
 
   async function handleGoogle() {
     setBusy(true);
-    const res = await lovable.auth.signInWithOAuth("google", {
-      redirect_uri: window.location.origin,
-    });
-    if (res.error) {
+    try {
+      const res = await lovable.auth.signInWithOAuth("google", {
+        redirect_uri: window.location.origin,
+      });
+      if (res.error) {
+        toast.error(res.error.message ?? t("auth.google_failed"));
+      }
+    } catch {
+      toast.error(t("auth.google_failed"));
+    } finally {
       setBusy(false);
-      toast.error(res.error.message ?? t("auth.google_failed"));
     }
+  }
+
+  async function handleResendEmail() {
+    if (resendCooldown > 0) return;
+    setResendCooldown(RESEND_COOLDOWN_SECONDS);
+    resendTimer.current = setInterval(() => {
+      setResendCooldown((prev) => {
+        if (prev <= 1) {
+          if (resendTimer.current) clearInterval(resendTimer.current);
+          resendTimer.current = null;
+          return 0;
+        }
+        return prev - 1;
+      });
+    }, 1000);
+    const redirectTo =
+      registrationIntent === "business"
+        ? `${window.location.origin}/${locale}/owner/onboarding`
+        : `${window.location.origin}/${locale}/account`;
+    const { error } = await supabase.auth.resend({
+      type: "signup",
+      email: signupEmail,
+      options: { emailRedirectTo: redirectTo },
+    });
+    if (error) {
+      toast.error(authErrorMessage(error.message, t));
+    } else {
+      toast.success(t("auth.resend_success"));
+    }
+  }
+
+  function handleChangeEmail() {
+    setSignupComplete(false);
+    setSignupEmail("");
+  }
+
+  if (signupComplete) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col gap-6 px-4 py-16">
+        <div className="rounded-lg border border-primary/30 bg-primary/5 p-6 text-center">
+          <div className="mx-auto mb-3 flex h-12 w-12 items-center justify-center rounded-full bg-primary/10 text-xl">
+            ✉️
+          </div>
+          <h2 className="text-xl font-bold text-foreground">{t("auth.account_created")}</h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {t("auth.email_verification_sent", { email: signupEmail })}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            {t("auth.verification_instructions")}
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">{t("auth.check_spam")}</p>
+        </div>
+
+        <div className="flex flex-col gap-3">
+          <Button asChild variant="default">
+            <a href={`/${locale}/auth`}>{t("auth.sign_in_after_verification")}</a>
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handleResendEmail}
+            disabled={resendCooldown > 0}
+          >
+            {resendCooldown > 0
+              ? t("auth.resend_available_in", { seconds: String(resendCooldown) })
+              : t("auth.resend_email")}
+          </Button>
+          <Button type="button" variant="ghost" onClick={handleChangeEmail}>
+            {t("auth.change_email")}
+          </Button>
+        </div>
+      </div>
+    );
   }
 
   return (
@@ -145,10 +248,9 @@ function AuthPage() {
         <p className="mt-2 text-sm text-muted-foreground">{t("auth.subtitle")}</p>
       </div>
 
-      {signupComplete ? (
-        <div className="rounded-lg border border-primary/30 bg-primary/5 p-4 text-sm">
-          <h2 className="font-semibold text-foreground">{t("auth.account_created")}</h2>
-          <p className="mt-1 text-muted-foreground">{t("auth.check_email")}</p>
+      {busy ? (
+        <div className="flex justify-center py-8">
+          <div className="h-6 w-6 animate-spin rounded-full border-2 border-primary border-t-transparent" />
         </div>
       ) : null}
 
@@ -198,7 +300,14 @@ function AuthPage() {
               />
             </div>
             <Button type="submit" disabled={busy}>
-              {t("auth.signin")}
+              {busy ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  {t("auth.signin")}
+                </span>
+              ) : (
+                t("auth.signin")
+              )}
             </Button>
           </form>
         </TabsContent>
@@ -290,7 +399,14 @@ function AuthPage() {
               <span>{t("auth.terms_accept")}</span>
             </label>
             <Button type="submit" disabled={busy}>
-              {t("auth.signup")}
+              {busy ? (
+                <span className="flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                  {t("auth.signup")}
+                </span>
+              ) : (
+                t("auth.signup")
+              )}
             </Button>
           </form>
         </TabsContent>
