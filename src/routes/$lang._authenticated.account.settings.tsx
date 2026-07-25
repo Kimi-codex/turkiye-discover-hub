@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { ArrowLeft, BadgeCheck, CircleAlert, Loader2, UserRound } from "lucide-react";
+import { ArrowLeft, BadgeCheck, CircleAlert, Loader2, Lock, UserRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -29,6 +29,9 @@ function AccountSettingsPage() {
   const [phone, setPhone] = useState("");
   const [language, setLanguage] = useState<Locale>(locale);
   const [initial, setInitial] = useState<{ name: string; phone: string; language: Locale } | null>(null);
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [passwordError, setPasswordError] = useState<string | null>(null);
 
   useEffect(() => {
     if (user?.user_metadata) {
@@ -74,6 +77,35 @@ function AccountSettingsPage() {
     e.preventDefault();
     saveMutation.mutate({ full_name: name, phone, preferred_language: language });
   };
+
+  const changePasswordMutation = useMutation({
+    mutationFn: async (password: string) => {
+      const { error } = await supabase.auth.updateUser({ password });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      toast.success(t("account.settings.password_changed"));
+      setNewPassword("");
+      setConfirmPassword("");
+      setPasswordError(null);
+    },
+    onError: (err) => {
+      toast.error(err instanceof Error ? err.message : t("account.settings.error"));
+    },
+  });
+
+  function handleChangePassword() {
+    setPasswordError(null);
+    if (!newPassword || newPassword.length < 8) {
+      setPasswordError(t("auth.password_too_short"));
+      return;
+    }
+    if (newPassword !== confirmPassword) {
+      setPasswordError(t("account.settings.password_mismatch"));
+      return;
+    }
+    changePasswordMutation.mutate(newPassword);
+  }
 
   const emailVerified = user?.email_confirmed_at || user?.confirmed_at;
   const hasChanges = initial
@@ -161,6 +193,56 @@ function AccountSettingsPage() {
                 </>
               )}
             </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <Lock className="h-5 w-5" />
+              <CardTitle>{t("account.settings.change_password_title")}</CardTitle>
+            </div>
+            <CardDescription>{t("account.settings.change_password_description")}</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="grid gap-2">
+              <Label htmlFor="settings-new-password">{t("account.settings.new_password")}</Label>
+              <Input
+                id="settings-new-password"
+                type="password"
+                value={newPassword}
+                onChange={(e) => setNewPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            <div className="grid gap-2">
+              <Label htmlFor="settings-confirm-password">{t("account.settings.confirm_password")}</Label>
+              <Input
+                id="settings-confirm-password"
+                type="password"
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                autoComplete="new-password"
+              />
+            </div>
+            {passwordError && (
+              <p className="text-sm text-destructive">{passwordError}</p>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleChangePassword}
+              disabled={changePasswordMutation.isPending}
+            >
+              {changePasswordMutation.isPending ? (
+                <span className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t("common.loading")}
+                </span>
+              ) : (
+                t("account.settings.change_password_title")
+              )}
+            </Button>
           </CardContent>
         </Card>
 

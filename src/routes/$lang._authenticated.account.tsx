@@ -1,6 +1,6 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Bell, Building2, Compass, Settings, UserRound, Store, ClipboardList, ArrowRight } from "lucide-react";
+import { Bell, Building2, Compass, Settings, UserRound, Store, ClipboardList, ArrowRight, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
@@ -114,16 +114,23 @@ function AccountPage() {
               <dd>{favorites.length}</dd>
             </div>
           </dl>
-          <Button asChild variant="outline" size="sm" className="mt-4">
-            <LocaleLink to="/account/settings">
-              <Settings className="h-4 w-4" /> {t("account.settings")}
-            </LocaleLink>
-          </Button>
-          {state === "admin" && (
-            <Button asChild variant="default" size="sm" className="mt-2 ml-2">
-              <LocaleLink to="/admin">{t("header.admin")}</LocaleLink>
+          <div className="mt-4 flex flex-wrap gap-2">
+            <Button asChild variant="outline" size="sm">
+              <LocaleLink to="/account/settings">
+                <Settings className="h-4 w-4" /> {t("account.settings")}
+              </LocaleLink>
             </Button>
-          )}
+            <Button asChild variant="outline" size="sm">
+              <LocaleLink to="/account/settings">
+                <Lock className="h-4 w-4" /> {t("account.change_password")}
+              </LocaleLink>
+            </Button>
+            {state === "admin" && (
+              <Button asChild variant="default" size="sm">
+                <LocaleLink to="/admin">{t("header.admin")}</LocaleLink>
+              </Button>
+            )}
+          </div>
         </div>
 
         <div className="rounded-lg border bg-card p-4">
@@ -192,12 +199,12 @@ function AccountPage() {
           <div className="rounded-lg border border-dashed bg-card p-4">
             <div className="flex items-center gap-2">
               <Store className="h-4 w-4" />
-              <h2 className="font-semibold">{t("account.conversion_title")}</h2>
+              <h2 className="font-semibold">{t("account.become_owner_title")}</h2>
             </div>
-            <p className="mt-3 text-sm text-muted-foreground">{t("account.conversion_description")}</p>
-            <Button asChild variant="outline" size="sm" className="mt-4">
+            <p className="mt-3 text-sm text-muted-foreground">{t("account.become_owner_description")}</p>
+            <Button asChild variant="default" size="sm" className="mt-4">
               <LocaleLink to="/owner/onboarding">
-                {t("account.conversion_cta")} <ArrowRight className="ml-1 h-3 w-3" />
+                {t("account.become_owner_cta")} <ArrowRight className="ml-1 h-3 w-3" />
               </LocaleLink>
             </Button>
           </div>
@@ -231,39 +238,36 @@ function AccountPage() {
           </div>
         )}
 
-        <div className="rounded-lg border bg-card p-4">
-          <div className="flex items-center gap-2">
-            <Compass className="h-4 w-4" />
-            <h2 className="font-semibold">{t("account.next_actions")}</h2>
+        {!isExplorer && (
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2">
+              <Compass className="h-4 w-4" />
+              <h2 className="font-semibold">{t("account.next_actions")}</h2>
+            </div>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button asChild size="sm">
+                <LocaleLink to="/search">{t("account.explore")}</LocaleLink>
+              </Button>
+              {isOwner && (
+                <Button asChild size="sm" variant="outline">
+                  <LocaleLink to="/owner">{t("owner.dashboard")}</LocaleLink>
+                </Button>
+              )}
+              {isOwner && (
+                <Button asChild size="sm" variant="outline">
+                  <LocaleLink to="/owner/onboarding">{t("account.add_another_business")}</LocaleLink>
+                </Button>
+              )}
+              {(isApplicant || isProspect) && (
+                <Button asChild size="sm" variant="outline">
+                  <LocaleLink to="/owner/onboarding">
+                    {isApplicant ? t("account.continue_application") : t("account.start_application")}
+                  </LocaleLink>
+                </Button>
+              )}
+            </div>
           </div>
-          <div className="mt-4 flex flex-wrap gap-2">
-            <Button asChild size="sm">
-              <LocaleLink to="/search">{t("account.explore")}</LocaleLink>
-            </Button>
-            {isOwner && (
-              <Button asChild size="sm" variant="outline">
-                <LocaleLink to="/owner">{t("owner.dashboard")}</LocaleLink>
-              </Button>
-            )}
-            {isOwner && (
-              <Button asChild size="sm" variant="outline">
-                <LocaleLink to="/owner/onboarding">{t("account.add_another_business")}</LocaleLink>
-              </Button>
-            )}
-            {(isApplicant || isProspect) && (
-              <Button asChild size="sm" variant="outline">
-                <LocaleLink to="/owner/onboarding">
-                  {isApplicant ? t("account.continue_application") : t("account.start_application")}
-                </LocaleLink>
-              </Button>
-            )}
-            {isExplorer && (
-              <Button asChild size="sm" variant="outline">
-                <LocaleLink to="/owner/onboarding">{t("account.conversion_cta")}</LocaleLink>
-              </Button>
-            )}
-          </div>
-        </div>
+        )}
       </section>
 
       {isApplicant && (
