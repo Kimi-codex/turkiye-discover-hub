@@ -18,6 +18,7 @@ export function RatingStars({
   size = "md",
   className,
 }: RatingStarsProps) {
+  if (value === 0 && (!reviewCount || reviewCount === 0)) return null;
   const rounded = Math.round(value * 10) / 10;
   const iconSize =
     size === "lg" ? "h-5 w-5" : size === "sm" ? "h-3.5 w-3.5" : "h-4 w-4";

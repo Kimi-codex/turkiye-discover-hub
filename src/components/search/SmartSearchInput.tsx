@@ -71,6 +71,7 @@ export function SmartSearchInput({
         placeholder={placeholder ?? t("home.search_placeholder")}
         aria-label={submitLabel}
         autoFocus={autoFocus}
+        autoComplete="off"
         className={cn(
           "min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground/70",
           hero ? "text-base sm:text-lg" : "text-sm",

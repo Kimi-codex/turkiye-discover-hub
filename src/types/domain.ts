@@ -4,8 +4,8 @@
  * when demo repositories are swapped for real Supabase repositories.
  */
 
-export type Locale = "ar" | "en" | "tr";
-export const LOCALES: Locale[] = ["ar", "en", "tr"];
+export type Locale = "ar" | "en" | "tr" | "fr" | "ru";
+export const LOCALES: Locale[] = ["ar", "en", "tr", "fr", "ru"];
 export const DEFAULT_LOCALE: Locale = "tr";
 export const FALLBACK_LOCALE: Locale = "en";
 export const RTL_LOCALES: Locale[] = ["ar"];

@@ -4,8 +4,9 @@ import { useMemo, useState } from "react";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { ClarificationCard } from "@/components/search/ClarificationCard";
+import { DidYouMean } from "@/components/search/DidYouMean";
 import { InterpretationChips } from "@/components/search/InterpretationChips";
-import { buildHreflang, canonicalFor } from "@/lib/seo/hreflang";
+import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
 import { translate, useLocale, useT, type Locale } from "@/lib/i18n";
 import {
   parseDirectorySearchIntent,
@@ -132,6 +133,17 @@ const searchQuery = (filters: SearchFilters) =>
     queryFn: () => services.businesses.list(filters),
   });
 
+const didYouMeanQuery = (query: string, locale: Locale) =>
+  queryOptions({
+    queryKey: ["did-you-mean", query, locale],
+    queryFn: async () => {
+      const { suggestDidYouMean } = await import("@/lib/search/did-you-mean.server");
+      return suggestDidYouMean({ data: { query, locale } });
+    },
+    enabled: query.length >= 2,
+    staleTime: 60_000,
+  });
+
 export const Route = createFileRoute("/$lang/search")({
   validateSearch,
   loaderDeps: ({ search }) => ({ search }),
@@ -142,7 +154,7 @@ export const Route = createFileRoute("/$lang/search")({
   },
   head: ({ params }) => {
     const locale = params.lang as Locale;
-    const title = `${translate(locale, "search.your_results")} ? ${translate(locale, "home.badge")}`;
+    const title = `${translate(locale, "search.your_results")} — ${translate(locale, "brand.name")}`;
     const desc = translate(locale, "home.subtitle");
     return {
       meta: [
@@ -151,7 +163,10 @@ export const Route = createFileRoute("/$lang/search")({
         { property: "og:title", content: title },
         { property: "og:description", content: desc },
         { property: "og:url", content: canonicalFor(locale, "/search") },
+        { property: "og:locale", content: ogLocaleFor(locale) },
         { name: "robots", content: "noindex, follow" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: desc },
       ],
       links: [
         { rel: "canonical", href: canonicalFor(locale, "/search") },
@@ -180,7 +195,7 @@ function SearchPage() {
   // (e.g. "fancy", "غالي") — do NOT apply it as a mandatory ILIKE filter.
   const effectiveFilters: SearchFilters = useMemo(() => {
     return normalizePublicSearchFilters({
-      query: intent.descriptiveIntent ? "" : intent.remainingQuery,
+      query: intent.remainingQuery,
       category: params.category ?? intent.matchedCategorySlug,
       city: params.city ?? intent.matchedCitySlug,
       district: params.district ?? intent.matchedDistrictSlug,
@@ -272,13 +287,21 @@ function SearchPage() {
         <p className="mt-6 text-sm text-muted-foreground">{t("search.relaxed")}</p>
       )}
 
+      {displayed.items.length < 3 && params.q && (
+        <DidYouMean
+          query={params.q}
+          resultCount={displayed.items.length}
+          className="mt-4"
+        />
+      )}
+
       <div className="mt-8">
         {displayed.items.length === 0 ? (
           hasActiveSearch ? <EmptyState /> : <CleanSearchState />
         ) : (
           <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
             {displayed.items.map((b, i) => (
-              <BusinessCard key={b.id} business={b} eager={i < 2} />
+              <BusinessCard key={b.id} business={b} eager={i < 2} highlightQuery={params.q} />
             ))}
           </div>
         )}

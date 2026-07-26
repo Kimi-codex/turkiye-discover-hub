@@ -4,7 +4,9 @@ import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { SearchBar } from "@/components/search/SearchBar";
-import { buildHreflang, canonicalFor } from "@/lib/seo/hreflang";
+import { SeoContent } from "@/components/seo/SeoContent";
+import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
+import { breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 import { RESERVED_LANG_CHILD_SLUGS } from "@/types/domain";
 
@@ -54,18 +56,36 @@ export const Route = createFileRoute("/$lang/$slug")({
       loaderData.kind === "category"
         ? `${name} — ${translate(locale, "hero.subtitle")}`
         : `${name}: ${translate(locale, "hero.subtitle")}`;
+    const siteUrl = canonicalFor(locale, path);
+    const scripts: Record<string, unknown>[] = [
+      breadcrumbJsonLd([
+        { label: translate(locale, "breadcrumb.home"), url: canonicalFor(locale, "/") },
+        { label: name, url: siteUrl },
+      ]),
+      collectionPageJsonLd(siteUrl, name, desc, loaderData.items.length),
+    ];
     return {
       meta: [
         { title },
         { name: "description", content: desc },
         { property: "og:title", content: title },
         { property: "og:description", content: desc },
-        { property: "og:url", content: canonicalFor(locale, path) },
+        { property: "og:url", content: siteUrl },
+        { property: "og:locale", content: ogLocaleFor(locale) },
+        ...(loaderData.kind === "city" && loaderData.city.imageUrl
+          ? [{ property: "og:image", content: loaderData.city.imageUrl }]
+          : []),
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: desc },
       ],
       links: [
-        { rel: "canonical", href: canonicalFor(locale, path) },
+        { rel: "canonical", href: siteUrl },
         ...buildHreflang(path),
       ],
+      scripts: scripts.map((s) => ({
+        type: "application/ld+json",
+        children: JSON.stringify(s),
+      })),
     };
   },
   component: LangSlugPage,
@@ -102,7 +122,7 @@ function LangSlugPage() {
           { label: heading },
         ]}
       />
-      {data.kind === "city" && data.city.imageUrl && (
+      {data.kind === "city" && data.city.imageUrl ? (
         <div className="relative mt-4 aspect-[21/8] overflow-hidden rounded-3xl">
           <img
             src={data.city.imageUrl}
@@ -117,9 +137,25 @@ function LangSlugPage() {
             <h1 className="text-2xl font-bold sm:text-4xl">{heading}</h1>
           </div>
         </div>
-      )}
-      {data.kind === "category" && (
+      ) : (
         <h1 className="mt-4 text-2xl font-bold sm:text-3xl">{heading}</h1>
+      )}
+
+      {data.kind === "category" && data.category.description && (
+        <div className="mt-4">
+          <SeoContent
+            content={pickLocalized(data.category.description, locale)}
+            originalContent={pickLocalized(data.category.description, "en")}
+          />
+        </div>
+      )}
+      {data.kind === "city" && data.city.description && (
+        <div className="mt-4">
+          <SeoContent
+            content={pickLocalized(data.city.description, locale)}
+            originalContent={pickLocalized(data.city.description, "en")}
+          />
+        </div>
       )}
 
       <div className="mt-6">

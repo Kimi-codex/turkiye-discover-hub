@@ -64,6 +64,7 @@ export function SearchBar({
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder={t("search.placeholder")}
+            autoComplete="off"
             className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
           />
         </label>

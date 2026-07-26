@@ -4,7 +4,8 @@ import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { SearchBar } from "@/components/search/SearchBar";
-import { buildHreflang, canonicalFor } from "@/lib/seo/hreflang";
+import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
+import { breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 
 const cityCategoryQuery = (citySlug: string, categorySlug: string) =>
@@ -39,18 +40,34 @@ export const Route = createFileRoute("/$lang/$citySlug/$categorySlug")({
     const cityName = pickLocalized(loaderData.city.name, locale);
     const title = `${catName} · ${cityName} — ${translate(locale, "brand.name")}`;
     const desc = `${catName} — ${cityName}. ${translate(locale, "hero.subtitle")}`;
+    const siteUrl = canonicalFor(locale, path);
+    const scripts = [
+      breadcrumbJsonLd([
+        { label: translate(locale, "breadcrumb.home"), url: canonicalFor(locale, "/") },
+        { label: cityName, url: canonicalFor(locale, `/${params.citySlug}`) },
+        { label: catName, url: siteUrl },
+      ]),
+      collectionPageJsonLd(siteUrl, title, desc, loaderData.total),
+    ];
     return {
       meta: [
         { title },
         { name: "description", content: desc },
         { property: "og:title", content: title },
         { property: "og:description", content: desc },
-        { property: "og:url", content: canonicalFor(locale, path) },
+        { property: "og:url", content: siteUrl },
+        { property: "og:locale", content: ogLocaleFor(locale) },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: desc },
       ],
       links: [
-        { rel: "canonical", href: canonicalFor(locale, path) },
+        { rel: "canonical", href: siteUrl },
         ...buildHreflang(path),
       ],
+      scripts: scripts.map((s) => ({
+        type: "application/ld+json",
+        children: JSON.stringify(s),
+      })),
     };
   },
   component: CityCategoryPage,

@@ -32,7 +32,7 @@ type TranslationRow = { language_code: string; name: string | null };
 function toLocalizedString(rows: TranslationRow[] | null | undefined): LocalizedString {
   const out: LocalizedString = {};
   for (const r of rows ?? []) {
-    if (r.language_code === "ar" || r.language_code === "en" || r.language_code === "tr") {
+    if (r.language_code === "ar" || r.language_code === "en" || r.language_code === "tr" || r.language_code === "fr" || r.language_code === "ru") {
       out[r.language_code as Locale] = fixMojibake(r.name ?? "");
     }
   }

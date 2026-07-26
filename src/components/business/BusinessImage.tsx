@@ -21,9 +21,10 @@ interface Props extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, "src" | 
   image: BusinessImageRow | null | undefined;
   alt: string;
   className?: string;
+  onLoadError?: () => void;
 }
 
-export function BusinessImage({ image, alt, className, ...rest }: Props) {
+export function BusinessImage({ image, alt, className, onLoadError, ...rest }: Props) {
   const initial = getBusinessImageUrl(image);
   const [src, setSrc] = useState(initial);
   return (
@@ -35,7 +36,10 @@ export function BusinessImage({ image, alt, className, ...rest }: Props) {
       decoding={rest.decoding ?? "async"}
       className={cn("bg-muted object-cover", className)}
       onError={() => {
-        if (src !== BUSINESS_IMAGE_PLACEHOLDER) setSrc(BUSINESS_IMAGE_PLACEHOLDER);
+        if (src !== BUSINESS_IMAGE_PLACEHOLDER) {
+          setSrc(BUSINESS_IMAGE_PLACEHOLDER);
+          onLoadError?.();
+        }
       }}
     />
   );

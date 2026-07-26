@@ -11,6 +11,18 @@ interface OpeningHoursProps {
 
 export function OpeningHoursBlock({ hours }: OpeningHoursProps) {
   const t = useT();
+  if (!hours || hours.length === 0) {
+    return (
+      <div className="rounded-2xl border border-border bg-card p-5">
+        <div className="text-sm font-semibold text-foreground">
+          {t("biz.opening_hours")}
+        </div>
+        <p className="mt-1 text-sm text-muted-foreground">
+          {t("hours.unavailable")}
+        </p>
+      </div>
+    );
+  }
   const [open, setOpen] = useState(false);
   const today = todayHours(hours);
   const status = isOpenNow(hours);

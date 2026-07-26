@@ -1,10 +1,29 @@
-import { SmartSearchInput } from "@/components/search/SmartSearchInput";
+import { useState, useCallback } from "react";
+import { useNavigate } from "@tanstack/react-router";
+import { AutocompleteDropdown } from "@/components/search/AutocompleteDropdown";
 import { SuggestionChips } from "@/components/search/SuggestionChips";
-import { useT } from "@/lib/i18n";
+import { useT, useLocale } from "@/lib/i18n";
+import { localePath } from "@/lib/i18n";
 import heroImg from "@/assets/hero-istanbul.jpg";
 
 export function Hero() {
   const t = useT();
+  const locale = useLocale();
+  const navigate = useNavigate();
+  const [searchValue, setSearchValue] = useState("");
+
+  const handleSearch = useCallback(
+    (value: string) => {
+      const trimmed = value.trim();
+      if (!trimmed) return;
+      navigate({
+        to: localePath(locale, "/search"),
+        search: { q: trimmed },
+      });
+    },
+    [locale, navigate],
+  );
+
   return (
     <section
       className="relative isolate flex min-h-[calc(100dvh-4rem)] w-full items-center justify-center overflow-hidden"
@@ -46,7 +65,13 @@ export function Hero() {
         </p>
 
         <div className="mt-2 w-full">
-          <SmartSearchInput size="hero" />
+          <AutocompleteDropdown
+            inputValue={searchValue}
+            onValueChange={setSearchValue}
+            onSubmit={handleSearch}
+            placeholder={t("home.search_placeholder")}
+            size="hero"
+          />
         </div>
 
         <SuggestionChips variant="onHero" className="mt-2" />

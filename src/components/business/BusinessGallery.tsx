@@ -1,7 +1,6 @@
 import { useState } from "react";
 import { ImageIcon } from "lucide-react";
-import type { BusinessImage } from "@/types/domain";
-import { getBusinessImageUrl } from "@/lib/images/storage";
+import type { BusinessImage as BusinessImageRow } from "@/types/domain";
 import { useT } from "@/lib/i18n";
 import {
   Dialog,
@@ -9,23 +8,31 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
+import { BusinessImage } from "./BusinessImage";
 import { cn } from "@/lib/utils";
 
 interface BusinessGalleryProps {
-  images: BusinessImage[];
+  images: BusinessImageRow[];
   businessName: string;
 }
 
-/**
- * 1-large + 4-small hero gallery per the reference screenshot.
- * On mobile stacks to a single large tile with "view all" overlay.
- */
 export function BusinessGallery({ images, businessName }: BusinessGalleryProps) {
   const t = useT();
   const [openIndex, setOpenIndex] = useState<number | null>(null);
-  const items = images.length > 0 ? images : [];
-  const main = items[0];
-  const thumbs = items.slice(1, 5);
+  const [failedIds, setFailedIds] = useState<Set<string>>(new Set());
+
+  const addFailed = (id: string) => {
+    setFailedIds((prev) => {
+      if (prev.has(id)) return prev;
+      const next = new Set(prev);
+      next.add(id);
+      return next;
+    });
+  };
+
+  const validItems = images.filter((img) => !failedIds.has(img.id));
+  const main = validItems[0];
+  const thumbs = validItems.slice(1, 5);
 
   if (!main) {
     return (
@@ -41,22 +48,24 @@ export function BusinessGallery({ images, businessName }: BusinessGalleryProps) 
         <button
           type="button"
           onClick={() => setOpenIndex(0)}
+          key={main.id}
           className="group relative col-span-2 row-span-2 aspect-[4/3] overflow-hidden rounded-2xl bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring sm:aspect-auto sm:rounded-none"
           aria-label={`${businessName} — ${t("biz.view_all_photos")}`}
         >
-          <img
-            src={getBusinessImageUrl(main)}
+          <BusinessImage
+            image={main}
             alt={businessName}
-            className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
             loading="eager"
+            onLoadError={() => addFailed(main.id)}
+            className="h-full w-full transition-transform duration-500 group-hover:scale-[1.02]"
           />
         </button>
         {[0, 1, 2, 3].map((i) => {
           const img = thumbs[i];
-          const isLast = i === 3 && items.length > 5;
+          const isLast = i === 3 && validItems.length > 5;
           return (
             <button
-              key={i}
+              key={img?.id ?? `thumb-${i}`}
               type="button"
               onClick={() => setOpenIndex(i + 1)}
               disabled={!img}
@@ -66,22 +75,22 @@ export function BusinessGallery({ images, businessName }: BusinessGalleryProps) 
               )}
               aria-label={
                 isLast
-                  ? `${t("biz.view_all_photos")} (${items.length})`
+                  ? `${t("biz.view_all_photos")} (${validItems.length})`
                   : `${businessName} — ${i + 2}`
               }
             >
               {img ? (
                 <>
-                  <img
-                    src={getBusinessImageUrl(img)}
+                  <BusinessImage
+                    image={img}
                     alt={`${businessName} ${i + 2}`}
-                    loading="lazy"
-                    className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-[1.02]"
+                    onLoadError={() => addFailed(img.id)}
+                    className="h-full w-full transition-transform duration-500 group-hover:scale-[1.02]"
                   />
                   {isLast && (
                     <div className="absolute inset-0 grid place-items-center bg-primary/60 text-primary-foreground">
                       <span className="text-sm font-semibold">
-                        +{items.length - 5} {t("biz.view_all_photos")}
+                        +{validItems.length - 5} {t("biz.view_all_photos")}
                       </span>
                     </div>
                   )}
@@ -94,7 +103,6 @@ export function BusinessGallery({ images, businessName }: BusinessGalleryProps) 
         })}
       </div>
 
-      {/* Mobile-only "view all" pill */}
       <div className="mt-2 flex justify-end sm:hidden">
         <button
           type="button"
@@ -102,7 +110,7 @@ export function BusinessGallery({ images, businessName }: BusinessGalleryProps) 
           className="inline-flex items-center gap-2 rounded-full border border-border bg-card px-3 py-1.5 text-xs font-medium shadow-sm"
         >
           <ImageIcon className="h-3.5 w-3.5" aria-hidden="true" />
-          {t("biz.view_all_photos")} ({items.length})
+          {t("biz.view_all_photos")} ({validItems.length})
         </button>
       </div>
 
@@ -116,13 +124,12 @@ export function BusinessGallery({ images, businessName }: BusinessGalleryProps) 
         <DialogContent className="max-h-[92vh] max-w-5xl overflow-y-auto p-3 sm:p-6">
           <DialogTitle className="sr-only">{businessName}</DialogTitle>
           <div className="grid gap-3 sm:grid-cols-2">
-            {items.map((img, i) => (
-              <img
+            {validItems.map((img, i) => (
+              <BusinessImage
                 key={img.id}
-                src={getBusinessImageUrl(img)}
+                image={img}
                 alt={`${businessName} ${i + 1}`}
                 className="w-full rounded-lg object-cover"
-                loading={i < 2 ? "eager" : "lazy"}
               />
             ))}
           </div>

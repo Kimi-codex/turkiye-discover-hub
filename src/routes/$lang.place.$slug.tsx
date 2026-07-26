@@ -1,5 +1,6 @@
 import { createFileRoute, notFound } from "@tanstack/react-router";
-import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
+import { useSuspenseQuery, useQuery, queryOptions } from "@tanstack/react-query";
+import { useServerFn } from "@tanstack/react-start";
 import {
   Globe,
   MapPin,
@@ -20,6 +21,8 @@ import { RatingStars } from "@/components/business/RatingStars";
 import { ReviewCard } from "@/components/business/ReviewCard";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { WriteReviewDialog } from "@/components/business/WriteReviewDialog";
+import { ClientBusinessMap } from "@/components/map/ClientMap";
+import { SeoContent } from "@/components/seo/SeoContent";
 import { services } from "@/lib/repos";
 import {
   DEFAULT_LOCALE,
@@ -27,8 +30,12 @@ import {
   translate,
   type Locale,
 } from "@/lib/i18n";
-import { buildHreflang, canonicalFor } from "@/lib/seo/hreflang";
+import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
+import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
 import { getBusinessImageUrl } from "@/lib/images/storage";
+import { areValidCoordinates } from "@/lib/business/coordinates";
+import { useAuth } from "@/hooks/use-auth";
+import { getMyReviewForBusiness } from "@/lib/reviews/reviews.functions";
 
 const businessQuery = (slug: string) =>
   queryOptions({
@@ -67,6 +74,7 @@ export const Route = createFileRoute("/$lang/place/$slug")({
     const cover = getBusinessImageUrl(
       b.images.find((i) => i.isCover) ?? b.images[0],
     );
+    const canonicalUrl = canonicalFor(locale, path);
     const jsonLd = {
       "@context": "https://schema.org",
       "@type": "LocalBusiness",
@@ -92,6 +100,13 @@ export const Route = createFileRoute("/$lang/place/$slug")({
       },
       priceRange: b.priceLevel ? "$".repeat(b.priceLevel) : undefined,
     };
+    const breadcrumbItems = [
+      { label: translate(locale, "breadcrumb.home"), url: canonicalFor(locale, "/") },
+      { label: pickLocalized(b.primaryCategory.name, locale), url: canonicalFor(locale, `/${b.primaryCategory.slug}`) },
+      ...(b.city?.slug ? [{ label: pickLocalized(b.city.name, locale), url: canonicalFor(locale, `/${b.city.slug}`) }] : []),
+      { label: b.name, url: canonicalUrl },
+    ];
+    const breadcrumbLd = breadcrumbJsonLd(breadcrumbItems);
     return {
       meta: [
         { title },
@@ -99,19 +114,25 @@ export const Route = createFileRoute("/$lang/place/$slug")({
         { property: "og:title", content: title },
         { property: "og:description", content: desc.slice(0, 200) },
         { property: "og:type", content: "business.business" },
-        { property: "og:url", content: canonicalFor(locale, path) },
+        { property: "og:url", content: canonicalUrl },
+        { property: "og:locale", content: ogLocaleFor(locale) },
         { property: "og:image", content: cover },
-        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:title", content: title },
+        { name: "twitter:description", content: desc.slice(0, 200) },
         { name: "twitter:image", content: cover },
       ],
       links: [
-        { rel: "canonical", href: canonicalFor(locale, path) },
+        { rel: "canonical", href: canonicalUrl },
         ...buildHreflang(path),
       ],
       scripts: [
         {
           type: "application/ld+json",
           children: JSON.stringify(jsonLd),
+        },
+        {
+          type: "application/ld+json",
+          children: JSON.stringify(breadcrumbLd),
         },
       ],
     };
@@ -139,13 +160,21 @@ function NotFound() {
 function BusinessDetailsPage() {
   const { lang } = Route.useParams();
   const locale = lang as Locale;
-  const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
+  const t = (k: Parameters<typeof translate>[1], vars?: Record<string, string | number>) => translate(locale, k, vars);
   const { data } = useSuspenseQuery(businessQuery(Route.useParams().slug));
   const { business: b, reviews, similar } = data;
 
+  const { user } = useAuth();
+  const getMine = useServerFn(getMyReviewForBusiness);
+  const mineQ = useQuery({
+    queryKey: ["my-review", b.id, user?.id ?? "anon"],
+    queryFn: () => getMine({ data: { businessId: b.id } }),
+    enabled: !!user,
+  });
+  const myReview = mineQ.data;
+
   const desc = pickLocalized(b.description, locale);
   const descOriginal = pickLocalized(b.description, b.originalLanguage);
-  const hasDescInLocale = !!b.description[locale];
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -192,10 +221,12 @@ function BusinessDetailsPage() {
                 reviewCount={b.reviewCount}
                 reviewLabel={t("card.reviews")}
               />
-              <span className="inline-flex items-center gap-1">
-                <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="truncate">{b.address}</span>
-              </span>
+              {b.address ? (
+                <span className="inline-flex items-center gap-1">
+                  <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span className="truncate">{b.address}</span>
+                </span>
+              ) : null}
             </div>
           </div>
         </div>
@@ -257,14 +288,13 @@ function BusinessDetailsPage() {
             <h2 id="section-overview" className="text-lg font-bold sm:text-xl">
               {t("biz.overview")}
             </h2>
-            <p className="mt-3 whitespace-pre-line text-sm leading-relaxed text-foreground sm:text-base">
-              {desc || descOriginal || "—"}
-            </p>
-            {!hasDescInLocale && descOriginal && (
-              <p className="mt-2 text-xs italic text-muted-foreground">
-                Original language: {b.originalLanguage.toUpperCase()}
-              </p>
-            )}
+            <div className="mt-3">
+              <SeoContent
+                content={desc}
+                originalContent={descOriginal}
+                originalLanguage={b.originalLanguage}
+              />
+            </div>
             {b.services.length > 0 && (
               <div className="mt-6">
                 <h3 className="text-sm font-semibold">{t("biz.services")}</h3>
@@ -287,43 +317,61 @@ function BusinessDetailsPage() {
               {t("biz.location")}
             </h2>
             <div className="mt-3 overflow-hidden rounded-2xl border border-border bg-card">
-              <div
-                className="grid aspect-[16/8] w-full place-items-center bg-surface-muted text-muted-foreground"
-                aria-label="Map preview"
-              >
-                <MapPin className="h-8 w-8" aria-hidden="true" />
-              </div>
+              {areValidCoordinates(b.latitude, b.longitude) ? (
+                <ClientBusinessMap
+                  latitude={b.latitude}
+                  longitude={b.longitude}
+                  name={b.name}
+                  googleMapsUrl={b.googleMapsUrl}
+                  className="aspect-[16/8] w-full"
+                />
+              ) : (
+                <div
+                  className="grid aspect-[16/8] w-full place-items-center bg-surface-muted text-muted-foreground"
+                  aria-label="Map preview"
+                >
+                  <MapPin className="h-8 w-8" aria-hidden="true" />
+                </div>
+              )}
               <div className="grid gap-3 p-5 sm:grid-cols-[minmax(0,1fr)_auto] sm:items-center">
                 <div className="min-w-0">
-                  <div className="truncate text-sm font-medium">{b.address}</div>
-                  <div className="mt-1 text-xs text-muted-foreground">
-                    {b.latitude.toFixed(4)}, {b.longitude.toFixed(4)}
-                  </div>
+                  {b.address ? (
+                    <div className="truncate text-sm font-medium">{b.address}</div>
+                  ) : null}
+                  {areValidCoordinates(b.latitude, b.longitude) ? (
+                    <div className={`text-xs text-muted-foreground${b.address ? " mt-1" : ""}`}>
+                      {b.latitude.toFixed(4)}, {b.longitude.toFixed(4)}
+                    </div>
+                  ) : null}
                 </div>
                 <div className="flex gap-2">
-                  <Button asChild variant="outline" size="sm" className="gap-2">
-                    <a
-                      href={b.googleMapsUrl ?? "#"}
-                      target="_blank"
-                      rel="noreferrer noopener"
+                  {areValidCoordinates(b.latitude, b.longitude) ? (
+                    <Button asChild variant="outline" size="sm" className="gap-2">
+                      <a
+                        href={b.googleMapsUrl ?? `https://www.google.com/maps?q=${b.latitude},${b.longitude}`}
+                        target="_blank"
+                        rel="noreferrer noopener"
+                      >
+                        <Navigation className="h-4 w-4" aria-hidden="true" />
+                        {t("biz.directions")}
+                      </a>
+                    </Button>
+                  ) : null}
+                  {b.address ? (
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className="gap-2"
+                      onClick={() => {
+                        if (typeof navigator !== "undefined" && navigator.clipboard) {
+                          navigator.clipboard.writeText(b.address).catch(() => {});
+                        }
+                      }}
                     >
-                      <Navigation className="h-4 w-4" aria-hidden="true" />
-                      {t("biz.directions")}
-                    </a>
-                  </Button>
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="gap-2"
-                    onClick={() => {
-                      if (typeof navigator !== "undefined" && navigator.clipboard) {
-                        navigator.clipboard.writeText(b.address).catch(() => {});
-                      }
-                    }}
-                  >
-                    <Copy className="h-4 w-4" aria-hidden="true" />
-                    {t("biz.copy_address")}
-                  </Button>
+                      <Copy className="h-4 w-4" aria-hidden="true" />
+                      {t("biz.copy_address")}
+                    </Button>
+                  ) : null}
                 </div>
               </div>
             </div>
@@ -336,18 +384,51 @@ function BusinessDetailsPage() {
               </h2>
               <WriteReviewDialog businessId={b.id} locale={locale} lang={lang} />
             </div>
-            {reviews.length === 0 ? (
+            {reviews.length > 0 ? (
+              <div className="mt-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  {reviews.map((r) => (
+                    <ReviewCard key={r.id} review={r} />
+                  ))}
+                </div>
+                {b.reviewCount > reviews.length ? (
+                  <p className="mt-3 text-center text-sm text-muted-foreground">
+                    {t("review.showing_of", { count: reviews.length, total: b.reviewCount })}
+                  </p>
+                ) : null}
+              </div>
+            ) : b.rating > 0 && b.reviewCount > 0 ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <RatingStars
+                  value={b.rating}
+                  reviewCount={b.reviewCount}
+                  reviewLabel={t("card.reviews")}
+                />
+                {b.googleMapsUrl ? (
+                  <Button asChild variant="outline" size="sm" className="mt-3">
+                    <a
+                      href={b.googleMapsUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                    >
+                      {t("review.check_on_google")}
+                    </a>
+                  </Button>
+                ) : null}
+              </div>
+            ) : myReview && myReview.status === "pending" ? (
+              <div className="mt-4 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
+                <p className="text-sm font-medium">{t("review.pending")}</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {t("review.dialog_desc")}
+                </p>
+              </div>
+            ) : (
               <div className="mt-4 rounded-2xl border border-dashed border-border bg-card/40 p-8 text-center">
                 <p className="text-sm font-medium">{t("review.empty.title")}</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {t("review.empty.desc")}
                 </p>
-              </div>
-            ) : (
-              <div className="mt-4 grid gap-3 sm:grid-cols-2">
-                {reviews.map((r) => (
-                  <ReviewCard key={r.id} review={r} />
-                ))}
               </div>
             )}
           </section>
@@ -390,13 +471,15 @@ function BusinessDetailsPage() {
                     </a>
                   </div>
                 )}
-                <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
-                  <MapPin
-                    className="mt-0.5 h-4 w-4 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                  <span className="text-foreground">{b.address}</span>
-                </div>
+                {b.address ? (
+                  <div className="grid grid-cols-[auto_minmax(0,1fr)] items-start gap-3">
+                    <MapPin
+                      className="mt-0.5 h-4 w-4 text-muted-foreground"
+                      aria-hidden="true"
+                    />
+                    <span className="text-foreground">{b.address}</span>
+                  </div>
+                ) : null}
               </dl>
               <Button className="mt-4 w-full gap-2" variant="outline">
                 <ShieldCheck className="h-4 w-4" aria-hidden="true" />

@@ -3,6 +3,7 @@ import type { Business } from "@/types/domain";
 import { getBusinessImageUrl } from "@/lib/images/storage";
 import { pickLocalized, useLocale, useT } from "@/lib/i18n";
 import { LocaleLink } from "@/components/site/LocaleLink";
+import { HighlightedText } from "@/components/search/HighlightedText";
 import { cn } from "@/lib/utils";
 import { isOpenNow } from "@/lib/business/opening-hours";
 
@@ -11,6 +12,7 @@ interface BusinessCardProps {
   variant?: "grid" | "horizontal" | "compact";
   className?: string;
   eager?: boolean;
+  highlightQuery?: string;
 }
 
 /**
@@ -22,6 +24,7 @@ export function BusinessCard({
   variant = "grid",
   className,
   eager = false,
+  highlightQuery,
 }: BusinessCardProps) {
   const t = useT();
   const locale = useLocale();
@@ -67,6 +70,9 @@ export function BusinessCard({
                 {t("card.featured")}
               </span>
             )}
+            <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-primary shadow-sm">
+              {primaryCat}
+            </span>
             {business.isVerified && (
               <span className="inline-flex items-center gap-1 rounded-full bg-white/95 px-2.5 py-1 text-[0.65rem] font-semibold uppercase tracking-wide text-primary shadow-sm">
                 <ShieldCheck className="h-3 w-3" aria-hidden="true" />
@@ -124,7 +130,7 @@ export function BusinessCard({
       <div className="flex min-w-0 flex-1 flex-col gap-3 p-5">
         <div className="flex items-start justify-between gap-3">
           <h3 className="line-clamp-2 min-w-0 font-display text-lg font-bold leading-tight text-primary">
-            {business.name}
+            <HighlightedText text={business.name} query={highlightQuery ?? ""} />
           </h3>
           {priceStr && (
             <span className="shrink-0 rounded-full bg-muted px-2 py-0.5 text-xs font-semibold text-muted-foreground">
