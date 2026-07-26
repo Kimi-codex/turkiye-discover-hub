@@ -31,15 +31,16 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, localBusinessJsonLd } from "@/lib/seo/jsonld";
 import { getBusinessImageUrl } from "@/lib/images/storage";
 import { areValidCoordinates } from "@/lib/business/coordinates";
 import { useAuth } from "@/hooks/use-auth";
 import { getMyReviewForBusiness } from "@/lib/reviews/reviews.functions";
+import { getPublishedBusinessSeoContent } from "@/lib/seo/generated-content.functions";
 
-const businessQuery = (slug: string) =>
+const businessQuery = (slug: string, locale: Locale) =>
   queryOptions({
-    queryKey: ["business", slug],
+    queryKey: ["business", slug, locale],
     queryFn: async () => {
       const b = await services.businesses.getBySlug(slug);
       if (!b) throw notFound();
@@ -47,13 +48,16 @@ const businessQuery = (slug: string) =>
         services.reviews.listForBusiness(b.id, 6),
         services.businesses.getSimilar(b, 4),
       ]);
-      return { business: b, reviews, similar };
+      const seo = await getPublishedBusinessSeoContent({
+        data: { businessId: b.id, locale },
+      });
+      return { business: b, reviews, similar, seo };
     },
   });
 
 export const Route = createFileRoute("/$lang/place/$slug")({
   loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(businessQuery(params.slug)),
+    context.queryClient.ensureQueryData(businessQuery(params.slug, params.lang as Locale)),
   head: ({ params, loaderData }) => {
     const locale = (params.lang as Locale) ?? DEFAULT_LOCALE;
     const path = `/place/${params.slug}`;
@@ -66,40 +70,17 @@ export const Route = createFileRoute("/$lang/place/$slug")({
       };
     }
     const b = loaderData.business;
-    const desc = pickLocalized(b.description, locale) || b.address;
+    const desc = loaderData.seo?.metaDescription || pickLocalized(b.description, locale) || b.address;
     const cityName = pickLocalized(b.city?.name, locale);
-    const title = cityName
+    const fallbackTitle = cityName
       ? `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)} · ${cityName}`
       : `${b.name} — ${pickLocalized(b.primaryCategory.name, locale)}`;
+    const title = loaderData.seo?.seoTitle || fallbackTitle;
     const cover = getBusinessImageUrl(
       b.images.find((i) => i.isCover) ?? b.images[0],
     );
     const canonicalUrl = canonicalFor(locale, path);
-    const jsonLd = {
-      "@context": "https://schema.org",
-      "@type": "LocalBusiness",
-      name: b.name,
-      image: cover,
-      address: {
-        "@type": "PostalAddress",
-        streetAddress: b.address,
-        addressLocality: pickLocalized(b.city?.name, "en"),
-        addressCountry: "TR",
-      },
-      geo: {
-        "@type": "GeoCoordinates",
-        latitude: b.latitude,
-        longitude: b.longitude,
-      },
-      telephone: b.phone ?? undefined,
-      url: b.website ?? undefined,
-      aggregateRating: {
-        "@type": "AggregateRating",
-        ratingValue: b.rating,
-        reviewCount: b.reviewCount,
-      },
-      priceRange: b.priceLevel ? "$".repeat(b.priceLevel) : undefined,
-    };
+    const jsonLd = localBusinessJsonLd(b, locale, canonicalUrl);
     const breadcrumbItems = [
       { label: translate(locale, "breadcrumb.home"), url: canonicalFor(locale, "/") },
       { label: pickLocalized(b.primaryCategory.name, locale), url: canonicalFor(locale, `/${b.primaryCategory.slug}`) },
@@ -161,7 +142,7 @@ function BusinessDetailsPage() {
   const { lang } = Route.useParams();
   const locale = lang as Locale;
   const t = (k: Parameters<typeof translate>[1], vars?: Record<string, string | number>) => translate(locale, k, vars);
-  const { data } = useSuspenseQuery(businessQuery(Route.useParams().slug));
+  const { data } = useSuspenseQuery(businessQuery(Route.useParams().slug, locale));
   const { business: b, reviews, similar } = data;
 
   const { user } = useAuth();
@@ -173,7 +154,7 @@ function BusinessDetailsPage() {
   });
   const myReview = mineQ.data;
 
-  const desc = pickLocalized(b.description, locale);
+  const desc = data.seo?.description || pickLocalized(b.description, locale);
   const descOriginal = pickLocalized(b.description, b.originalLanguage);
 
   return (

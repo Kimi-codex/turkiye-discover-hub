@@ -1,45 +1,9 @@
 import { supabase } from "@/integrations/supabase/client";
-import { LOCALES } from "@/types/domain";
+import { LOCALES, type Locale } from "@/types/domain";
+import { configuredSiteOrigin, safePathSegment, xmlEscape } from "./url";
 
-const SITEMAP_MAX_URLS = 45000;
-
-function xmlUrl(loc: string, lastmod?: string, changefreq?: string, priority?: string): string {
-  let s = `  <url>\n    <loc>${loc}</loc>`;
-  if (lastmod) s += `\n    <lastmod>${lastmod}</lastmod>`;
-  if (changefreq) s += `\n    <changefreq>${changefreq}</changefreq>`;
-  if (priority) s += `\n    <priority>${priority}</priority>`;
-  s += "\n  </url>";
-  return s;
-}
-
-function sitemapXml(urls: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.0.9">\n${urls.join("\n")}\n</urlset>`;
-}
-
-function sitemapIndexXml(indexes: string[]): string {
-  return `<?xml version="1.0" encoding="UTF-8"?>\n<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.0.9">\n${indexes.join("\n")}\n</sitemapindex>`;
-}
-
-function sitemapIndexEntry(loc: string): string {
-  return `  <sitemap>\n    <loc>${loc}</loc>\n  </sitemap>`;
-}
-
-function localePath(siteUrl: string, locale: string, path: string): string {
-  if (path === "/") return `${siteUrl}/${locale}`;
-  return `${siteUrl}/${locale}${path}`;
-}
-
-function todayDate(): string {
-  return new Date().toISOString().slice(0, 10);
-}
-
-function forEachLocale(fn: (locale: string) => string[]): string[] {
-  const results: string[] = [];
-  for (const locale of LOCALES) {
-    results.push(...fn(locale));
-  }
-  return results;
-}
+const SITEMAP_MAX_URLS = 45_000;
+const BUSINESS_PAGE_SIZE = 1_000;
 
 type SitemapBatch = {
   page: number;
@@ -47,195 +11,276 @@ type SitemapBatch = {
   xml: string;
 };
 
-// ── Static Pages ──────────────────────────────────────────
-export async function generateStaticPagesSitemap(siteUrl: string): Promise<string> {
-  const urls: string[] = [];
-  for (const locale of LOCALES) {
-    urls.push(xmlUrl(localePath(siteUrl, locale, "/"), todayDate(), "weekly", "1.0"));
-    urls.push(xmlUrl(localePath(siteUrl, locale, "/search"), undefined, "never", "0.3"));
-  }
-  return sitemapXml(urls);
+type RouteEntry = {
+  path: string;
+  lastmod?: string | null;
+  changefreq?: string;
+  priority?: string;
+};
+
+type BusinessRouteRow = {
+  slug: string | null;
+  updated_at: string | null;
+};
+
+type ComboRow = {
+  updated_at: string | null;
+  city: { slug: string | null } | null;
+  district: { slug: string | null } | null;
+  primary_category: { slug: string | null } | null;
+};
+
+function sitemapXml(urls: string[]): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.0.9">',
+    ...urls,
+    "</urlset>",
+  ].join("\n");
 }
 
-// ── Categories ────────────────────────────────────────────
+function sitemapIndexXml(indexes: string[]): string {
+  return [
+    '<?xml version="1.0" encoding="UTF-8"?>',
+    '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.0.9">',
+    ...indexes,
+    "</sitemapindex>",
+  ].join("\n");
+}
+
+function sitemapIndexEntry(loc: string): string {
+  return `  <sitemap>\n    <loc>${xmlEscape(loc)}</loc>\n  </sitemap>`;
+}
+
+function normalizeDate(value?: string | null): string | undefined {
+  if (!value) return undefined;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return undefined;
+  return date.toISOString().slice(0, 10);
+}
+
+function routeUrl(origin: string, locale: Locale, path: string): string {
+  const cleanPath = path === "/" ? "" : path;
+  return `${origin}/${locale}${cleanPath}`;
+}
+
+function xmlUrl(origin: string, locale: Locale, entry: RouteEntry): string {
+  const loc = routeUrl(origin, locale, entry.path);
+  const lastmod = normalizeDate(entry.lastmod);
+  let s = `  <url>\n    <loc>${xmlEscape(loc)}</loc>`;
+  if (lastmod) s += `\n    <lastmod>${lastmod}</lastmod>`;
+  if (entry.changefreq) s += `\n    <changefreq>${entry.changefreq}</changefreq>`;
+  if (entry.priority) s += `\n    <priority>${entry.priority}</priority>`;
+  s += "\n  </url>";
+  return s;
+}
+
+function expandLocales(origin: string, entries: RouteEntry[]): string[] {
+  const urls: string[] = [];
+  const seen = new Set<string>();
+  for (const entry of entries) {
+    for (const locale of LOCALES) {
+      const loc = routeUrl(origin, locale, entry.path);
+      if (seen.has(loc)) continue;
+      seen.add(loc);
+      urls.push(xmlUrl(origin, locale, entry));
+    }
+  }
+  return urls;
+}
+
+function pathFromSegments(...segments: string[]): string | null {
+  const safe = segments.map(safePathSegment);
+  if (safe.some((s) => !s)) return null;
+  return `/${safe.join("/")}`;
+}
+
+export async function generateStaticPagesSitemap(siteUrl: string): Promise<string> {
+  const origin = configuredSiteOrigin(siteUrl);
+  return sitemapXml(
+    expandLocales(origin, [
+      { path: "/", changefreq: "weekly", priority: "1.0" },
+    ]),
+  );
+}
+
 export async function generateCategoriesSitemap(siteUrl: string): Promise<string> {
-  const { data: categories } = await supabase
+  const origin = configuredSiteOrigin(siteUrl);
+  const { data, error } = await supabase
     .from("categories")
     .select("slug, updated_at")
     .eq("is_active", true);
-  if (!categories) return sitemapXml([]);
+  if (error || !data) return sitemapXml([]);
 
-  const urls = forEachLocale((locale) =>
-    categories.map((cat) =>
-      xmlUrl(
-        localePath(siteUrl, locale, `/${cat.slug}`),
-        cat.updated_at?.slice(0, 10) ?? undefined,
-        "weekly",
-        "0.8",
-      ),
-    ),
-  );
-  return sitemapXml(urls);
+  const entries = data.flatMap((row) => {
+    const path = row.slug ? pathFromSegments(row.slug) : null;
+    return path ? [{ path, lastmod: row.updated_at, changefreq: "weekly", priority: "0.8" }] : [];
+  });
+  return sitemapXml(expandLocales(origin, entries));
 }
 
-// ── Cities ────────────────────────────────────────────────
 export async function generateCitiesSitemap(siteUrl: string): Promise<string> {
-  const { data: cities } = await supabase
+  const origin = configuredSiteOrigin(siteUrl);
+  const { data, error } = await supabase
     .from("cities")
     .select("slug, updated_at")
     .eq("is_active", true);
-  if (!cities) return sitemapXml([]);
+  if (error || !data) return sitemapXml([]);
 
-  const urls = forEachLocale((locale) =>
-    cities.map((city) =>
-      xmlUrl(
-        localePath(siteUrl, locale, `/${city.slug}`),
-        city.updated_at?.slice(0, 10) ?? undefined,
-        "weekly",
-        "0.8",
-      ),
-    ),
+  const entries = data.flatMap((row) => {
+    const path = row.slug ? pathFromSegments(row.slug) : null;
+    return path ? [{ path, lastmod: row.updated_at, changefreq: "weekly", priority: "0.8" }] : [];
+  });
+  return sitemapXml(expandLocales(origin, entries));
+}
+
+async function loadComboEntries(): Promise<RouteEntry[]> {
+  const entries = new Map<string, RouteEntry>();
+  let from = 0;
+  while (true) {
+    const to = from + BUSINESS_PAGE_SIZE - 1;
+    const { data, error } = await supabase
+      .from("businesses")
+      .select(
+        `
+          updated_at,
+          city:cities!businesses_city_id_fkey(slug),
+          district:districts!businesses_district_id_fkey(slug),
+          primary_category:categories!businesses_primary_category_id_fkey(slug)
+        `,
+      )
+      .eq("status", "published")
+      .range(from, to);
+    if (error || !data || data.length === 0) break;
+
+    for (const row of data as unknown as ComboRow[]) {
+      const citySlug = row.city?.slug;
+      const catSlug = row.primary_category?.slug;
+      if (!citySlug || !catSlug) continue;
+      const cityCatPath = pathFromSegments(citySlug, catSlug);
+      if (cityCatPath) mergeEntry(entries, cityCatPath, row.updated_at, "weekly", "0.7");
+
+      const districtSlug = row.district?.slug;
+      if (districtSlug) {
+        const districtPath = pathFromSegments(citySlug, districtSlug, catSlug);
+        if (districtPath) mergeEntry(entries, districtPath, row.updated_at, "weekly", "0.6");
+      }
+    }
+
+    if (data.length < BUSINESS_PAGE_SIZE) break;
+    from += BUSINESS_PAGE_SIZE;
+  }
+  return [...entries.values()].sort((a, b) => a.path.localeCompare(b.path));
+}
+
+function mergeEntry(
+  entries: Map<string, RouteEntry>,
+  path: string,
+  lastmod: string | null,
+  changefreq: string,
+  priority: string,
+) {
+  const existing = entries.get(path);
+  if (!existing) {
+    entries.set(path, { path, lastmod, changefreq, priority });
+    return;
+  }
+  if (lastmod && (!existing.lastmod || lastmod > existing.lastmod)) {
+    existing.lastmod = lastmod;
+  }
+}
+
+export async function generateComboBatch(siteUrl: string, page: number): Promise<SitemapBatch | null> {
+  const origin = configuredSiteOrigin(siteUrl);
+  const entries = await loadComboEntries();
+  return batchEntries(origin, entries, page);
+}
+
+export async function generateComboSitemapIndexes(siteUrl: string): Promise<string[]> {
+  const origin = configuredSiteOrigin(siteUrl);
+  const entries = await loadComboEntries();
+  const totalUrls = entries.length * LOCALES.length;
+  const totalPages = Math.max(1, Math.ceil(totalUrls / SITEMAP_MAX_URLS));
+  return Array.from({ length: totalPages }, (_, i) =>
+    sitemapIndexEntry(`${origin}/sitemap-directory-${i + 1}.xml`),
   );
-  return sitemapXml(urls);
 }
 
-// ── Category-City pages ───────────────────────────────────
-async function loadCatCityPairs(): Promise<{ citySlug: string; catSlug: string }[]> {
-  const [{ data: cities }, { data: categories }] = await Promise.all([
-    supabase.from("cities").select("slug").eq("is_active", true),
-    supabase.from("categories").select("slug").eq("is_active", true),
-  ]);
-  if (!cities || !categories) return [];
-  const pairs: { citySlug: string; catSlug: string }[] = [];
-  for (const city of cities) {
-    for (const cat of categories) {
-      pairs.push({ citySlug: city.slug, catSlug: cat.slug });
-    }
-  }
-  return pairs;
-}
-
-export async function generateCatCityBatch(siteUrl: string, page: number): Promise<SitemapBatch | null> {
-  const pairs = await loadCatCityPairs();
-  if (pairs.length === 0) return null;
-
-  const totalPairs = pairs.length * LOCALES.length;
-  const totalPages = Math.max(1, Math.ceil(totalPairs / SITEMAP_MAX_URLS));
-  if (page < 1 || page > totalPages) return null;
-
-  const startIdx = (page - 1) * SITEMAP_MAX_URLS;
-  const endIdx = startIdx + SITEMAP_MAX_URLS;
-  const urls: string[] = [];
-
-  let globalIdx = 0;
-  for (const locale of LOCALES) {
-    for (const pair of pairs) {
-      if (globalIdx < startIdx) { globalIdx++; continue; }
-      if (globalIdx >= endIdx) break;
-      urls.push(xmlUrl(localePath(siteUrl, locale, `/${pair.citySlug}/${pair.catSlug}`), undefined, "weekly", "0.7"));
-      globalIdx++;
-    }
-    if (globalIdx >= endIdx) break;
-  }
-
-  return { page, totalPages, xml: sitemapXml(urls) };
-}
-
-export async function generateCatCitySitemapIndexes(siteUrl: string): Promise<string[]> {
-  const pairs = await loadCatCityPairs();
-  if (pairs.length === 0) return [];
-
-  const totalPairs = pairs.length * LOCALES.length;
-  const totalPages = Math.max(1, Math.ceil(totalPairs / SITEMAP_MAX_URLS));
-  const indexes: string[] = [];
-  for (let i = 1; i <= totalPages; i++) {
-    indexes.push(sitemapIndexEntry(`${siteUrl}/sitemap-catcity-${i}.xml`));
-  }
-  return indexes;
-}
-
-// ── Business detail pages ─────────────────────────────────
 export async function generateBusinessesBatch(siteUrl: string, page: number): Promise<SitemapBatch | null> {
-  const { data: businesses, error } = await supabase
+  const origin = configuredSiteOrigin(siteUrl);
+  const from = (page - 1) * Math.floor(SITEMAP_MAX_URLS / LOCALES.length);
+  const pageSize = Math.floor(SITEMAP_MAX_URLS / LOCALES.length);
+  const to = from + pageSize - 1;
+
+  const { data, error, count } = await supabase
     .from("businesses")
-    .select("slug, updated_at")
+    .select("slug, updated_at", { count: "exact" })
     .eq("status", "published")
-    .order("updated_at", { ascending: false });
-  if (error || !businesses) return null;
+    .order("updated_at", { ascending: false })
+    .range(from, to);
+  if (error || !data || page < 1) return null;
 
-  const totalBiz = businesses.length * LOCALES.length;
-  const totalPages = Math.max(1, Math.ceil(totalBiz / SITEMAP_MAX_URLS));
-  if (page < 1 || page > totalPages) return null;
+  const totalPages = Math.max(1, Math.ceil(((count ?? 0) * LOCALES.length) / SITEMAP_MAX_URLS));
+  if (page > totalPages) return null;
 
-  const startIdx = (page - 1) * SITEMAP_MAX_URLS;
-  const endIdx = startIdx + SITEMAP_MAX_URLS;
-  const urls: string[] = [];
+  const entries = (data as BusinessRouteRow[]).flatMap((row) => {
+    const slug = row.slug ? safePathSegment(row.slug) : null;
+    return slug ? [{ path: `/place/${slug}`, lastmod: row.updated_at, changefreq: "weekly", priority: "0.6" }] : [];
+  });
 
-  let globalIdx = 0;
-  for (const locale of LOCALES) {
-    for (const biz of businesses) {
-      if (globalIdx < startIdx) { globalIdx++; continue; }
-      if (globalIdx >= endIdx) break;
-      urls.push(xmlUrl(
-        localePath(siteUrl, locale, `/place/${biz.slug}`),
-        biz.updated_at?.slice(0, 10) ?? undefined,
-        "weekly",
-        "0.6",
-      ));
-      globalIdx++;
-    }
-    if (globalIdx >= endIdx) break;
-  }
-
-  return { page, totalPages, xml: sitemapXml(urls) };
+  return { page, totalPages, xml: sitemapXml(expandLocales(origin, entries)) };
 }
 
 export async function generateBusinessesSitemapIndexes(siteUrl: string): Promise<string[]> {
-  const { data: businesses } = await supabase
+  const origin = configuredSiteOrigin(siteUrl);
+  const { count, error } = await supabase
     .from("businesses")
-    .select("slug")
+    .select("id", { count: "exact", head: true })
     .eq("status", "published");
-  if (!businesses) return [];
-
-  const totalBiz = businesses.length * LOCALES.length;
-  const totalPages = Math.max(1, Math.ceil(totalBiz / SITEMAP_MAX_URLS));
-  const indexes: string[] = [];
-  for (let i = 1; i <= totalPages; i++) {
-    indexes.push(sitemapIndexEntry(`${siteUrl}/sitemap-businesses-${i}.xml`));
-  }
-  return indexes;
+  if (error) return [];
+  const totalPages = Math.max(1, Math.ceil(((count ?? 0) * LOCALES.length) / SITEMAP_MAX_URLS));
+  return Array.from({ length: totalPages }, (_, i) =>
+    sitemapIndexEntry(`${origin}/sitemap-businesses-${i + 1}.xml`),
+  );
 }
 
-// ── Sitemap Index ─────────────────────────────────────────
+function batchEntries(origin: string, entries: RouteEntry[], page: number): SitemapBatch | null {
+  const totalUrls = entries.length * LOCALES.length;
+  const totalPages = Math.max(1, Math.ceil(totalUrls / SITEMAP_MAX_URLS));
+  if (page < 1 || page > totalPages) return null;
+
+  const expanded = expandLocales(origin, entries);
+  const start = (page - 1) * SITEMAP_MAX_URLS;
+  const urls = expanded.slice(start, start + SITEMAP_MAX_URLS);
+  return { page, totalPages, xml: sitemapXml(urls) };
+}
+
 export async function generateSitemapIndex(siteUrl: string): Promise<string> {
+  const origin = configuredSiteOrigin(siteUrl);
   const entries = [
-    sitemapIndexEntry(`${siteUrl}/sitemap-pages.xml`),
-    sitemapIndexEntry(`${siteUrl}/sitemap-categories.xml`),
-    sitemapIndexEntry(`${siteUrl}/sitemap-cities.xml`),
-    ...(await generateCatCitySitemapIndexes(siteUrl)),
-    ...(await generateBusinessesSitemapIndexes(siteUrl)),
+    sitemapIndexEntry(`${origin}/sitemap-pages.xml`),
+    sitemapIndexEntry(`${origin}/sitemap-categories.xml`),
+    sitemapIndexEntry(`${origin}/sitemap-cities.xml`),
+    ...(await generateComboSitemapIndexes(origin)),
+    ...(await generateBusinessesSitemapIndexes(origin)),
   ];
   return sitemapIndexXml(entries);
 }
 
-// ── Robots.txt ────────────────────────────────────────────
 export function generateRobotsTxt(siteUrl: string): string {
-  return `User-agent: *
-Allow: /
-Allow: /ar/
-Allow: /en/
-Allow: /tr/
-Allow: /fr/
-Allow: /ru/
-Disallow: /admin
-Disallow: /auth
-Disallow: /account
-Disallow: /owner
-Disallow: /api/
-Disallow: /dashboard
-Disallow: /_tanstack/
-Disallow: /assets/
-
-Sitemap: ${siteUrl}/sitemap.xml
-`;
+  const origin = configuredSiteOrigin(siteUrl);
+  return [
+    "User-agent: *",
+    "Allow: /",
+    "Disallow: /*/_authenticated",
+    "Disallow: /*/admin",
+    "Disallow: /*/auth",
+    "Disallow: /*/account",
+    "Disallow: /*/owner",
+    "Disallow: /api/",
+    "Disallow: /_tanstack/",
+    "",
+    `Sitemap: ${origin}/sitemap.xml`,
+    "",
+  ].join("\n");
 }

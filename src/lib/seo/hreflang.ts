@@ -1,4 +1,5 @@
 import { LOCALES, DEFAULT_LOCALE, type Locale } from "@/lib/i18n";
+import { absoluteUrl, stripSearchAndHash } from "./url";
 
 /**
  * Build hreflang link entries for a locale-neutral path.
@@ -13,23 +14,21 @@ export function buildHreflang(
   href: string;
   hrefLang?: string;
 }> {
-  const p = pathWithoutLocale === "/" ? "" : pathWithoutLocale;
-  const prefix = siteUrl ?? "";
+  const cleanPath = stripSearchAndHash(pathWithoutLocale);
   const links: Array<{
     rel: "alternate" | "canonical";
     href: string;
     hrefLang?: string;
   }> = [];
   for (const loc of LOCALES) {
-    links.push({ rel: "alternate", hrefLang: loc, href: `${prefix}/${loc}${p}` });
+    links.push({ rel: "alternate", hrefLang: loc, href: absoluteUrl(loc, cleanPath, siteUrl) });
   }
-  links.push({ rel: "alternate", hrefLang: "x-default", href: `${prefix}/${DEFAULT_LOCALE}${p}` });
+  links.push({ rel: "alternate", hrefLang: "x-default", href: absoluteUrl(DEFAULT_LOCALE, cleanPath, siteUrl) });
   return links;
 }
 
 export function canonicalFor(locale: Locale, pathWithoutLocale: string, siteUrl?: string): string {
-  const p = pathWithoutLocale === "/" ? "" : pathWithoutLocale;
-  return `${siteUrl ?? ""}/${locale}${p}`;
+  return absoluteUrl(locale, stripSearchAndHash(pathWithoutLocale), siteUrl);
 }
 
 const OG_LOCALE_MAP: Record<string, string> = {

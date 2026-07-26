@@ -7,7 +7,7 @@ import {
   generateStaticPagesSitemap,
   generateCategoriesSitemap,
   generateCitiesSitemap,
-  generateCatCityBatch,
+  generateComboBatch,
   generateBusinessesBatch,
   generateRobotsTxt,
 } from "./lib/seo/sitemap.server";
@@ -94,11 +94,11 @@ async function handleSitemapRoute(url: URL): Promise<Response | null> {
       }
     }
 
-    // Pattern: /sitemap-catcity-{page}.xml
-    const catCityMatch = pathname.match(/^\/sitemap-catcity-(\d+)\.xml$/);
-    if (catCityMatch) {
-      const page = parseInt(catCityMatch[1], 10);
-      const result = await generateCatCityBatch(siteUrl, page);
+    // Pattern: /sitemap-directory-{page}.xml
+    const directoryMatch = pathname.match(/^\/sitemap-directory-(\d+)\.xml$/);
+    if (directoryMatch) {
+      const page = parseInt(directoryMatch[1], 10);
+      const result = await generateComboBatch(siteUrl, page);
       if (result) return new Response(result.xml, { headers });
       return new Response("Not Found", { status: 404 });
     }

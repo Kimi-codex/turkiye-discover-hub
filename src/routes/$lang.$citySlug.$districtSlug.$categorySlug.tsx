@@ -4,7 +4,7 @@ import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 
 const cityDistrictCategoryQuery = (
@@ -58,10 +58,11 @@ export const Route = createFileRoute(
       breadcrumbJsonLd([
         { label: translate(locale, "breadcrumb.home"), url: canonicalFor(locale, "/") },
         { label: city, url: canonicalFor(locale, `/${params.citySlug}`) },
-        { label: dist, url: canonicalFor(locale, `/${params.citySlug}/${params.districtSlug}/${params.categorySlug}`) },
-        { label: cat, url: siteUrl },
+        { label: cat, url: canonicalFor(locale, `/${params.citySlug}/${params.categorySlug}`) },
+        { label: dist, url: siteUrl },
       ]),
       collectionPageJsonLd(siteUrl, title, desc, loaderData.total),
+      businessItemListJsonLd(loaderData.items, (business) => canonicalFor(locale, `/place/${business.slug}`)),
     ];
     return {
       meta: [

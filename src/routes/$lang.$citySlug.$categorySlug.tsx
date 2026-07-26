@@ -5,7 +5,7 @@ import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { SearchBar } from "@/components/search/SearchBar";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 
 const cityCategoryQuery = (citySlug: string, categorySlug: string) =>
@@ -48,6 +48,7 @@ export const Route = createFileRoute("/$lang/$citySlug/$categorySlug")({
         { label: catName, url: siteUrl },
       ]),
       collectionPageJsonLd(siteUrl, title, desc, loaderData.total),
+      businessItemListJsonLd(loaderData.items, (business) => canonicalFor(locale, `/place/${business.slug}`)),
     ];
     return {
       meta: [

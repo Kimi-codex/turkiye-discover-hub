@@ -6,7 +6,7 @@ import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { SearchBar } from "@/components/search/SearchBar";
 import { SeoContent } from "@/components/seo/SeoContent";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 import { RESERVED_LANG_CHILD_SLUGS } from "@/types/domain";
 
@@ -63,6 +63,7 @@ export const Route = createFileRoute("/$lang/$slug")({
         { label: name, url: siteUrl },
       ]),
       collectionPageJsonLd(siteUrl, name, desc, loaderData.items.length),
+      businessItemListJsonLd(loaderData.items, (business) => canonicalFor(locale, `/place/${business.slug}`)),
     ];
     return {
       meta: [
