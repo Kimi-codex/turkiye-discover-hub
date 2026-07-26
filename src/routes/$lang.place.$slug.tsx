@@ -31,7 +31,7 @@ import {
   type Locale,
 } from "@/lib/i18n";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, localBusinessJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, localBusinessJsonLd, safeJsonLdStringify } from "@/lib/seo/jsonld";
 import { getBusinessImageUrl } from "@/lib/images/storage";
 import { areValidCoordinates } from "@/lib/business/coordinates";
 import { useAuth } from "@/hooks/use-auth";
@@ -109,11 +109,11 @@ export const Route = createFileRoute("/$lang/place/$slug")({
       scripts: [
         {
           type: "application/ld+json",
-          children: JSON.stringify(jsonLd),
+          children: safeJsonLdStringify(jsonLd),
         },
         {
           type: "application/ld+json",
-          children: JSON.stringify(breadcrumbLd),
+          children: safeJsonLdStringify(breadcrumbLd),
         },
       ],
     };

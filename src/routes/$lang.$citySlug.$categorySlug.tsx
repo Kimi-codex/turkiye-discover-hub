@@ -8,7 +8,7 @@ import { DirectoryPagination } from "@/components/directory/DirectoryPagination"
 import { MapToggle } from "@/components/map/MapToggle";
 import { SearchBar } from "@/components/search/SearchBar";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd, safeJsonLdStringify } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 
 interface DirectorySearchParams {
@@ -85,7 +85,7 @@ export const Route = createFileRoute("/$lang/$citySlug/$categorySlug")({
       ],
       scripts: scripts.map((s) => ({
         type: "application/ld+json",
-        children: JSON.stringify(s),
+        children: safeJsonLdStringify(s),
       })),
     };
   },

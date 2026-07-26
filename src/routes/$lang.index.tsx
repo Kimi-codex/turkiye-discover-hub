@@ -4,7 +4,7 @@ import { services } from "@/lib/repos";
 import { Hero } from "@/components/home/Hero";
 import { CategoryShortcuts } from "@/components/home/CategoryShortcuts";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { organizationJsonLd, websiteJsonLd } from "@/lib/seo/jsonld";
+import { organizationJsonLd, safeJsonLdStringify, websiteJsonLd } from "@/lib/seo/jsonld";
 import { configuredSiteOrigin } from "@/lib/seo/url";
 import { translate, type Locale } from "@/lib/i18n";
 
@@ -45,13 +45,13 @@ export const Route = createFileRoute("/$lang/")({
       scripts: [
         {
           type: "application/ld+json",
-          children: JSON.stringify(
+          children: safeJsonLdStringify(
             organizationJsonLd(origin, translate(locale, "brand.name"), `${origin}/favicon.ico`),
           ),
         },
         {
           type: "application/ld+json",
-          children: JSON.stringify(websiteJsonLd(origin, translate(locale, "brand.name"), desc)),
+          children: safeJsonLdStringify(websiteJsonLd(origin, translate(locale, "brand.name"), desc)),
         },
       ],
     };

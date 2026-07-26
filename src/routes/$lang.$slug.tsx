@@ -10,7 +10,7 @@ import { SearchBar } from "@/components/search/SearchBar";
 import { SeoContent } from "@/components/seo/SeoContent";
 import { Badge } from "@/components/ui/badge";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
+import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd, safeJsonLdStringify } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 import { RESERVED_LANG_CHILD_SLUGS } from "@/types/domain";
 
@@ -110,7 +110,7 @@ export const Route = createFileRoute("/$lang/$slug")({
       ],
       scripts: scripts.map((s) => ({
         type: "application/ld+json",
-        children: JSON.stringify(s),
+        children: safeJsonLdStringify(s),
       })),
     };
   },
