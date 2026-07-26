@@ -3,17 +3,29 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
+import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
+import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
 import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
+
+interface DirectorySearchParams {
+  page: number;
+}
+
+function validateDirectorySearch(raw: Record<string, unknown>): DirectorySearchParams {
+  const rawPage = typeof raw.page === "number" ? raw.page : Number(raw.page);
+  return { page: Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1) };
+}
 
 const cityDistrictCategoryQuery = (
   citySlug: string,
   districtSlug: string,
   categorySlug: string,
+  page: number,
 ) =>
   queryOptions({
-    queryKey: ["city-district-category", citySlug, districtSlug, categorySlug],
+    queryKey: ["city-district-category", citySlug, districtSlug, categorySlug, page],
     queryFn: async () => {
       const city = await services.cities.getBySlug(citySlug);
       if (!city) throw notFound();
@@ -27,21 +39,24 @@ const cityDistrictCategoryQuery = (
         district: districtSlug,
         category: categorySlug,
         sort: "recommended",
-        page: 1,
+        page,
       });
-      return { city, district, category, items: result.items, total: result.total };
+      return { city, district, category, items: result.items, total: result.total, page: result.page, pageSize: result.pageSize };
     },
   });
 
 export const Route = createFileRoute(
   "/$lang/$citySlug/$districtSlug/$categorySlug",
 )({
-  loader: ({ context, params }) =>
+  validateSearch: validateDirectorySearch,
+  loaderDeps: ({ search }) => ({ search }),
+  loader: ({ context, params, deps }) =>
     context.queryClient.ensureQueryData(
       cityDistrictCategoryQuery(
         params.citySlug,
         params.districtSlug,
         params.categorySlug,
+        deps.search.page,
       ),
     ),
   head: ({ params, loaderData }) => {
@@ -93,10 +108,11 @@ export const Route = createFileRoute(
 
 function CityDistrictCategoryPage() {
   const { lang, citySlug, districtSlug, categorySlug } = Route.useParams();
+  const search = Route.useSearch();
   const locale = lang as Locale;
   const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
   const { data } = useSuspenseQuery(
-    cityDistrictCategoryQuery(citySlug, districtSlug, categorySlug),
+    cityDistrictCategoryQuery(citySlug, districtSlug, categorySlug, search.page),
   );
   const cityName = pickLocalized(data.city.name, locale);
   const districtName = pickLocalized(data.district.name, locale);
@@ -108,11 +124,8 @@ function CityDistrictCategoryPage() {
         items={[
           { label: t("breadcrumb.home"), to: "/" },
           { label: cityName, to: `/${citySlug}` },
-          {
-            label: districtName,
-            to: `/${citySlug}/${districtSlug}/${categorySlug}`,
-          },
-          { label: catName },
+          { label: catName, to: `/${citySlug}/${categorySlug}` },
+          { label: districtName },
         ]}
       />
       <h1 className="mt-4 text-2xl font-bold sm:text-3xl">
@@ -121,11 +134,25 @@ function CityDistrictCategoryPage() {
       <p className="mt-4 text-sm text-muted-foreground">
         {data.total.toLocaleString()} {t("common.results")}
       </p>
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {data.items.map((b, i) => (
-          <BusinessCard key={b.id} business={b} eager={i < 4} />
-        ))}
-      </div>
+      {data.items.length === 0 ? (
+        <div className="mt-6">
+          <DirectoryEmptyState />
+        </div>
+      ) : (
+        <>
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {data.items.map((b, i) => (
+              <BusinessCard key={b.id} business={b} eager={i < 4} />
+            ))}
+          </div>
+          <DirectoryPagination
+            className="mt-8"
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+          />
+        </>
+      )}
     </div>
   );
 }

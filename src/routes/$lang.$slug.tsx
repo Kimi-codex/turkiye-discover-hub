@@ -3,8 +3,11 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
+import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
+import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
 import { SearchBar } from "@/components/search/SearchBar";
 import { SeoContent } from "@/components/seo/SeoContent";
+import { Badge } from "@/components/ui/badge";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
 import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
@@ -15,9 +18,18 @@ import { RESERVED_LANG_CHILD_SLUGS } from "@/types/domain";
  * OR a city landing page. Reserved paths (search, place, admin, etc.) are
  * matched by their own explicit route files and never reach this loader.
  */
-const slugQuery = (slug: string) =>
+interface DirectorySearchParams {
+  page: number;
+}
+
+function validateDirectorySearch(raw: Record<string, unknown>): DirectorySearchParams {
+  const rawPage = typeof raw.page === "number" ? raw.page : Number(raw.page);
+  return { page: Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1) };
+}
+
+const slugQuery = (slug: string, page: number) =>
   queryOptions({
-    queryKey: ["lang-slug", slug],
+    queryKey: ["lang-slug", slug, page],
     queryFn: async () => {
       if (RESERVED_LANG_CHILD_SLUGS.has(slug)) throw notFound();
       const [category, city] = await Promise.all([
@@ -25,20 +37,28 @@ const slugQuery = (slug: string) =>
         services.cities.getBySlug(slug),
       ]);
       if (category) {
-        const items = await services.businesses.getByCategory(slug, 24);
-        return { kind: "category" as const, category, items };
+        const [result, cities] = await Promise.all([
+          services.businesses.list({ category: slug, sort: "recommended", page }),
+          services.cities.list(),
+        ]);
+        return { kind: "category" as const, category, items: result.items, total: result.total, page: result.page, pageSize: result.pageSize, nav: cities };
       }
       if (city) {
-        const items = await services.businesses.getByCity(slug, 24);
-        return { kind: "city" as const, city, items };
+        const [result, categories] = await Promise.all([
+          services.businesses.list({ city: slug, sort: "recommended", page }),
+          services.categories.list(),
+        ]);
+        return { kind: "city" as const, city, items: result.items, total: result.total, page: result.page, pageSize: result.pageSize, nav: categories };
       }
       throw notFound();
     },
   });
 
 export const Route = createFileRoute("/$lang/$slug")({
-  loader: ({ context, params }) =>
-    context.queryClient.ensureQueryData(slugQuery(params.slug)),
+  validateSearch: validateDirectorySearch,
+  loaderDeps: ({ search }) => ({ search }),
+  loader: ({ context, params, deps }) =>
+    context.queryClient.ensureQueryData(slugQuery(params.slug, deps.search.page)),
   head: ({ params, loaderData }) => {
     const locale = params.lang as Locale;
     const path = `/${params.slug}`;
@@ -106,14 +126,17 @@ function NotFound() {
 
 function LangSlugPage() {
   const { lang, slug } = Route.useParams();
+  const search = Route.useSearch();
   const locale = lang as Locale;
   const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
-  const { data } = useSuspenseQuery(slugQuery(slug));
+  const { data } = useSuspenseQuery(slugQuery(slug, search.page));
 
   const heading =
     data.kind === "category"
       ? pickLocalized(data.category.name, locale)
       : pickLocalized(data.city.name, locale);
+  const navigationTitle =
+    data.kind === "category" ? t("filters.city") : t("filters.category");
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -165,15 +188,46 @@ function LangSlugPage() {
 
       <div className="mt-6 flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {data.items.length.toLocaleString()} {t("common.results")}
+          {data.total.toLocaleString()} {t("common.results")}
         </p>
       </div>
 
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {data.items.map((b, i) => (
-          <BusinessCard key={b.id} business={b} eager={i < 4} />
+      <nav className="mt-4 flex flex-wrap gap-2" aria-label={navigationTitle}>
+        {data.nav.slice(0, 12).map((item) => (
+          <a
+            key={item.id}
+            href={
+              data.kind === "category"
+                ? `/${locale}/${item.slug}/${data.category.slug}`
+                : `/${locale}/${data.city.slug}/${item.slug}`
+            }
+          >
+            <Badge variant="outline">
+              {pickLocalized(item.name, locale)}
+            </Badge>
+          </a>
         ))}
-      </div>
+      </nav>
+
+      {data.items.length === 0 ? (
+        <div className="mt-6">
+          <DirectoryEmptyState />
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {data.items.map((b, i) => (
+              <BusinessCard key={b.id} business={b} eager={i < 4} />
+            ))}
+          </div>
+          <DirectoryPagination
+            className="mt-8"
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+          />
+        </>
+      )}
     </div>
   );
 }

@@ -3,14 +3,25 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
+import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
+import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
 import { SearchBar } from "@/components/search/SearchBar";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
 import { breadcrumbJsonLd, businessItemListJsonLd, collectionPageJsonLd } from "@/lib/seo/jsonld";
 import { pickLocalized, translate, type Locale } from "@/lib/i18n";
 
-const cityCategoryQuery = (citySlug: string, categorySlug: string) =>
+interface DirectorySearchParams {
+  page: number;
+}
+
+function validateDirectorySearch(raw: Record<string, unknown>): DirectorySearchParams {
+  const rawPage = typeof raw.page === "number" ? raw.page : Number(raw.page);
+  return { page: Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1) };
+}
+
+const cityCategoryQuery = (citySlug: string, categorySlug: string, page: number) =>
   queryOptions({
-    queryKey: ["city-category", citySlug, categorySlug],
+    queryKey: ["city-category", citySlug, categorySlug, page],
     queryFn: async () => {
       const [city, category] = await Promise.all([
         services.cities.getBySlug(citySlug),
@@ -21,16 +32,18 @@ const cityCategoryQuery = (citySlug: string, categorySlug: string) =>
         city: citySlug,
         category: categorySlug,
         sort: "recommended",
-        page: 1,
+        page,
       });
-      return { city, category, items: result.items, total: result.total };
+      return { city, category, items: result.items, total: result.total, page: result.page, pageSize: result.pageSize };
     },
   });
 
 export const Route = createFileRoute("/$lang/$citySlug/$categorySlug")({
-  loader: ({ context, params }) =>
+  validateSearch: validateDirectorySearch,
+  loaderDeps: ({ search }) => ({ search }),
+  loader: ({ context, params, deps }) =>
     context.queryClient.ensureQueryData(
-      cityCategoryQuery(params.citySlug, params.categorySlug),
+      cityCategoryQuery(params.citySlug, params.categorySlug, deps.search.page),
     ),
   head: ({ params, loaderData }) => {
     const locale = params.lang as Locale;
@@ -79,9 +92,10 @@ export const Route = createFileRoute("/$lang/$citySlug/$categorySlug")({
 
 function CityCategoryPage() {
   const { lang, citySlug, categorySlug } = Route.useParams();
+  const search = Route.useSearch();
   const locale = lang as Locale;
   const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
-  const { data } = useSuspenseQuery(cityCategoryQuery(citySlug, categorySlug));
+  const { data } = useSuspenseQuery(cityCategoryQuery(citySlug, categorySlug, search.page));
   const cityName = pickLocalized(data.city.name, locale);
   const catName = pickLocalized(data.category.name, locale);
 
@@ -103,11 +117,25 @@ function CityCategoryPage() {
       <p className="mt-6 text-sm text-muted-foreground">
         {data.total.toLocaleString()} {t("common.results")}
       </p>
-      <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-        {data.items.map((b, i) => (
-          <BusinessCard key={b.id} business={b} eager={i < 4} />
-        ))}
-      </div>
+      {data.items.length === 0 ? (
+        <div className="mt-6">
+          <DirectoryEmptyState />
+        </div>
+      ) : (
+        <>
+          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {data.items.map((b, i) => (
+              <BusinessCard key={b.id} business={b} eager={i < 4} />
+            ))}
+          </div>
+          <DirectoryPagination
+            className="mt-8"
+            page={data.page}
+            pageSize={data.pageSize}
+            total={data.total}
+          />
+        </>
+      )}
     </div>
   );
 }

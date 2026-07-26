@@ -3,11 +3,17 @@ import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
+import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
+import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
+import { FiltersPanel } from "@/components/search/FiltersPanel";
 import { ClarificationCard } from "@/components/search/ClarificationCard";
 import { DidYouMean } from "@/components/search/DidYouMean";
 import { InterpretationChips } from "@/components/search/InterpretationChips";
+import { SortSelect } from "@/components/search/SortSelect";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
-import { translate, useLocale, useT, type Locale } from "@/lib/i18n";
+import { pickLocalized, translate, useLocale, useT, type Locale } from "@/lib/i18n";
 import {
   parseDirectorySearchIntent,
   pickClarifyingQuestion,
@@ -231,6 +237,18 @@ function SearchPage() {
   );
 
   const chips: InterpretationChip[] = intent.interpretation;
+  const activeFilterLabels = useMemo(() => {
+    const labels: string[] = [];
+    const category = dict.categories.find((c) => c.slug === effectiveFilters.category);
+    const city = dict.cities.find((c) => c.slug === effectiveFilters.city);
+    const district = dict.districts.find((d) => d.slug === effectiveFilters.district);
+    if (category) labels.push(pickLocalized(category.name, locale));
+    if (city) labels.push(pickLocalized(city.name, locale));
+    if (district) labels.push(pickLocalized(district.name, locale));
+    if (effectiveFilters.rating) labels.push(`${effectiveFilters.rating}+`);
+    if (effectiveFilters.priceLevel) labels.push("$".repeat(effectiveFilters.priceLevel));
+    return labels;
+  }, [dict, effectiveFilters, locale]);
   const clarifyQuestion = pickClarifyingQuestion(intent);
   const showClarify =
     !dismissedClarify &&
@@ -255,8 +273,16 @@ function SearchPage() {
     });
   }
 
+  function clearAll() {
+    navigate({
+      to: "/$lang/search",
+      params: { lang: locale },
+      search: validateSearch({}),
+    });
+  }
+
   return (
-    <div className="mx-auto w-full max-w-5xl px-4 py-8 sm:px-6 lg:py-10">
+    <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
       <div className="flex flex-col gap-2">
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           {t("search.your_results")}
@@ -271,6 +297,21 @@ function SearchPage() {
             className="mt-2"
           />
         )}
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-sm text-muted-foreground" aria-live="polite">
+            {displayed.total.toLocaleString()} {t("common.results")}
+          </span>
+          {activeFilterLabels.map((label) => (
+            <Badge key={label} variant="secondary">
+              {label}
+            </Badge>
+          ))}
+          {hasActiveSearch && (
+            <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
+              {t("filters.clear")}
+            </Button>
+          )}
+        </div>
       </div>
 
       {showClarify && (
@@ -295,16 +336,39 @@ function SearchPage() {
         />
       )}
 
-      <div className="mt-8">
-        {displayed.items.length === 0 ? (
-          hasActiveSearch ? <EmptyState /> : <CleanSearchState />
-        ) : (
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-            {displayed.items.map((b, i) => (
-              <BusinessCard key={b.id} business={b} eager={i < 2} highlightQuery={params.q} />
-            ))}
+      <div className="mt-8 grid gap-6 lg:grid-cols-[18rem_minmax(0,1fr)]">
+        <FiltersPanel
+          filters={effectiveFilters}
+          categories={dict.categories}
+          cities={dict.cities}
+          districts={dict.districts}
+        />
+        <section aria-label={t("search.your_results")}>
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <p className="text-sm text-muted-foreground">
+              {displayed.total.toLocaleString()} {t("common.results")}
+            </p>
+            <SortSelect value={effectiveFilters.sort} />
           </div>
-        )}
+
+          {displayed.items.length === 0 ? (
+            hasActiveSearch ? <EmptyState /> : <CleanSearchState />
+          ) : (
+            <>
+              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                {displayed.items.map((b, i) => (
+                  <BusinessCard key={b.id} business={b} eager={i < 2} highlightQuery={params.q} />
+                ))}
+              </div>
+              <DirectoryPagination
+                className="mt-8"
+                page={displayed.page}
+                pageSize={displayed.pageSize}
+                total={displayed.total}
+              />
+            </>
+          )}
+        </section>
       </div>
     </div>
   );
@@ -313,21 +377,16 @@ function SearchPage() {
 function EmptyState() {
   const t = useT();
   return (
-    <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
-      <h2 className="text-lg font-semibold">{t("search.no_results.title")}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">
-        {t("search.no_results.desc")}
-      </p>
-    </div>
+    <DirectoryEmptyState
+      title={t("search.no_results.title")}
+      description={t("search.no_results.desc")}
+    />
   );
 }
 
 function CleanSearchState() {
   const t = useT();
   return (
-    <div className="rounded-3xl border border-dashed border-border bg-card p-10 text-center">
-      <h2 className="text-lg font-semibold">{t("search.button")}</h2>
-      <p className="mt-2 text-sm text-muted-foreground">{t("home.subtitle")}</p>
-    </div>
+    <DirectoryEmptyState title={t("search.button")} description={t("home.subtitle")} />
   );
 }

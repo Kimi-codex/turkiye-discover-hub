@@ -4,12 +4,15 @@ import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 import { useLocale, useT, pickLocalized, localePath } from "@/lib/i18n";
-import { CATEGORIES, CITIES } from "@/lib/repos/demo-data";
-import type { SearchFilters } from "@/types/domain";
+import type { Category, City, District, SearchFilters } from "@/types/domain";
 import { cn } from "@/lib/utils";
 
 interface FiltersPanelProps {
   filters: Partial<SearchFilters>;
+  categories: Category[];
+  cities: City[];
+  districts?: District[];
+  showOpenNow?: boolean;
   className?: string;
   onClose?: () => void;
 }
@@ -18,7 +21,15 @@ interface FiltersPanelProps {
  * Filters panel driven entirely by URL search params.
  * The parent search route owns validateSearch; this panel merges partial updates.
  */
-export function FiltersPanel({ filters, className, onClose }: FiltersPanelProps) {
+export function FiltersPanel({
+  filters,
+  categories,
+  cities,
+  districts = [],
+  showOpenNow = false,
+  className,
+  onClose,
+}: FiltersPanelProps) {
   const t = useT();
   const locale = useLocale();
   const navigate = useNavigate();
@@ -75,7 +86,7 @@ export function FiltersPanel({ filters, className, onClose }: FiltersPanelProps)
         <RadioLike
           items={[
             { value: null, label: t("sort.recommended") },
-            ...CATEGORIES.map((c) => ({
+            ...categories.map((c) => ({
               value: c.slug,
               label: pickLocalized(c.name, locale),
             })),
@@ -90,7 +101,7 @@ export function FiltersPanel({ filters, className, onClose }: FiltersPanelProps)
         <RadioLike
           items={[
             { value: null, label: t("sort.recommended") },
-            ...CITIES.map((c) => ({
+            ...cities.map((c) => ({
               value: c.slug,
               label: pickLocalized(c.name, locale),
             })),
@@ -100,6 +111,25 @@ export function FiltersPanel({ filters, className, onClose }: FiltersPanelProps)
           name="city"
         />
       </FilterGroup>
+
+      {filters.city && districts.length > 0 && (
+        <FilterGroup title={t("filters.district")}>
+          <RadioLike
+            items={[
+              { value: null, label: t("sort.recommended") },
+              ...districts
+                .filter((d) => d.cityId === cities.find((c) => c.slug === filters.city)?.id)
+                .map((d) => ({
+                  value: d.slug,
+                  label: pickLocalized(d.name, locale),
+                })),
+            ]}
+            value={filters.district ?? null}
+            onChange={(v) => update({ district: v })}
+            name="district"
+          />
+        </FilterGroup>
+      )}
 
       <FilterGroup title={t("filters.rating")}>
         <div className="flex flex-wrap gap-2">
@@ -150,16 +180,18 @@ export function FiltersPanel({ filters, className, onClose }: FiltersPanelProps)
         </div>
       </FilterGroup>
 
-      <div className="flex items-center gap-2">
-        <Checkbox
-          id="filter-open-now"
-          checked={!!filters.openNow}
-          onCheckedChange={(v) => update({ openNow: v === true })}
-        />
-        <Label htmlFor="filter-open-now" className="cursor-pointer text-sm">
-          {t("filters.open_now")}
-        </Label>
-      </div>
+      {showOpenNow && (
+        <div className="flex items-center gap-2">
+          <Checkbox
+            id="filter-open-now"
+            checked={!!filters.openNow}
+            onCheckedChange={(v) => update({ openNow: v === true })}
+          />
+          <Label htmlFor="filter-open-now" className="cursor-pointer text-sm">
+            {t("filters.open_now")}
+          </Label>
+        </div>
+      )}
     </aside>
   );
 }
