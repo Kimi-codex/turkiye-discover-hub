@@ -12,6 +12,9 @@ interface MapBusiness {
   slug: string;
   latitude: number;
   longitude: number;
+  category?: string;
+  rating?: number;
+  url: string;
 }
 
 interface ClusterMapProps {
@@ -89,7 +92,26 @@ export function ClusterMap({
 
     const markers = valid.map((b) => {
       const marker = L.marker([b.latitude, b.longitude]);
-      marker.bindPopup(`<strong>${b.name}</strong>`);
+      const popup = document.createElement("div");
+      popup.className = "space-y-1";
+      const title = document.createElement("a");
+      title.href = b.url;
+      title.textContent = b.name;
+      title.className = "font-semibold text-brand hover:underline";
+      popup.appendChild(title);
+      if (b.category) {
+        const category = document.createElement("div");
+        category.textContent = b.category;
+        category.className = "text-xs text-muted-foreground";
+        popup.appendChild(category);
+      }
+      if (typeof b.rating === "number" && b.rating > 0) {
+        const rating = document.createElement("div");
+        rating.textContent = `★ ${b.rating.toFixed(1)}`;
+        rating.className = "text-xs";
+        popup.appendChild(rating);
+      }
+      marker.bindPopup(popup);
       if (onBusinessClick) {
         marker.on("click", () => onBusinessClick(b.slug));
       }

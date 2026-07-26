@@ -50,6 +50,7 @@ export function DidYouMean({ query, resultCount, className }: DidYouMeanProps) {
                     clarify: null,
                     sort: "recommended",
                     page: 1,
+                    view: "list",
                   },
                 });
               }}

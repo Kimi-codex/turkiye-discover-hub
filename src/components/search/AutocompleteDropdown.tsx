@@ -120,6 +120,7 @@ export function AutocompleteDropdown({
           clarify: null,
           sort: "recommended",
           page: 1,
+          view: "list",
         },
       });
     }

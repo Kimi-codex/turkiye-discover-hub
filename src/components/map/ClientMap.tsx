@@ -11,7 +11,16 @@ interface ClientBusinessMapProps {
 }
 
 interface ClientClusterMapProps {
-  businesses: Array<{ id: string; name: string; slug: string; latitude: number; longitude: number }>;
+  businesses: Array<{
+    id: string;
+    name: string;
+    slug: string;
+    latitude: number;
+    longitude: number;
+    category?: string;
+    rating?: number;
+    url: string;
+  }>;
   className?: string;
   onBusinessClick?: (slug: string) => void;
 }

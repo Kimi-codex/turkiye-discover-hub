@@ -1,29 +1,38 @@
-import { useState, useMemo } from "react";
+import { useMemo, type ReactNode } from "react";
 import { MapIcon, List, Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { useT } from "@/lib/i18n";
+import { pickLocalized, useLocale, useT } from "@/lib/i18n";
 import { BusinessCard } from "@/components/business/BusinessCard";
-import { ClusterMap } from "@/components/map/ClusterMap";
+import { ClientClusterMap } from "@/components/map/ClientMap";
+import { areValidCoordinates } from "@/lib/business/coordinates";
 import type { Business } from "@/types/domain";
 
 interface MapToggleProps {
   businesses: Business[];
+  total?: number;
+  view: "list" | "map";
+  onViewChange: (view: "list" | "map") => void;
+  children?: ReactNode;
   className?: string;
 }
 
-export function MapToggle({ businesses, className }: MapToggleProps) {
+export function MapToggle({
+  businesses,
+  total,
+  view,
+  onViewChange,
+  children,
+  className,
+}: MapToggleProps) {
   const t = useT();
-  const [view, setView] = useState<"list" | "map">("list");
+  const locale = useLocale();
 
   const mapData = useMemo(
     () =>
       businesses
         .filter(
           (b): b is Business & { latitude: number; longitude: number } =>
-            typeof b.latitude === "number" &&
-            typeof b.longitude === "number" &&
-            b.latitude !== 0 &&
-            b.longitude !== 0,
+            areValidCoordinates(b.latitude, b.longitude),
         )
         .map((b) => ({
           id: b.id,
@@ -31,20 +40,24 @@ export function MapToggle({ businesses, className }: MapToggleProps) {
           slug: b.slug,
           latitude: b.latitude,
           longitude: b.longitude,
+          category: pickLocalized(b.primaryCategory.name, locale),
+          rating: b.rating,
+          url: `/${locale}/place/${b.slug}`,
         })),
-    [businesses],
+    [businesses, locale],
   );
 
   return (
     <div className={cn("space-y-4", className)}>
       <div className="flex items-center justify-between">
         <p className="text-sm text-muted-foreground">
-          {businesses.length.toLocaleString()} {t("common.results")}
+          {(total ?? businesses.length).toLocaleString()} {t("common.results")}
         </p>
         <div className="flex overflow-hidden rounded-lg border border-border bg-card">
           <button
             type="button"
-            onClick={() => setView("list")}
+            onClick={() => onViewChange("list")}
+            aria-pressed={view === "list"}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
               view === "list"
@@ -57,7 +70,8 @@ export function MapToggle({ businesses, className }: MapToggleProps) {
           </button>
           <button
             type="button"
-            onClick={() => setView("map")}
+            onClick={() => onViewChange("map")}
+            aria-pressed={view === "map"}
             className={cn(
               "flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium transition-colors",
               view === "map"
@@ -71,16 +85,10 @@ export function MapToggle({ businesses, className }: MapToggleProps) {
         </div>
       </div>
 
-      {view === "list" ? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {businesses.map((b, i) => (
-            <BusinessCard key={b.id} business={b} eager={i < 4} />
-          ))}
-        </div>
-      ) : (
+      {view === "map" && (
         <div className="relative aspect-[21/9] w-full overflow-hidden rounded-2xl border border-border">
           {mapData.length > 0 ? (
-            <ClusterMap businesses={mapData} className="h-full w-full" />
+            <ClientClusterMap businesses={mapData} className="h-full w-full" />
           ) : (
             <div className="flex h-full items-center justify-center bg-muted text-sm text-muted-foreground">
               <div className="flex flex-col items-center gap-2">
@@ -89,6 +97,14 @@ export function MapToggle({ businesses, className }: MapToggleProps) {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {children ?? (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+          {businesses.map((b, i) => (
+            <BusinessCard key={b.id} business={b} eager={i < 4} />
+          ))}
         </div>
       )}
     </div>

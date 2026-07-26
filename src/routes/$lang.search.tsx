@@ -6,6 +6,7 @@ import { BusinessCard } from "@/components/business/BusinessCard";
 import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
 import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
 import { FiltersPanel } from "@/components/search/FiltersPanel";
+import { MapToggle } from "@/components/map/MapToggle";
 import { ClarificationCard } from "@/components/search/ClarificationCard";
 import { DidYouMean } from "@/components/search/DidYouMean";
 import { InterpretationChips } from "@/components/search/InterpretationChips";
@@ -38,6 +39,7 @@ interface SearchParams {
   clarify: string | null;
   sort: SortOption;
   page: number;
+  view: "list" | "map";
 }
 
 const VALID_SORTS: SortOption[] = [
@@ -72,6 +74,7 @@ function validateSearch(raw: Record<string, unknown>): SearchParams {
     clarify: asStr(raw.clarify) || null,
     sort,
     page: Math.max(1, asNum(raw.page) ?? 1),
+    view: asStr(raw.view) === "map" ? "map" : "list",
   };
 }
 
@@ -281,6 +284,17 @@ function SearchPage() {
     });
   }
 
+  function setView(view: "list" | "map") {
+    navigate({
+      to: "/$lang/search",
+      params: { lang: locale },
+      search: (prev: Record<string, unknown>) => ({
+        ...validateSearch(prev),
+        view,
+      }),
+    });
+  }
+
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-8 sm:px-6 lg:py-10">
       <div className="flex flex-col gap-2">
@@ -355,11 +369,18 @@ function SearchPage() {
             hasActiveSearch ? <EmptyState /> : <CleanSearchState />
           ) : (
             <>
-              <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
-                {displayed.items.map((b, i) => (
-                  <BusinessCard key={b.id} business={b} eager={i < 2} highlightQuery={params.q} />
-                ))}
-              </div>
+              <MapToggle
+                businesses={displayed.items}
+                total={displayed.total}
+                view={params.view}
+                onViewChange={setView}
+              >
+                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                  {displayed.items.map((b, i) => (
+                    <BusinessCard key={b.id} business={b} eager={i < 2} highlightQuery={params.q} />
+                  ))}
+                </div>
+              </MapToggle>
               <DirectoryPagination
                 className="mt-8"
                 page={displayed.page}

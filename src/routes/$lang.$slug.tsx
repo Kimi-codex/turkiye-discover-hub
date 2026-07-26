@@ -1,10 +1,11 @@
-import { createFileRoute, notFound } from "@tanstack/react-router";
+import { createFileRoute, notFound, useNavigate } from "@tanstack/react-router";
 import { useSuspenseQuery, queryOptions } from "@tanstack/react-query";
 import { services } from "@/lib/repos";
 import { BusinessCard } from "@/components/business/BusinessCard";
 import { Breadcrumbs } from "@/components/site/Breadcrumbs";
 import { DirectoryEmptyState } from "@/components/directory/DirectoryEmptyState";
 import { DirectoryPagination } from "@/components/directory/DirectoryPagination";
+import { MapToggle } from "@/components/map/MapToggle";
 import { SearchBar } from "@/components/search/SearchBar";
 import { SeoContent } from "@/components/seo/SeoContent";
 import { Badge } from "@/components/ui/badge";
@@ -20,11 +21,15 @@ import { RESERVED_LANG_CHILD_SLUGS } from "@/types/domain";
  */
 interface DirectorySearchParams {
   page: number;
+  view: "list" | "map";
 }
 
 function validateDirectorySearch(raw: Record<string, unknown>): DirectorySearchParams {
   const rawPage = typeof raw.page === "number" ? raw.page : Number(raw.page);
-  return { page: Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1) };
+  return {
+    page: Math.max(1, Number.isFinite(rawPage) ? Math.floor(rawPage) : 1),
+    view: raw.view === "map" ? "map" : "list",
+  };
 }
 
 const slugQuery = (slug: string, page: number) =>
@@ -127,6 +132,7 @@ function NotFound() {
 function LangSlugPage() {
   const { lang, slug } = Route.useParams();
   const search = Route.useSearch();
+  const navigate = useNavigate();
   const locale = lang as Locale;
   const t = (k: Parameters<typeof translate>[1]) => translate(locale, k);
   const { data } = useSuspenseQuery(slugQuery(slug, search.page));
@@ -137,6 +143,17 @@ function LangSlugPage() {
       : pickLocalized(data.city.name, locale);
   const navigationTitle =
     data.kind === "category" ? t("filters.city") : t("filters.category");
+
+  function setView(view: "list" | "map") {
+    navigate({
+      to: "/$lang/$slug",
+      params: { lang, slug },
+      search: (prev) => ({
+        ...validateDirectorySearch(prev),
+        view,
+      }),
+    });
+  }
 
   return (
     <div className="mx-auto w-full max-w-7xl px-4 py-6 sm:px-6 lg:px-8 lg:py-10">
@@ -215,11 +232,19 @@ function LangSlugPage() {
         </div>
       ) : (
         <>
-          <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {data.items.map((b, i) => (
-              <BusinessCard key={b.id} business={b} eager={i < 4} />
-            ))}
-          </div>
+          <MapToggle
+            className="mt-4"
+            businesses={data.items}
+            total={data.total}
+            view={search.view}
+            onViewChange={setView}
+          >
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+              {data.items.map((b, i) => (
+                <BusinessCard key={b.id} business={b} eager={i < 4} />
+              ))}
+            </div>
+          </MapToggle>
           <DirectoryPagination
             className="mt-8"
             page={data.page}
