@@ -17,10 +17,10 @@ import { buildHreflang, canonicalFor, ogLocaleFor } from "@/lib/seo/hreflang";
 import { pickLocalized, translate, useLocale, useT, type Locale } from "@/lib/i18n";
 import {
   parseDirectorySearchIntent,
+  queryForParsedSearchIntent,
   pickClarifyingQuestion,
   type ParsedIntent,
   type InterpretationChip,
-  type SearchDictionary,
 } from "@/lib/search/parseIntent";
 import { normalizePublicSearchFilters } from "@/lib/search/search-filters";
 import { removePublicSearchChip } from "@/lib/search/search-url-state";
@@ -118,8 +118,7 @@ const searchDictQuery = () =>
 
 function queryForFilters(params: SearchParams, intent?: ParsedIntent): string {
   if (!intent) return params.q;
-  if (intent.descriptiveIntent) return "";
-  return intent.remainingQuery;
+  return queryForParsedSearchIntent(intent);
 }
 
 function toFilters(params: SearchParams, intent?: ParsedIntent): SearchFilters {
@@ -140,17 +139,6 @@ const searchQuery = (filters: SearchFilters) =>
   queryOptions({
     queryKey: ["search", filters],
     queryFn: () => services.businesses.list(filters),
-  });
-
-const didYouMeanQuery = (query: string, locale: Locale) =>
-  queryOptions({
-    queryKey: ["did-you-mean", query, locale],
-    queryFn: async () => {
-      const { suggestDidYouMean } = await import("@/lib/search/did-you-mean.server");
-      return suggestDidYouMean({ data: { query, locale } });
-    },
-    enabled: query.length >= 2,
-    staleTime: 60_000,
   });
 
 export const Route = createFileRoute("/$lang/search")({
@@ -204,7 +192,7 @@ function SearchPage() {
   // (e.g. "fancy", "غالي") — do NOT apply it as a mandatory ILIKE filter.
   const effectiveFilters: SearchFilters = useMemo(() => {
     return normalizePublicSearchFilters({
-      query: intent.remainingQuery,
+      query: queryForParsedSearchIntent(intent),
       category: params.category ?? intent.matchedCategorySlug,
       city: params.city ?? intent.matchedCitySlug,
       district: params.district ?? intent.matchedDistrictSlug,

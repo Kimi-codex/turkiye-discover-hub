@@ -4,6 +4,7 @@ import { configuredSiteOrigin, safePathSegment, xmlEscape } from "./url";
 
 const SITEMAP_MAX_URLS = 45_000;
 const BUSINESS_PAGE_SIZE = 1_000;
+const COMBO_CACHE_TTL_MS = 60 * 60 * 1_000;
 
 type SitemapBatch = {
   page: number;
@@ -29,6 +30,10 @@ type ComboRow = {
   district: { slug: string | null } | null;
   primary_category: { slug: string | null } | null;
 };
+
+let comboEntriesCache:
+  | { expiresAt: number; promise: Promise<RouteEntry[]> }
+  | undefined;
 
 function sitemapXml(urls: string[]): string {
   return [
@@ -173,6 +178,21 @@ async function loadComboEntries(): Promise<RouteEntry[]> {
   return [...entries.values()].sort((a, b) => a.path.localeCompare(b.path));
 }
 
+function loadComboEntriesCached(): Promise<RouteEntry[]> {
+  const now = Date.now();
+  if (!comboEntriesCache || comboEntriesCache.expiresAt <= now) {
+    const promise = loadComboEntries().catch((error) => {
+      comboEntriesCache = undefined;
+      throw error;
+    });
+    comboEntriesCache = {
+      expiresAt: now + COMBO_CACHE_TTL_MS,
+      promise,
+    };
+  }
+  return comboEntriesCache.promise;
+}
+
 function mergeEntry(
   entries: Map<string, RouteEntry>,
   path: string,
@@ -192,13 +212,13 @@ function mergeEntry(
 
 export async function generateComboBatch(siteUrl: string, page: number): Promise<SitemapBatch | null> {
   const origin = configuredSiteOrigin(siteUrl);
-  const entries = await loadComboEntries();
+  const entries = await loadComboEntriesCached();
   return batchEntries(origin, entries, page);
 }
 
 export async function generateComboSitemapIndexes(siteUrl: string): Promise<string[]> {
   const origin = configuredSiteOrigin(siteUrl);
-  const entries = await loadComboEntries();
+  const entries = await loadComboEntriesCached();
   const totalUrls = entries.length * LOCALES.length;
   const totalPages = Math.max(1, Math.ceil(totalUrls / SITEMAP_MAX_URLS));
   return Array.from({ length: totalPages }, (_, i) =>

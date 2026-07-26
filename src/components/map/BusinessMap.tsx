@@ -3,6 +3,7 @@ import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 import { Navigation } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { createBusinessMapPopup } from "./map-popup";
 
 interface BusinessMapProps {
   latitude: number;
@@ -51,9 +52,11 @@ export function BusinessMap({
       maxZoom: 19,
     }).addTo(map);
 
+    const popup = createBusinessMapPopup(name);
+
     L.marker([latitude, longitude])
       .addTo(map)
-      .bindPopup(`<strong>${name}</strong>`);
+      .bindPopup(popup);
 
     instanceRef.current = map;
 

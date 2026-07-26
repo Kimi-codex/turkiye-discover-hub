@@ -77,7 +77,7 @@ export type SeoOutput = z.infer<typeof seoSchema>;
 // ---------- Hallucination guard ----------
 
 const HALLUCINATION_PATTERNS = [
-  /\+\d[\d\s\-\(\)]{7,}/, // phone numbers
+  /\+\d[\d\s\-()]{7,}/, // phone numbers
   /[\w.+-]+@[\w-]+\.[\w.-]+/, // email
   /https?:\/\/[^\s]+/, // URLs
   /\b(?:₺|TL|USD|EUR|GBP|TRY)\s*\d+/, // prices with currency symbols

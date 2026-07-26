@@ -35,12 +35,14 @@ CREATE TRIGGER trg_businesses_search_vector
   FOR EACH ROW EXECUTE FUNCTION public.maintain_search_vector();
 
 -- ── 4. Backfill existing published businesses ────────────────
-SELECT public.rebuild_search_vectors();
+-- Existing rows are not backfilled automatically during deployment. Use the
+-- bounded Phase E backfill function after deployment instead.
 
 -- ── Rollback ─────────────────────────────────────────────────
 -- To rollback:
 --   1. Restore maintain_search_vector() to exclude description
 --   2. Restore rebuild_search_vectors() to exclude description
 --   3. Rebuild trigger on name, slug only
---   4. Run rebuild_search_vectors()
+--   4. Run rebuild_search_vectors() only in a controlled maintenance window,
+--      or use the bounded Phase E backfill function.
 -- See 20260726100020_add_search_vector_and_ranking.sql for the original definitions.

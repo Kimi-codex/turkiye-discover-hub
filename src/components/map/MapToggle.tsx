@@ -100,12 +100,24 @@ export function MapToggle({
         </div>
       )}
 
-      {children ?? (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {businesses.map((b, i) => (
-            <BusinessCard key={b.id} business={b} eager={i < 4} />
-          ))}
-        </div>
+      {view === "list" ? (
+        children ?? (
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {businesses.map((b, i) => (
+              <BusinessCard key={b.id} business={b} eager={i < 4} />
+            ))}
+          </div>
+        )
+      ) : (
+        <nav className="sr-only" aria-label={t("search.your_results")}>
+          <ul>
+            {businesses.map((business) => (
+              <li key={business.id}>
+                <a href={`/${locale}/place/${business.slug}`}>{business.name}</a>
+              </li>
+            ))}
+          </ul>
+        </nav>
       )}
     </div>
   );

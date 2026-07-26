@@ -239,7 +239,7 @@ describe("enrichment counter behavior", () => {
   });
 
   it("businessesFailed does not increment when no failures", () => {
-    const failed = false || false || false || false;
+    const failed = [false, false, false, false].some(Boolean);
     expect(failed).toBe(false);
   });
 

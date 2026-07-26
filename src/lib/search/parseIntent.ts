@@ -343,6 +343,10 @@ export function parseDirectorySearchIntent(query: string, locale: Locale, dict: 
   };
 }
 
+export function queryForParsedSearchIntent(intent: ParsedIntent): string {
+  return intent.descriptiveIntent ? "" : intent.remainingQuery;
+}
+
 export function pickClarifyingQuestion(intent: ParsedIntent): import("@/lib/i18n").MessageKey {
   const cat = intent.matchedCategorySlug;
   if (cat === "hotels") {

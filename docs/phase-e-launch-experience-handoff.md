@@ -45,7 +45,7 @@ Reusable WIP was preserved. Unsafe WIP was corrected where it was inside Phase E
 - E.3 Search Experience migration hygiene: `48f7724`
 - E.3 Search Experience completion: `56a0902`
 - E.4 Public Maps: `6e237a6`
-- E.5 Launch Validation: recorded by the final validation commit.
+- E.5 Launch Validation: `e15ece3`
 
 ## Files created
 
@@ -187,7 +187,7 @@ Did-you-mean remains conservative and is only shown by the UI for low-result sea
 
 ## Map architecture
 
-Maps use the existing Leaflet and `leaflet.markercluster` dependencies with OpenStreetMap tiles. No paid provider, API key, PostGIS, or new spatial architecture was introduced. Map/list mode is URL-backed. Only businesses with valid latitude/longitude are displayed. Marker popups use DOM text nodes and canonical localized business links. List content remains rendered below the map for SEO, accessibility, and no-JavaScript resilience.
+Maps use the existing Leaflet and `leaflet.markercluster` dependencies with OpenStreetMap tiles. No paid provider, API key, PostGIS, or new spatial architecture was introduced. Map/list mode is URL-backed. Only businesses with valid latitude/longitude are displayed. Marker popups use DOM text nodes and canonical localized business links. In map mode, duplicate visible cards are suppressed and a screen-reader-only canonical link list remains available as the accessible fallback.
 
 ## Test additions
 
@@ -283,9 +283,58 @@ Database rollback for `20260726103000_phase_e_search_experience_additions.sql`:
 
 1. Remove seeded alias rows if necessary.
 2. Restore `maintain_search_vector()` and `rebuild_search_vectors()` definitions from `20260726100040_add_description_to_search_vector.sql`.
-3. Re-run `public.rebuild_search_vectors()`.
+3. Refresh affected rows with `public.backfill_business_search_vectors_batch()` or run `public.rebuild_search_vectors()` only in a controlled maintenance window.
 
 No destructive SQL was executed during implementation.
+
+## Final pre-deploy remediation addendum
+
+The final remediation pass addressed the release-blocking audit findings before merge/deploy:
+
+- Critical XSS: business-detail Leaflet popups no longer interpolate imported business names into HTML. Popup content is created as a DOM node and assigned through `textContent`.
+- High SEO freshness issue: the public Phase C SEO read path now uses the same original-language taxonomy/location label selection used by the enrichment source-hash path.
+- High search UX issue: server loader and client search route now use the shared `queryForParsedSearchIntent()` decision, preventing descriptive modifiers from becoming unintended mandatory residual filters.
+- High migration risk: Phase E search-vector migrations no longer call `public.rebuild_search_vectors()` during deployment. Bounded, resumable `public.backfill_business_search_vectors_batch()` is available for operational rollout.
+- High trigger issue: inserted businesses get a basic vector before insert and a complete alias/category-aware vector after insert/update, with relationship changes refreshing linked businesses.
+- Medium did-you-mean issue: canonical `businesses.name` candidates are included alongside translated names and deduplicated by normalized text.
+- Medium sitemap cost issue: directory-combination route discovery is paged and request-cached for one hour.
+- Medium accessibility issue: pagination labels are localized for Turkish, Arabic, English, French, and Russian.
+- Medium map/list issue: map mode avoids duplicate visible lists while preserving a screen-reader fallback list of canonical business links.
+- Low production-origin issue: production canonical/sitemap/robots generation now requires an explicit configured site origin or request origin instead of silently falling back to the Lovable preview host.
+
+Production deployment prerequisite: set one of `VITE_PUBLIC_SITE_URL`, `PUBLIC_SITE_URL`, `SITE_URL`, or `URL` to the canonical production origin before building/running production.
+
+Local runtime note: `npm run preview` could not serve the built output in this workspace because Vite preview looked for `dist/server/server.js` while the production build emitted `.output`. Run browser, Lighthouse, and crawl checks against a deployed preview before production.
+
+### Production migration runbook
+
+1. Pre-deploy checks:
+   - Confirm Phase E has not already been applied to the target database.
+   - Confirm migration filenames have unique timestamp prefixes.
+   - Confirm a recent database backup exists.
+   - Confirm `PUBLIC_SITE_URL`/canonical origin configuration is present in the deployment environment.
+2. Schema migration order:
+   - Apply migrations in timestamp order through `20260726103000_phase_e_search_experience_additions.sql`.
+   - Do not call `public.rebuild_search_vectors()` as part of deployment.
+3. Bounded backfill:
+   - Run `select * from public.backfill_business_search_vectors_batch(null, 500);`
+   - Use the returned `last_id` as the next cursor: `select * from public.backfill_business_search_vectors_batch('<last_id>', 500);`
+   - Repeat until `processed = 0`.
+   - Keep batches at or below 1000 rows.
+4. Monitoring:
+   - Track batch duration, lock waits, database CPU, and public search error rate.
+   - Spot-check published businesses inserted/updated after deployment for populated `search_vector`.
+5. Stop conditions:
+   - Stop backfill if lock waits, API errors, or database CPU materially increase.
+   - Stop if any batch exceeds the normal operational window for the environment.
+6. Rollback/disable:
+   - Stop batch calls immediately.
+   - Drop after-write/category-link triggers only if they cause verified operational harm.
+   - Revert the application commit if public behavior regresses.
+   - Restore previous search-vector function definitions only during a planned maintenance window.
+7. Post-deploy verification:
+   - Verify autocomplete, search, did-you-mean, sitemap, robots, business detail, category/city/district pages, and map mode against production-like data.
+   - Verify no unpublished businesses appear in public sitemap or map/list results.
 
 ## Recommended follow-up work
 

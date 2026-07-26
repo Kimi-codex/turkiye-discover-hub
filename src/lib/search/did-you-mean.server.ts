@@ -13,6 +13,7 @@ const MAX_SUGGESTIONS = 3;
 const MIN_CONFIDENCE = 0.45;
 
 type Suggestion = { text: string; type: string; confidence: number };
+type Candidate = { text: string | null; type: string };
 type AliasRow = { alias: string; entity_type: string };
 
 function cleanQuery(input: string): string {
@@ -91,9 +92,22 @@ function addSuggestion(
 ) {
   if (!text) return;
   const score = confidence(query, text);
-  if (score < MIN_CONFIDENCE || seen.has(text)) return;
-  seen.add(text);
+  const seenKey = normalize(text);
+  if (score < MIN_CONFIDENCE || seen.has(seenKey)) return;
+  seen.add(seenKey);
   suggestions.push({ text, type, confidence: score });
+}
+
+export function rankDidYouMeanCandidates(query: string, candidates: Candidate[]) {
+  const suggestions: Suggestion[] = [];
+  const seen = new Set<string>();
+  for (const candidate of candidates) {
+    addSuggestion(suggestions, seen, query, candidate.text, candidate.type);
+  }
+  return suggestions
+    .sort((a, b) => b.confidence - a.confidence || a.text.localeCompare(b.text))
+    .slice(0, MAX_SUGGESTIONS)
+    .map(({ text, type }) => ({ text, type }));
 }
 
 /**
@@ -106,9 +120,18 @@ export const suggestDidYouMean = createServerFn({ method: "GET" })
     const query = cleanQuery(data.query);
     if (query.length < 2) return [];
 
-    const suggestions: Suggestion[] = [];
-    const seen = new Set<string>();
+    const candidates: Candidate[] = [];
     const likePattern = `%${query}%`;
+
+    const { data: businessNames } = await supabase
+      .from("businesses")
+      .select("name")
+      .eq("status", "published")
+      .ilike("name", likePattern)
+      .limit(MAX_SUGGESTIONS);
+    for (const row of businessNames ?? []) {
+      candidates.push({ text: row.name, type: "business" });
+    }
 
     const { data: bizNames } = await supabase
       .from("business_translations")
@@ -117,7 +140,7 @@ export const suggestDidYouMean = createServerFn({ method: "GET" })
       .ilike("translated_name", likePattern)
       .limit(MAX_SUGGESTIONS);
     for (const row of bizNames ?? []) {
-      addSuggestion(suggestions, seen, query, row.translated_name, "business");
+      candidates.push({ text: row.translated_name, type: "business" });
     }
 
     const { data: catNames } = await supabase
@@ -127,7 +150,7 @@ export const suggestDidYouMean = createServerFn({ method: "GET" })
       .ilike("name", likePattern)
       .limit(MAX_SUGGESTIONS);
     for (const row of catNames ?? []) {
-      addSuggestion(suggestions, seen, query, row.name, "category");
+      candidates.push({ text: row.name, type: "category" });
     }
 
     const { data: cityNames } = await supabase
@@ -137,7 +160,7 @@ export const suggestDidYouMean = createServerFn({ method: "GET" })
       .ilike("name", likePattern)
       .limit(MAX_SUGGESTIONS);
     for (const row of cityNames ?? []) {
-      addSuggestion(suggestions, seen, query, row.name, "city");
+      candidates.push({ text: row.name, type: "city" });
     }
 
     const { data: districtNames } = await supabase
@@ -147,15 +170,12 @@ export const suggestDidYouMean = createServerFn({ method: "GET" })
       .ilike("name", likePattern)
       .limit(MAX_SUGGESTIONS);
     for (const row of districtNames ?? []) {
-      addSuggestion(suggestions, seen, query, row.name, "district");
+      candidates.push({ text: row.name, type: "district" });
     }
 
     for (const row of await fetchAliasSuggestions(query, data.locale)) {
-      addSuggestion(suggestions, seen, query, row.alias, "alias");
+      candidates.push({ text: row.alias, type: "alias" });
     }
 
-    return suggestions
-      .sort((a, b) => b.confidence - a.confidence || a.text.localeCompare(b.text))
-      .slice(0, MAX_SUGGESTIONS)
-      .map(({ text, type }) => ({ text, type }));
+    return rankDidYouMeanCandidates(query, candidates);
   });

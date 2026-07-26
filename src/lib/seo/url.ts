@@ -1,15 +1,27 @@
 import { DEFAULT_LOCALE, LOCALES, type Locale } from "@/types/domain";
 
-const DEFAULT_SITE_ORIGIN = "https://turkiye-discover-hub.lovable.app";
+const DEVELOPMENT_SITE_ORIGIN = "https://example.invalid";
 
-export function configuredSiteOrigin(fallback?: string): string {
-  const raw =
+function configuredRawOrigin(fallback?: string): string | undefined {
+  return (
     process.env.VITE_PUBLIC_SITE_URL ||
     process.env.PUBLIC_SITE_URL ||
     process.env.SITE_URL ||
     process.env.URL ||
-    fallback ||
-    DEFAULT_SITE_ORIGIN;
+    fallback
+  );
+}
+
+export function configuredSiteOrigin(fallback?: string): string {
+  const raw = configuredRawOrigin(fallback);
+  if (!raw) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(
+        "Missing production site origin. Set VITE_PUBLIC_SITE_URL, PUBLIC_SITE_URL, SITE_URL, URL, or pass a request origin.",
+      );
+    }
+    return DEVELOPMENT_SITE_ORIGIN;
+  }
   return normalizeOrigin(raw);
 }
 
@@ -18,7 +30,10 @@ export function normalizeOrigin(origin: string): string {
     const u = new URL(origin);
     return u.origin;
   } catch {
-    return DEFAULT_SITE_ORIGIN;
+    if (process.env.NODE_ENV === "production") {
+      throw new Error(`Invalid production site origin: ${origin}`);
+    }
+    return DEVELOPMENT_SITE_ORIGIN;
   }
 }
 
@@ -28,7 +43,11 @@ export function isSupportedLocale(value: string): value is Locale {
 
 export function safePathSegment(value: string): string | null {
   const trimmed = value.trim();
-  if (!trimmed || /[/?#\u0000-\u001F\u007F]/.test(trimmed)) return null;
+  if (!trimmed || /[/?#]/.test(trimmed)) return null;
+  for (let index = 0; index < trimmed.length; index += 1) {
+    const code = trimmed.charCodeAt(index);
+    if (code <= 31 || code === 127) return null;
+  }
   return encodeURIComponent(trimmed);
 }
 

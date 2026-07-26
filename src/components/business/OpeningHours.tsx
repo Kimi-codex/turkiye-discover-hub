@@ -11,6 +11,7 @@ interface OpeningHoursProps {
 
 export function OpeningHoursBlock({ hours }: OpeningHoursProps) {
   const t = useT();
+  const [open, setOpen] = useState(false);
   if (!hours || hours.length === 0) {
     return (
       <div className="rounded-2xl border border-border bg-card p-5">
@@ -23,7 +24,6 @@ export function OpeningHoursBlock({ hours }: OpeningHoursProps) {
       </div>
     );
   }
-  const [open, setOpen] = useState(false);
   const today = todayHours(hours);
   const status = isOpenNow(hours);
   const sorted = [...hours].sort((a, b) => a.dayOfWeek - b.dayOfWeek);

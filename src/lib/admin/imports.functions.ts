@@ -56,7 +56,7 @@ import {
   SUPPORTED_LOCALES,
   ENRICHMENT_PROMPT_VERSION,
 } from "@/lib/enrichment/generator.server";
-import { computeSourceHash, computeGenerationKey, isGenerationFresh } from "@/lib/enrichment/generation-key";
+import { computeSourceHash, computeGenerationKey, isGenerationFresh, pickSourceHashLabel } from "@/lib/enrichment/generation-key";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -438,7 +438,10 @@ export const executeImportChunk = createServerFn({ method: "POST" })
       return { row: r, metadata: m, exec: (m.execution as Record<string, unknown>) ?? {} };
     }
 
-    let { row, metadata, exec } = await readBatch();
+    const initialBatch = await readBatch();
+    const row = initialBatch.row;
+    let metadata = initialBatch.metadata;
+    let exec = initialBatch.exec;
     if (exec.status !== "running") {
       return { skipped: true, reason: String(exec.status ?? "idle") };
     }
@@ -856,7 +859,12 @@ async function generateContentForBusiness(
       .eq("language_code", originalLanguage)
       .limit(1)
       .maybeSingle();
-    if (cat) categoryName = String((cat as Record<string, unknown>).name ?? "");
+    if (cat) {
+      categoryName = pickSourceHashLabel(
+        [{ language_code: originalLanguage, name: String((cat as Record<string, unknown>).name ?? "") }],
+        originalLanguage,
+      );
+    }
   }
   let cityName = "";
   if (business.city_id) {
@@ -867,7 +875,12 @@ async function generateContentForBusiness(
       .eq("language_code", originalLanguage)
       .limit(1)
       .maybeSingle();
-    if (ct) cityName = String((ct as Record<string, unknown>).name ?? "");
+    if (ct) {
+      cityName = pickSourceHashLabel(
+        [{ language_code: originalLanguage, name: String((ct as Record<string, unknown>).name ?? "") }],
+        originalLanguage,
+      );
+    }
   }
 
   const businessData = {
@@ -1324,7 +1337,7 @@ export const processEnrichmentChunk = createServerFn({ method: "POST" })
       return { row: r, metadata: m, enrich: (m.enrichment as Record<string, unknown>) ?? {} };
     }
 
-    let { row, metadata, enrich } = await readBatch();
+    const { row, metadata, enrich } = await readBatch();
     if (enrich.status !== "running") {
       return { skipped: true, reason: String(enrich.status ?? "idle") };
     }

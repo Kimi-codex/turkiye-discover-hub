@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from "react";
-import { useNavigate, useRouter } from "@tanstack/react-router";
+import { useNavigate } from "@tanstack/react-router";
 import { Search, MapPin, Tag, Building2, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
 import { useLocale, isRtl } from "@/lib/i18n";
 import { cn } from "@/lib/utils";

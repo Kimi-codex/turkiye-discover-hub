@@ -8,6 +8,23 @@ export const ENRICHMENT_PROMPT_VERSION = "enrich-v1";
 
 export type ContentType = "description" | "seo";
 
+export type SourceNameTranslation = {
+  language_code: string | null;
+  name: string | null;
+};
+
+/**
+ * Pick the exact localized taxonomy/location label used in Phase C source
+ * hashing. Generation uses the business original language and intentionally
+ * does not fall back to another locale.
+ */
+export function pickSourceHashLabel(
+  rows: SourceNameTranslation[] | null | undefined,
+  originalLanguage: string,
+): string {
+  return rows?.find((row) => row.language_code === originalLanguage)?.name ?? "";
+}
+
 /**
  * Deterministic source hash built from the exact fields used in generation prompts.
  * Any change to these fields invalidates existing generated content.

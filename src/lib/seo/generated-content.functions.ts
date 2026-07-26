@@ -1,6 +1,6 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { ENRICHMENT_PROMPT_VERSION, computeSourceHash } from "@/lib/enrichment/generation-key";
+import { ENRICHMENT_PROMPT_VERSION, computeSourceHash, pickSourceHashLabel } from "@/lib/enrichment/generation-key";
 import type { Locale } from "@/types/domain";
 
 const supportedLocaleSchema = z.enum(["tr", "en", "ar", "fr", "ru"]);
@@ -130,20 +130,15 @@ export const getPublishedBusinessSeoContent = createServerFn({ method: "GET" })
       primary_category?: { category_translations?: Array<{ language_code: string; name: string | null }> } | null;
     };
 
-    const categoryName =
-      row.primary_category?.category_translations?.find((t) => t.language_code === "en")?.name ??
-      row.primary_category?.category_translations?.[0]?.name ??
-      "";
-    const cityName =
-      row.city?.city_translations?.find((t) => t.language_code === "en")?.name ??
-      row.city?.city_translations?.[0]?.name ??
-      "";
+    const originalLanguage = row.original_language ?? "";
+    const categoryName = pickSourceHashLabel(row.primary_category?.category_translations, originalLanguage);
+    const cityName = pickSourceHashLabel(row.city?.city_translations, originalLanguage);
 
     const currentSourceHash = computeSourceHash({
       name: row.name ?? "",
       category: categoryName,
       city: cityName,
-      originalLanguage: row.original_language ?? "",
+      originalLanguage,
       existingDescription: row.description ?? "",
     });
 

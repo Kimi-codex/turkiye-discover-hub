@@ -2,6 +2,7 @@ import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { useT } from "@/lib/i18n";
 
 interface DirectoryPaginationProps {
   page: number;
@@ -16,6 +17,7 @@ export function DirectoryPagination({
   total,
   className,
 }: DirectoryPaginationProps) {
+  const t = useT();
   const navigate = useNavigate();
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const totalPages = Math.max(1, Math.ceil(total / Math.max(1, pageSize)));
@@ -45,22 +47,22 @@ export function DirectoryPagination({
         variant="outline"
         disabled={!hasPrevious}
         onClick={() => goToPage(currentPage - 1)}
-        aria-label="Previous page"
+        aria-label={t("pagination.previous")}
       >
         <ChevronLeft className="me-1 h-4 w-4 rtl:rotate-180" aria-hidden="true" />
-        Previous
+        {t("pagination.previous")}
       </Button>
       <span className="text-sm text-muted-foreground" aria-live="polite">
-        Page {currentPage} of {totalPages}
+        {t("pagination.page_of", { page: currentPage, total: totalPages })}
       </span>
       <Button
         type="button"
         variant="outline"
         disabled={!hasNext}
         onClick={() => goToPage(currentPage + 1)}
-        aria-label="Next page"
+        aria-label={t("pagination.next")}
       >
-        Next
+        {t("pagination.next")}
         <ChevronRight className="ms-1 h-4 w-4 rtl:rotate-180" aria-hidden="true" />
       </Button>
     </nav>
