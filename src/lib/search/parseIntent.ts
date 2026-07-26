@@ -60,6 +60,13 @@ const CATEGORY_ALIASES: Record<string, string[]> = {
   cafes: ["cafe", "cafes", "kafe", "kafeler", "مقهى", "مقاهي"],
 };
 
+const EXTRA_CATEGORY_ALIASES: Record<string, string[]> = {
+  hotels: ["accommodation", "lodging", "konaklama", "hôtel", "hébergement", "отель", "отели", "гостиница"],
+  clinics: ["medical clinic", "dental clinic", "dentist", "dentists", "doctor", "dişçi", "disci", "diş kliniği", "doktor", "clinique", "dentiste", "médecin", "клиника", "стоматолог", "врач"],
+  restaurants: ["food", "dining", "eatery", "lokanta", "yemek", "cuisine", "ресторан", "рестораны", "еда"],
+  cafes: ["coffee", "coffee shop", "kahve", "café", "cafés", "кофе", "кафе"],
+};
+
 const RATING_WORDS = [
   "best",
   "top",
@@ -199,8 +206,9 @@ function findMatch<T extends Named>(
     const mergedAliases = new Set<string>();
     for (const alias of additionalAliases?.[item.slug] ?? []) mergedAliases.add(alias);
     for (const alias of CATEGORY_ALIASES[item.slug] ?? []) mergedAliases.add(alias);
+    for (const alias of EXTRA_CATEGORY_ALIASES[item.slug] ?? []) mergedAliases.add(alias);
     for (const alias of mergedAliases) labels.add(alias);
-    for (const language of ["tr", "en", "ar"] as Locale[]) {
+    for (const language of ["tr", "en", "ar", "fr", "ru"] as Locale[]) {
       const value = item.name[language];
       if (value) labels.add(value);
     }

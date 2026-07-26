@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback, type FormEvent } from "react";
 import { useNavigate, useRouter } from "@tanstack/react-router";
-import { Search, MapPin, Tag, Building2, ArrowRight, ArrowLeft } from "lucide-react";
+import { Search, MapPin, Tag, Building2, ArrowRight, ArrowLeft, Sparkles } from "lucide-react";
 import { useLocale, isRtl } from "@/lib/i18n";
 import { cn } from "@/lib/utils";
 import { searchAutocomplete, type AutocompleteSuggestion } from "@/lib/search/autocomplete.server";
@@ -19,13 +19,17 @@ interface AutocompleteDropdownProps {
 const ICONS: Record<string, typeof Search> = {
   category: Tag,
   city: MapPin,
+  district: MapPin,
   business: Building2,
+  alias: Sparkles,
 };
 
 const LABELS: Record<string, string> = {
   category: "Category",
   city: "City",
+  district: "District",
   business: "Business",
+  alias: "Suggestion",
 };
 
 export function AutocompleteDropdown({
@@ -96,11 +100,27 @@ export function AutocompleteDropdown({
   function select(suggestion: AutocompleteSuggestion) {
     close();
     if (suggestion.type === "business" && suggestion.slug) {
-      navigate({ to: `/${locale}/place/${suggestion.slug}` });
+      navigate({
+        to: "/$lang/place/$slug",
+        params: { lang: locale, slug: suggestion.slug },
+      });
     } else {
       navigate({
-        to: `/${locale}/search`,
-        search: { q: suggestion.text },
+        to: "/$lang/search",
+        params: { lang: locale },
+        search: {
+          q: suggestion.text,
+          category: null,
+          city: null,
+          district: null,
+          rating: null,
+          priceLevel: null,
+          audience: null,
+          intent: null,
+          clarify: null,
+          sort: "recommended",
+          page: 1,
+        },
       });
     }
   }

@@ -255,6 +255,23 @@ function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, "\\$&").replace(/,/g, " ");
 }
 
+function applyStableOrdering<T extends { order: (column: string, options: { ascending?: boolean; nullsFirst?: boolean }) => T }>(
+  query: T,
+  sort: ReturnType<typeof sortColumn>,
+): T {
+  let ordered = query.order(sort.column, {
+    ascending: sort.ascending,
+    nullsFirst: false,
+  });
+  if (sort.column !== "rating") {
+    ordered = ordered.order("rating", { ascending: false, nullsFirst: false });
+  }
+  if (sort.column !== "review_count") {
+    ordered = ordered.order("review_count", { ascending: false, nullsFirst: false });
+  }
+  return ordered.order("id", { ascending: true, nullsFirst: false });
+}
+
 async function logSearchQuery(params: {
   query: string;
   locale?: string;
@@ -370,7 +387,7 @@ async function executeFullTextSearch(normalized: ReturnType<typeof normalizePubl
   if (normalized.rating) query = query.gte("rating", normalized.rating);
   if (normalized.priceLevel) query = query.eq("price_level", normalized.priceLevel);
 
-  query = query.order(column, { ascending, nullsFirst: false });
+  query = applyStableOrdering(query, { column, ascending });
 
   const from = (page - 1) * pageSize;
   const { data, error, count } = await query.range(from, from + pageSize - 1);
@@ -423,7 +440,7 @@ async function executeTrigramSearch(normalized: ReturnType<typeof normalizePubli
   if (normalized.rating) query = query.gte("rating", normalized.rating);
   if (normalized.priceLevel) query = query.eq("price_level", normalized.priceLevel);
 
-  query = query.order(column, { ascending, nullsFirst: false });
+  query = applyStableOrdering(query, { column, ascending });
 
   const from = (page - 1) * pageSize;
   const { data, error, count } = await query.range(from, from + pageSize - 1);
@@ -471,7 +488,7 @@ async function executeBrowseSearch(normalized: ReturnType<typeof normalizePublic
   if (normalized.rating) query = query.gte("rating", normalized.rating);
   if (normalized.priceLevel) query = query.eq("price_level", normalized.priceLevel);
 
-  query = query.order(column, { ascending, nullsFirst: false });
+  query = applyStableOrdering(query, { column, ascending });
 
   const from = (page - 1) * pageSize;
   const { data, error, count } = await query.range(from, from + pageSize - 1);

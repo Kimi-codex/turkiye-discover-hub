@@ -163,6 +163,18 @@ describe("parseDirectorySearchIntent", () => {
     expect(r.matchedCitySlug).toBe("antalya");
   });
 
+  it("matches French fallback aliases", () => {
+    const r = parseDirectorySearchIntent("hôtel istanbul", "fr", dict);
+    expect(r.matchedCategorySlug).toBe("hotels");
+    expect(r.matchedCitySlug).toBe("istanbul");
+  });
+
+  it("matches Russian fallback aliases", () => {
+    const r = parseDirectorySearchIntent("ресторан antalya", "ru", dict);
+    expect(r.matchedCategorySlug).toBe("restaurants");
+    expect(r.matchedCitySlug).toBe("antalya");
+  });
+
   it("hardcoded aliases still work alongside categoryAliases", () => {
     const dictWithAliases: SearchDictionary = {
       ...dict,

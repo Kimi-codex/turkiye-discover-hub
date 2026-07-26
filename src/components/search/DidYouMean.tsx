@@ -36,8 +36,21 @@ export function DidYouMean({ query, resultCount, className }: DidYouMeanProps) {
               type="button"
               onClick={() => {
                 navigate({
-                  to: `/${locale}/search`,
-                  search: { q: s.text },
+                  to: "/$lang/search",
+                  params: { lang: locale },
+                  search: {
+                    q: s.text,
+                    category: null,
+                    city: null,
+                    district: null,
+                    rating: null,
+                    priceLevel: null,
+                    audience: null,
+                    intent: null,
+                    clarify: null,
+                    sort: "recommended",
+                    page: 1,
+                  },
                 });
               }}
               className="font-medium text-brand hover:underline"
