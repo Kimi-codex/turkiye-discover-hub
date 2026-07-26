@@ -88,6 +88,6 @@ export function sortColumn(sort: SortOption): { column: string; ascending: boole
       return { column: "name", ascending: true };
     case "recommended":
     default:
-      return { column: "rating", ascending: false };
+      return { column: "ranking_score", ascending: false };
   }
 }

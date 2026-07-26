@@ -12,10 +12,12 @@ import {
   pickClarifyingQuestion,
   type ParsedIntent,
   type InterpretationChip,
+  type SearchDictionary,
 } from "@/lib/search/parseIntent";
 import { normalizePublicSearchFilters } from "@/lib/search/search-filters";
 import { removePublicSearchChip } from "@/lib/search/search-url-state";
-import type { SearchFilters, SortOption } from "@/types/domain";
+import type { SearchFilters, SortOption, Category } from "@/types/domain";
+import { supabase } from "@/integrations/supabase/client";
 
 interface SearchParams {
   q: string;
@@ -78,7 +80,28 @@ const searchDictQuery = () =>
       const districtLists = await Promise.all(
         cities.map((c) => services.cities.listDistricts(c.id)),
       );
-      return { categories, cities, districts: districtLists.flat() };
+
+      // Load category aliases from the search_aliases table
+      const categoryAliases: Record<string, string[]> = {};
+      try {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const qb = (supabase as any).from("search_aliases");
+        const { data: aliasRows } = await qb
+          .select("entity_id, alias, entity_type")
+          .eq("entity_type", "category");
+        if (aliasRows) {
+          for (const row of aliasRows) {
+            const cat = categories.find((c: Category) => c.id === row.entity_id);
+            if (cat) {
+              (categoryAliases[cat.slug] ??= []).push(row.alias);
+            }
+          }
+        }
+      } catch {
+        // Table may not exist yet — fall back to hardcoded aliases
+      }
+
+      return { categories, cities, districts: districtLists.flat(), categoryAliases };
     },
     staleTime: 5 * 60_000,
   });

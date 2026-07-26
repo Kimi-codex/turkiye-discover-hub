@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { parseDirectorySearchIntent, pickClarifyingQuestion } from "../parseIntent";
 import type { Category, City, District } from "@/types/domain";
+import type { SearchDictionary } from "../parseIntent";
 
 const categories: Category[] = [
   {
@@ -131,5 +132,56 @@ describe("parseDirectorySearchIntent", () => {
     const r = parseDirectorySearchIntent("hotel in istanbul", "en", dict);
     const q = pickClarifyingQuestion(r);
     expect(q).toMatch(/^search\.q\.hotel_/);
+  });
+
+  it("uses categoryAliases from dictionary to match additional terms", () => {
+    const dictWithAliases: SearchDictionary = {
+      ...dict,
+      categoryAliases: {
+        hotels: ["konaklama", "gecekonaklama"],
+      },
+    };
+    const r = parseDirectorySearchIntent("konaklama istanbul", "tr", dictWithAliases);
+    expect(r.matchedCategorySlug).toBe("hotels");
+    expect(r.matchedCitySlug).toBe("istanbul");
+  });
+
+  it("falls back to hardcoded aliases when categoryAliases is undefined", () => {
+    const r = parseDirectorySearchIntent("oteller", "tr", dict);
+    expect(r.matchedCategorySlug).toBe("hotels");
+  });
+
+  it("merges categoryAliases with hardcoded aliases", () => {
+    const dictWithAliases: SearchDictionary = {
+      ...dict,
+      categoryAliases: {
+        clinics: ["dis", "disci"],
+      },
+    };
+    const r = parseDirectorySearchIntent("disci antalya", "tr", dictWithAliases);
+    expect(r.matchedCategorySlug).toBe("clinics");
+    expect(r.matchedCitySlug).toBe("antalya");
+  });
+
+  it("hardcoded aliases still work alongside categoryAliases", () => {
+    const dictWithAliases: SearchDictionary = {
+      ...dict,
+      categoryAliases: {
+        hotels: ["konaklama"],
+      },
+    };
+    const r = parseDirectorySearchIntent("restoran", "tr", dictWithAliases);
+    expect(r.matchedCategorySlug).toBe("restaurants");
+  });
+
+  it("prefers longer alias match over shorter one", () => {
+    const dictWithAliases: SearchDictionary = {
+      ...dict,
+      categoryAliases: {
+        hotels: ["lüks otel"],
+      },
+    };
+    const r = parseDirectorySearchIntent("lüks otel", "tr", dictWithAliases);
+    expect(r.matchedCategorySlug).toBe("hotels");
   });
 });

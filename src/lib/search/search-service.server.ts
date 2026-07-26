@@ -213,14 +213,8 @@ async function idForSlug(table: "categories" | "cities" | "districts", slug: str
 /**
  * Returns all published business UUIDs matching a category via EITHER
  * primary_category_id OR business_category_links.
- *
- * Uses the `search_business_ids_for_category` RPC when available (robust
- * against URL length limits). Falls back to a direct query + id.in.(...)
- * for small result sets (URL-safe) or primary_category_id.eq for large
- * sets (pragmatic).
  */
 async function idsMatchingCategory(categoryId: string): Promise<string[]> {
-  // 1. Try the RPC (clean; has no URL serialisation).
   try {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const { data, error } = await (supabase as any).rpc(
@@ -234,10 +228,9 @@ async function idsMatchingCategory(categoryId: string): Promise<string[]> {
       if (ids.length > 0) return ids;
     }
   } catch {
-    // RPC does not exist yet (migration not applied) – fall through.
+    // RPC does not exist yet – fall through.
   }
 
-  // 2. Fallback: query business_category_links directly for linked IDs.
   const { data: links, error: linkErr } = await supabase
     .from("business_category_links")
     .select("business_id")
@@ -248,14 +241,9 @@ async function idsMatchingCategory(categoryId: string): Promise<string[]> {
 
   if (linkedIds.length === 0) return [];
 
-  // Estimate whether URL is safe with all IDs in an id.in.(...).
   const urlEstimate = `id.in.(${linkedIds.join(",")})`.length;
   if (urlEstimate < 4000) return linkedIds;
 
-  // 3. Too many IDs for a URL – the RPC is the intended path.
-  //    Fall back to primary_category_id.eq only (accepting that
-  //    linked-only businesses may be missed until the RPC migration
-  //    is applied).
   console.warn(
     `[search] ${linkedIds.length} IDs for category ${categoryId} exceeds ` +
       `URL safety threshold – falling back to primary_category_id.eq only`,
@@ -267,8 +255,85 @@ function escapeLike(input: string): string {
   return input.replace(/[\\%_]/g, "\\$&").replace(/,/g, " ");
 }
 
+async function logSearchQuery(params: {
+  query: string;
+  locale?: string;
+  resultCount: number;
+  topResultIds: string[];
+  durationMs: number;
+  method: string;
+}) {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const qb = (supabase as any).from("search_query_log");
+    await qb.insert({
+      query: params.query,
+      locale: params.locale ?? "tr",
+      intent: null,
+      result_count: params.resultCount,
+      top_result_ids: params.topResultIds,
+      duration_ms: params.durationMs,
+      method: params.method,
+    });
+  } catch {
+    // Silent catch — logging must never throw
+  }
+}
+
 export async function searchPublishedBusinesses(filters: Partial<SearchFilters>): Promise<SearchResult> {
+  const start = Date.now();
   const normalized = normalizePublicSearchFilters(filters);
+  const pageSize = normalized.pageSize ?? 12;
+  const page = normalized.page;
+
+  let method = "fulltext";
+  let rows: any[] = [];
+  let totalCount = 0;
+
+  if (normalized.query) {
+    // Step 1: Full-text search via tsvector
+    const ftResult = await executeFullTextSearch(normalized);
+    rows = ftResult.rows;
+    totalCount = ftResult.totalCount;
+
+    // Step 2: Fallback to trigram ILIKE if fewer than 5 results
+    if (rows.length < 5) {
+      method = "trigram_fallback";
+      const tgResult = await executeTrigramSearch(normalized);
+      rows = tgResult.rows;
+      totalCount = tgResult.totalCount;
+    }
+  } else {
+    // Browse mode: no text query, just structured filters + sort
+    method = "browse";
+    const brResult = await executeBrowseSearch(normalized);
+    rows = brResult.rows;
+    totalCount = brResult.totalCount;
+  }
+
+  const durationMs = Date.now() - start;
+  const topResultIds = rows.slice(0, 10).map((r: any) => r.id).filter(Boolean);
+
+  logSearchQuery({
+    query: normalized.query,
+    resultCount: totalCount,
+    topResultIds,
+    durationMs,
+    method,
+  });
+
+  return {
+    items: rows.map(mapBusiness),
+    total: totalCount,
+    page,
+    pageSize,
+  };
+}
+
+async function executeFullTextSearch(normalized: ReturnType<typeof normalizePublicSearchFilters>): Promise<{
+  rows: any[];
+  totalCount: number;
+}> {
   const pageSize = normalized.pageSize ?? 12;
   const page = normalized.page;
   const { column, ascending } = sortColumn(normalized.sort);
@@ -276,28 +341,24 @@ export async function searchPublishedBusinesses(filters: Partial<SearchFilters>)
   let query = supabase
     .from("businesses")
     .select(BUSINESS_SELECT, { count: "exact" })
-    .eq("status", "published");
-
-  if (normalized.query) {
-    const pattern = `%${escapeLike(normalized.query)}%`;
-    query = query.or(`name.ilike.${pattern},formatted_address.ilike.${pattern},slug.ilike.${pattern}`);
-  }
+    .eq("status", "published")
+    .textSearch("search_vector", normalized.query, { config: "public.simple_unaccent" });
 
   if (normalized.city) {
     const cityId = await idForSlug("cities", normalized.city);
-    if (!cityId) return { items: [], total: 0, page, pageSize };
+    if (!cityId) return { rows: [], totalCount: 0 };
     query = query.eq("city_id", cityId);
   }
 
   if (normalized.district) {
     const districtId = await idForSlug("districts", normalized.district);
-    if (!districtId) return { items: [], total: 0, page, pageSize };
+    if (!districtId) return { rows: [], totalCount: 0 };
     query = query.eq("district_id", districtId);
   }
 
   if (normalized.category) {
     const categoryId = await idForSlug("categories", normalized.category);
-    if (!categoryId) return { items: [], total: 0, page, pageSize };
+    if (!categoryId) return { rows: [], totalCount: 0 };
     const matchingIds = await idsMatchingCategory(categoryId);
     if (matchingIds.length === 0) {
       query = query.eq("primary_category_id", categoryId);
@@ -315,10 +376,106 @@ export async function searchPublishedBusinesses(filters: Partial<SearchFilters>)
   const { data, error, count } = await query.range(from, from + pageSize - 1);
   if (error) throw error;
 
-  return {
-    items: (data ?? []).map(mapBusiness),
-    total: count ?? 0,
-    page,
-    pageSize,
-  };
+  return { rows: data ?? [], totalCount: count ?? 0 };
+}
+
+async function executeTrigramSearch(normalized: ReturnType<typeof normalizePublicSearchFilters>): Promise<{
+  rows: any[];
+  totalCount: number;
+}> {
+  const pageSize = normalized.pageSize ?? 12;
+  const page = normalized.page;
+  const { column, ascending } = sortColumn(normalized.sort);
+
+  let query = supabase
+    .from("businesses")
+    .select(BUSINESS_SELECT, { count: "exact" })
+    .eq("status", "published");
+
+  if (normalized.query) {
+    const pattern = `%${escapeLike(normalized.query)}%`;
+    query = query.or(`name.ilike.${pattern},formatted_address.ilike.${pattern},slug.ilike.${pattern}`);
+  }
+
+  if (normalized.city) {
+    const cityId = await idForSlug("cities", normalized.city);
+    if (!cityId) return { rows: [], totalCount: 0 };
+    query = query.eq("city_id", cityId);
+  }
+
+  if (normalized.district) {
+    const districtId = await idForSlug("districts", normalized.district);
+    if (!districtId) return { rows: [], totalCount: 0 };
+    query = query.eq("district_id", districtId);
+  }
+
+  if (normalized.category) {
+    const categoryId = await idForSlug("categories", normalized.category);
+    if (!categoryId) return { rows: [], totalCount: 0 };
+    const matchingIds = await idsMatchingCategory(categoryId);
+    if (matchingIds.length === 0) {
+      query = query.eq("primary_category_id", categoryId);
+    } else {
+      query = query.in("id", matchingIds);
+    }
+  }
+
+  if (normalized.rating) query = query.gte("rating", normalized.rating);
+  if (normalized.priceLevel) query = query.eq("price_level", normalized.priceLevel);
+
+  query = query.order(column, { ascending, nullsFirst: false });
+
+  const from = (page - 1) * pageSize;
+  const { data, error, count } = await query.range(from, from + pageSize - 1);
+  if (error) throw error;
+
+  return { rows: data ?? [], totalCount: count ?? 0 };
+}
+
+async function executeBrowseSearch(normalized: ReturnType<typeof normalizePublicSearchFilters>): Promise<{
+  rows: any[];
+  totalCount: number;
+}> {
+  const pageSize = normalized.pageSize ?? 12;
+  const page = normalized.page;
+  const { column, ascending } = sortColumn(normalized.sort);
+
+  let query = supabase
+    .from("businesses")
+    .select(BUSINESS_SELECT, { count: "exact" })
+    .eq("status", "published");
+
+  if (normalized.city) {
+    const cityId = await idForSlug("cities", normalized.city);
+    if (!cityId) return { rows: [], totalCount: 0 };
+    query = query.eq("city_id", cityId);
+  }
+
+  if (normalized.district) {
+    const districtId = await idForSlug("districts", normalized.district);
+    if (!districtId) return { rows: [], totalCount: 0 };
+    query = query.eq("district_id", districtId);
+  }
+
+  if (normalized.category) {
+    const categoryId = await idForSlug("categories", normalized.category);
+    if (!categoryId) return { rows: [], totalCount: 0 };
+    const matchingIds = await idsMatchingCategory(categoryId);
+    if (matchingIds.length === 0) {
+      query = query.eq("primary_category_id", categoryId);
+    } else {
+      query = query.in("id", matchingIds);
+    }
+  }
+
+  if (normalized.rating) query = query.gte("rating", normalized.rating);
+  if (normalized.priceLevel) query = query.eq("price_level", normalized.priceLevel);
+
+  query = query.order(column, { ascending, nullsFirst: false });
+
+  const from = (page - 1) * pageSize;
+  const { data, error, count } = await query.range(from, from + pageSize - 1);
+  if (error) throw error;
+
+  return { rows: data ?? [], totalCount: count ?? 0 };
 }

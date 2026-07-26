@@ -39,10 +39,18 @@ export interface InterpretationChip {
     | "audience";
 }
 
+export interface SearchAlias {
+  alias: string;
+  slug: string;
+  languageCode: string;
+}
+
 export interface SearchDictionary {
   categories: Category[];
   cities: City[];
   districts: District[];
+  /** Optional map from category slug to additional aliases loaded from the DB */
+  categoryAliases?: Record<string, string[]>;
 }
 
 const CATEGORY_ALIASES: Record<string, string[]> = {
@@ -178,12 +186,20 @@ function findMatchedText(haystack: string, label: string): string | null {
   }) ?? null;
 }
 
-function findMatch<T extends Named>(haystack: string, items: T[], locale: Locale): NamedMatch<T> | null {
+function findMatch<T extends Named>(
+  haystack: string,
+  items: T[],
+  locale: Locale,
+  additionalAliases?: Record<string, string[]>,
+): NamedMatch<T> | null {
   const scored: Array<{ item: T; score: number; matchedText: string }> = [];
   for (const item of items) {
     const labels = new Set<string>();
     labels.add(item.slug.replace(/-/g, " "));
-    for (const alias of CATEGORY_ALIASES[item.slug] ?? []) labels.add(alias);
+    const mergedAliases = new Set<string>();
+    for (const alias of additionalAliases?.[item.slug] ?? []) mergedAliases.add(alias);
+    for (const alias of CATEGORY_ALIASES[item.slug] ?? []) mergedAliases.add(alias);
+    for (const alias of mergedAliases) labels.add(alias);
     for (const language of ["tr", "en", "ar"] as Locale[]) {
       const value = item.name[language];
       if (value) labels.add(value);
@@ -238,7 +254,7 @@ export function removeConsumedIntentTerm(
 export function parseDirectorySearchIntent(query: string, locale: Locale, dict: SearchDictionary): ParsedIntent {
   const raw = query ?? "";
   const norm = normalize(raw);
-  const matchedCategory = findMatch(norm, dict.categories, locale);
+  const matchedCategory = findMatch(norm, dict.categories, locale, dict.categoryAliases);
   const matchedCity = findMatch(norm, dict.cities, locale);
   const districtsForCity = matchedCity
     ? dict.districts.filter((district) => district.cityId === matchedCity.item.id)
