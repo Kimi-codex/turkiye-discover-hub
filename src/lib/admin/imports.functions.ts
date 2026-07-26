@@ -48,6 +48,15 @@ import {
   type MappingRow,
 } from "@/lib/import/schema-detector";
 import { sha256Hex } from "@/lib/utils/sha256";
+import {
+  generateAIDescription,
+  generateSeoContent,
+  classifyEnrichmentError,
+  getBackoffDelay as enrichmentBackoff,
+  SUPPORTED_LOCALES,
+  ENRICHMENT_PROMPT_VERSION,
+} from "@/lib/enrichment/generator.server";
+import { computeSourceHash, computeGenerationKey, isGenerationFresh } from "@/lib/enrichment/generation-key";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Sb = any;
@@ -195,6 +204,1253 @@ export const markImportBatchFailed = createServerFn({ method: "POST" })
       .eq("id", data.id);
     if (error) throw new Response(error.message, { status: 400 });
     return { ok: true };
+  });
+
+// ---------- Execution state (Phase B) ----------
+
+export type ExecutionStatus = "idle" | "running" | "paused" | "stopped" | "completed" | "failed";
+
+export interface ExecutionLogEntry {
+  at: string;
+  type: "info" | "warn" | "error" | "retry";
+  message: string;
+}
+
+export interface ImportExecutionState {
+  status: ExecutionStatus;
+  startedAt: string | null;
+  pausedAt: string | null;
+  stoppedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  errorMessage: string | null;
+  delayMs: number;
+  retryAttempt: number;
+  maxRetries: number;
+  chunksCompleted: number;
+  totalChunkDurationMs: number;
+  log: ExecutionLogEntry[];
+}
+
+function defaultExecutionState(): ImportExecutionState {
+  return {
+    status: "idle",
+    startedAt: null,
+    pausedAt: null,
+    stoppedAt: null,
+    completedAt: null,
+    failedAt: null,
+    errorMessage: null,
+    delayMs: 250,
+    retryAttempt: 0,
+    maxRetries: 3,
+    chunksCompleted: 0,
+    totalChunkDurationMs: 0,
+    log: [],
+  };
+}
+
+function classifyImportError(err: Error): "transient" | "permanent" {
+  const m = err.message.toLowerCase();
+  if (
+    m.includes("network") ||
+    m.includes("econnrefused") ||
+    m.includes("econnreset") ||
+    m.includes("etimedout") ||
+    m.includes("enotfound") ||
+    m.includes("fetch failed")
+  )
+    return "transient";
+  if (m.includes("429") || m.includes("rate limit") || m.includes("too many requests")) return "transient";
+  if (m.includes("502") || m.includes("503") || m.includes("504")) return "transient";
+  if (m.includes("409") || m.includes("already processing")) return "transient";
+  return "permanent";
+}
+
+function getBackoffDelay(attempt: number): number {
+  const base = 1000;
+  const cap = 30000;
+  return Math.round(Math.min(base * Math.pow(2, attempt) + Math.random() * base, cap));
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
+
+type ExecutionCommand = "start" | "pause" | "resume" | "stop" | "set_delay" | "recover";
+
+function buildExecutionPatch(
+  current: Record<string, unknown>,
+  command: ExecutionCommand,
+  delayMs?: number,
+): ImportExecutionState {
+  const now = new Date().toISOString();
+  const base = defaultExecutionState();
+  const existing: ImportExecutionState = { ...base, ...(current as unknown as ImportExecutionState) };
+
+  switch (command) {
+    case "start":
+    case "resume":
+      return {
+        ...existing,
+        status: "running",
+        startedAt: existing.startedAt ?? now,
+        pausedAt: null,
+        stoppedAt: null,
+        failedAt: null,
+        errorMessage: null,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: command === "resume" ? "Execution resumed" : "Execution started" },
+        ],
+      };
+    case "pause":
+      return {
+        ...existing,
+        status: "paused",
+        pausedAt: now,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Execution paused" },
+        ],
+      };
+    case "stop":
+      return {
+        ...existing,
+        status: "stopped",
+        stoppedAt: now,
+        errorMessage: null,
+        retryAttempt: 0,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Execution stopped" },
+        ],
+      };
+    case "set_delay":
+      return {
+        ...existing,
+        delayMs: delayMs ?? existing.delayMs,
+      };
+    case "recover":
+      return {
+        ...existing,
+        status: "running",
+        pausedAt: null,
+        stoppedAt: null,
+        failedAt: null,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Execution recovered after interruption" },
+        ],
+      };
+  }
+}
+
+export const getImportExecutionState = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("metadata, processed_items, total_items, failed_items, status, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+    const metadata = (batch.metadata as Record<string, unknown>) ?? {};
+    const exec = (metadata.execution as ImportExecutionState | null) ?? null;
+    return {
+      execution: exec,
+      counters: {
+        processed: batch.processed_items ?? 0,
+        total: batch.total_items ?? 0,
+        failed: batch.failed_items ?? 0,
+      },
+      remaining: Math.max(0, (batch.total_items ?? 0) - (batch.processed_items ?? 0)),
+      batchStatus: batch.status,
+      batchStage: batch.stage,
+    };
+  });
+
+export const updateImportExecutionControl = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string; command: string; delayMs?: number }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    if (!["start", "pause", "resume", "stop", "set_delay", "recover"].includes(i.command))
+      throw new Response("Invalid command", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("metadata, stage, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+
+    // Validate stage: only allow execution controls in execute/preview stage
+    if (!["preview", "execute"].includes(String(batch.stage))) {
+      throw new Response(`Cannot control execution in stage=${batch.stage}`, { status: 400 });
+    }
+    if (["completed", "partially_completed", "failed", "cancelled", "archived"].includes(String(batch.status))) {
+      throw new Response(`Batch status=${batch.status}`, { status: 400 });
+    }
+
+    const metadata = (batch.metadata as Record<string, unknown>) ?? {};
+    const exec = (metadata.execution as Record<string, unknown>) ?? {};
+    const currentStatus = String(exec?.status ?? "idle");
+
+    if ((data.command === "start" || data.command === "resume") && currentStatus === "running") {
+      return { ok: true, execution: exec as unknown as ImportExecutionState };
+    }
+
+    const patch = buildExecutionPatch(exec, data.command as ExecutionCommand, data.delayMs);
+
+    await supabase
+      .from("import_batches")
+      .update({ metadata: { ...metadata, execution: patch } })
+      .eq("id", data.id);
+
+    return { ok: true, execution: patch };
+  });
+
+export const executeImportChunk = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+
+    async function readBatch() {
+      const r = await supabase
+        .from("import_batches")
+        .select("metadata, processed_items, total_items, status, stage")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (!r) throw new Response("Not found", { status: 404 });
+      const m = (r.metadata as Record<string, unknown>) ?? {};
+      return { row: r, metadata: m, exec: (m.execution as Record<string, unknown>) ?? {} };
+    }
+
+    let { row, metadata, exec } = await readBatch();
+    if (exec.status !== "running") {
+      return { skipped: true, reason: String(exec.status ?? "idle") };
+    }
+    if (!["preview", "execute"].includes(String(row.stage))) {
+      return { skipped: true, reason: `wrong_stage:${row.stage}` };
+    }
+    if (["completed", "partially_completed", "failed", "cancelled", "archived"].includes(String(row.status))) {
+      return { skipped: true, reason: `batch_ended:${row.status}` };
+    }
+
+    const { count: remaining } = await supabase
+      .from("import_batch_items")
+      .select("id", { count: "exact", head: true })
+      .eq("import_batch_id", data.id)
+      .eq("status", "pending");
+
+    if (!remaining || remaining === 0) {
+      const patch = {
+        ...exec,
+        status: "completed" as const,
+        completedAt: new Date().toISOString(),
+        errorMessage: null,
+        retryAttempt: 0,
+        log: [
+          ...((exec.log as ExecutionLogEntry[]) ?? []).slice(-99),
+          { at: new Date().toISOString(), type: "info" as const, message: "All items processed" },
+        ],
+      };
+      await supabase
+        .from("import_batches")
+        .update({ metadata: { ...metadata, execution: patch } })
+        .eq("id", data.id);
+      return { done: true, skipped: false };
+    }
+
+    let lastError: Error | null = null;
+    const maxRetries = Number(exec.maxRetries ?? 3);
+    let previousProcessed = row.processed_items ?? 0;
+    let chunksCompleted = Number(exec.chunksCompleted ?? 0);
+    let totalChunkDurationMs = Number(exec.totalChunkDurationMs ?? 0);
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      const beforeAttempt = previousProcessed;
+      const attemptStart = Date.now();
+      try {
+        const result = await runImportChunk({ data: { id: data.id } });
+        totalChunkDurationMs += Date.now() - attemptStart;
+        chunksCompleted += 1;
+
+        const log = ((exec.log as ExecutionLogEntry[]) ?? []).slice(-99);
+        log.push({
+          at: new Date().toISOString(),
+          type: "info",
+          message: `Chunk: ${result.processed} items (${result.inserted} inserted, ${result.updated} updated, ${result.skipped} skipped, ${result.failed} failed)`,
+        });
+
+        const patch: ImportExecutionState = {
+          ...(exec as unknown as ImportExecutionState),
+          chunksCompleted,
+          totalChunkDurationMs,
+          status: "running",
+          errorMessage: null,
+          retryAttempt: 0,
+          log,
+        };
+        await supabase
+          .from("import_batches")
+          .update({ metadata: { ...metadata, execution: patch } })
+          .eq("id", data.id);
+
+        return result;
+      } catch (err) {
+        lastError = err as Error;
+        const errorType = classifyImportError(lastError);
+
+        if (errorType === "permanent") {
+          const fresh = await readBatch();
+          metadata = fresh.metadata; exec = fresh.exec; previousProcessed = fresh.row.processed_items ?? 0;
+          const log = ((exec.log as ExecutionLogEntry[]) ?? []).slice(-99);
+          log.push({
+            at: new Date().toISOString(),
+            type: "error",
+            message: `Permanent error: ${lastError.message}`,
+          });
+          const patch: ImportExecutionState = {
+            ...(exec as unknown as ImportExecutionState),
+            status: "failed",
+            errorMessage: lastError.message,
+            failedAt: new Date().toISOString(),
+            retryAttempt: Number(exec.retryAttempt ?? 0) + 1,
+            log,
+          };
+          await supabase
+            .from("import_batches")
+            .update({ metadata: { ...metadata, execution: patch } })
+            .eq("id", data.id);
+          throw lastError;
+        }
+
+        const fresh = await readBatch();
+        metadata = fresh.metadata; exec = fresh.exec; previousProcessed = fresh.row.processed_items ?? 0;
+
+        if (previousProcessed > beforeAttempt) {
+          chunksCompleted += 1;
+          const log = ((exec.log as ExecutionLogEntry[]) ?? []).slice(-99);
+          log.push({
+            at: new Date().toISOString(),
+            type: "info",
+            message: `Chunk completed on previous attempt (processed advanced: ${beforeAttempt} → ${previousProcessed})`,
+          });
+          const patch: ImportExecutionState = {
+            ...(exec as unknown as ImportExecutionState),
+            chunksCompleted,
+            retryAttempt: 0,
+            log,
+          };
+          await supabase
+            .from("import_batches")
+            .update({ metadata: { ...metadata, execution: patch } })
+            .eq("id", data.id);
+          return { processed: previousProcessed - beforeAttempt };
+        }
+
+        if (attempt >= maxRetries) {
+          const log = ((exec.log as ExecutionLogEntry[]) ?? []).slice(-99);
+          log.push({
+            at: new Date().toISOString(),
+            type: "error",
+            message: `Transient error (attempt ${attempt + 1}/${maxRetries}) — final: ${lastError.message}`,
+          });
+          const patch: ImportExecutionState = {
+            ...(exec as unknown as ImportExecutionState),
+            status: "failed",
+            errorMessage: `Transient error after ${attempt + 1} retries: ${lastError.message}`,
+            failedAt: new Date().toISOString(),
+            retryAttempt: Number(exec.retryAttempt ?? 0) + 1,
+            log,
+          };
+          await supabase
+            .from("import_batches")
+            .update({ metadata: { ...metadata, execution: patch } })
+            .eq("id", data.id);
+          throw lastError;
+        }
+
+        const log = ((exec.log as ExecutionLogEntry[]) ?? []).slice(-99);
+        log.push({
+          at: new Date().toISOString(),
+          type: "retry",
+          message: `Transient error (attempt ${attempt + 1}/${maxRetries}), retrying in ${getBackoffDelay(attempt)}ms: ${lastError.message}`,
+        });
+        const patch: ImportExecutionState = {
+          ...(exec as unknown as ImportExecutionState),
+          status: "running",
+          retryAttempt: Number(exec.retryAttempt ?? 0) + 1,
+          log,
+        };
+        await supabase
+          .from("import_batches")
+          .update({ metadata: { ...metadata, execution: patch } })
+          .eq("id", data.id);
+
+        await sleep(getBackoffDelay(attempt));
+      }
+    }
+
+    throw lastError ?? new Response("Execution failed", { status: 500 });
+  });
+
+// ---------- Enrichment state (Phase C) ----------
+
+export type EnrichmentStatus = "idle" | "running" | "paused" | "stopped" | "completed" | "failed";
+
+export interface ImportEnrichmentState {
+  status: EnrichmentStatus;
+  startedAt: string | null;
+  pausedAt: string | null;
+  stoppedAt: string | null;
+  completedAt: string | null;
+  failedAt: string | null;
+  errorMessage: string | null;
+  delayMs: number;
+  retryAttempt: number;
+  maxRetries: number;
+  businessesTotal: number;
+  businessesProcessed: number;
+  businessesCompleted: number;
+  businessesFailed: number;
+  businessesRetryable: number;
+  businessesStale: number;
+  descriptionsGenerated: number;
+  seoArGenerated: number;
+  seoEnGenerated: number;
+  seoTrGenerated: number;
+  latestError: string | null;
+  lastRetryCount: number;
+  totalDurationMs: number;
+  log: ExecutionLogEntry[];
+}
+
+function defaultEnrichmentState(): ImportEnrichmentState {
+  return {
+    status: "idle",
+    startedAt: null,
+    pausedAt: null,
+    stoppedAt: null,
+    completedAt: null,
+    failedAt: null,
+    errorMessage: null,
+    delayMs: 500,
+    retryAttempt: 0,
+    maxRetries: 3,
+    businessesTotal: 0,
+    businessesProcessed: 0,
+    businessesCompleted: 0,
+    businessesFailed: 0,
+    businessesRetryable: 0,
+    businessesStale: 0,
+    descriptionsGenerated: 0,
+    seoArGenerated: 0,
+    seoEnGenerated: 0,
+    seoTrGenerated: 0,
+    latestError: null,
+    lastRetryCount: 0,
+    totalDurationMs: 0,
+    log: [],
+  };
+}
+
+type EnrichmentCommand = "start" | "pause" | "resume" | "stop" | "set_delay" | "recover";
+
+function buildEnrichmentPatch(
+  current: Record<string, unknown>,
+  command: EnrichmentCommand,
+  delayMs?: number,
+): ImportEnrichmentState {
+  const now = new Date().toISOString();
+  const base = defaultEnrichmentState();
+  const existing: ImportEnrichmentState = { ...base, ...(current as unknown as ImportEnrichmentState) };
+
+  switch (command) {
+    case "start":
+    case "resume":
+      return {
+        ...existing,
+        status: "running",
+        startedAt: existing.startedAt ?? now,
+        pausedAt: null,
+        stoppedAt: null,
+        failedAt: null,
+        errorMessage: null,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: command === "resume" ? "Enrichment resumed" : "Enrichment started" },
+        ],
+      };
+    case "pause":
+      return {
+        ...existing,
+        status: "paused",
+        pausedAt: now,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Enrichment paused" },
+        ],
+      };
+    case "stop":
+      return {
+        ...existing,
+        status: "stopped",
+        stoppedAt: now,
+        errorMessage: null,
+        retryAttempt: 0,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Enrichment stopped" },
+        ],
+      };
+    case "set_delay":
+      return {
+        ...existing,
+        delayMs: delayMs ?? existing.delayMs,
+      };
+    case "recover":
+      return {
+        ...existing,
+        status: "running",
+        pausedAt: null,
+        stoppedAt: null,
+        failedAt: null,
+        log: [
+          ...(existing.log ?? []).slice(-99),
+          { at: now, type: "info" as const, message: "Enrichment recovered after interruption" },
+        ],
+      };
+  }
+}
+
+export const getEnrichmentState = createServerFn({ method: "GET" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("metadata, status, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+    const metadata = (batch.metadata as Record<string, unknown>) ?? {};
+    const enrich = (metadata.enrichment as ImportEnrichmentState | null) ?? null;
+    return {
+      enrichment: enrich,
+      counters: enrich
+        ? {
+            processed: enrich.businessesProcessed,
+            total: enrich.businessesTotal,
+            completed: enrich.businessesCompleted,
+            failed: enrich.businessesFailed,
+            retryable: enrich.businessesRetryable,
+            stale: enrich.businessesStale,
+            descriptionsGenerated: enrich.descriptionsGenerated,
+            seoArGenerated: enrich.seoArGenerated,
+            seoEnGenerated: enrich.seoEnGenerated,
+            seoTrGenerated: enrich.seoTrGenerated,
+            latestError: enrich.latestError,
+            lastRetryCount: enrich.lastRetryCount,
+          }
+        : null,
+      remaining: enrich ? Math.max(0, enrich.businessesTotal - enrich.businessesProcessed) : 0,
+    };
+  });
+
+export const updateEnrichmentControl = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string; command: string; delayMs?: number }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    if (!["start", "pause", "resume", "stop", "set_delay", "recover"].includes(i.command))
+      throw new Response("Invalid command", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch } = await supabase
+      .from("import_batches")
+      .select("metadata, stage, status")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (!batch) throw new Response("Not found", { status: 404 });
+
+    if (!["enrich"].includes(String(batch.stage))) {
+      throw new Response(`Cannot control enrichment in stage=${batch.stage}`, { status: 400 });
+    }
+    if (["completed", "partially_completed", "failed", "cancelled", "archived"].includes(String(batch.status))) {
+      throw new Response(`Batch status=${batch.status}`, { status: 400 });
+    }
+
+    const metadata = (batch.metadata as Record<string, unknown>) ?? {};
+    const enrich = (metadata.enrichment as Record<string, unknown>) ?? {};
+    const currentStatus = String(enrich?.status ?? "idle");
+
+    if ((data.command === "start" || data.command === "resume") && currentStatus === "running") {
+      return { ok: true, enrichment: enrich as unknown as ImportEnrichmentState };
+    }
+
+    const patch = buildEnrichmentPatch(enrich, data.command as EnrichmentCommand, data.delayMs);
+
+    await supabase
+      .from("import_batches")
+      .update({ metadata: { ...metadata, enrichment: patch } })
+      .eq("id", data.id);
+
+    return { ok: true, enrichment: patch };
+  });
+
+async function generateContentForBusiness(
+  supabase: Sb,
+  businessId: string,
+): Promise<{
+  descriptionGenerated: boolean;
+  descriptionFailed: boolean;
+  descriptionStale: boolean;
+  seoArGenerated: boolean;
+  seoArFailed: boolean;
+  seoArStale: boolean;
+  seoEnGenerated: boolean;
+  seoEnFailed: boolean;
+  seoEnStale: boolean;
+  seoTrGenerated: boolean;
+  seoTrFailed: boolean;
+  seoTrStale: boolean;
+  latestError: string | null;
+  lastRetryCount: number;
+}> {
+  const { data: biz } = await supabase
+    .from("businesses")
+    .select("id, name, description, original_language, primary_category_id, city_id")
+    .eq("id", businessId)
+    .maybeSingle();
+  if (!biz) return { descriptionGenerated: false, descriptionFailed: false, descriptionStale: false, seoArGenerated: false, seoArFailed: false, seoArStale: false, seoEnGenerated: false, seoEnFailed: false, seoEnStale: false, seoTrGenerated: false, seoTrFailed: false, seoTrStale: false, latestError: null, lastRetryCount: 0 };
+
+  const business = biz as Record<string, unknown>;
+  const originalLanguage = String(business.original_language ?? "en");
+  const existingDescription = String(business.description ?? "").trim();
+
+  let categoryName = "";
+  if (business.primary_category_id) {
+    const { data: cat } = await supabase
+      .from("category_translations")
+      .select("name")
+      .eq("category_id", business.primary_category_id)
+      .eq("language_code", originalLanguage)
+      .limit(1)
+      .maybeSingle();
+    if (cat) categoryName = String((cat as Record<string, unknown>).name ?? "");
+  }
+  let cityName = "";
+  if (business.city_id) {
+    const { data: ct } = await supabase
+      .from("city_translations")
+      .select("name")
+      .eq("city_id", business.city_id)
+      .eq("language_code", originalLanguage)
+      .limit(1)
+      .maybeSingle();
+    if (ct) cityName = String((ct as Record<string, unknown>).name ?? "");
+  }
+
+  const businessData = {
+    name: String(business.name ?? ""),
+    category: categoryName,
+    city: cityName,
+    originalLanguage,
+    existingDescription,
+  };
+
+  const currentSourceHash = computeSourceHash(businessData);
+  const promptVersion = ENRICHMENT_PROMPT_VERSION;
+  const maxRetries = 3;
+
+  // ---- Description ----
+  let descriptionGenerated = false;
+  let descriptionFailed = false;
+  let descriptionStale = false;
+  let latestError: string | null = null;
+  let lastRetryCount = 0;
+
+  const descGenKey = computeGenerationKey({
+    businessId,
+    contentType: "description",
+    locale: originalLanguage,
+    sourceHash: currentSourceHash,
+    promptVersion,
+  });
+
+  const { data: existingDesc } = await supabase
+    .from("business_content_generation")
+    .select("generation_status, source_content_hash, prompt_version")
+    .eq("generation_key", descGenKey)
+    .maybeSingle();
+
+  if (existingDesc && isGenerationFresh({
+    recordStatus: String((existingDesc as Record<string, unknown>).generation_status ?? ""),
+    recordSourceHash: String((existingDesc as Record<string, unknown>).source_content_hash ?? ""),
+    recordPromptVersion: String((existingDesc as Record<string, unknown>).prompt_version ?? ""),
+    currentSourceHash,
+    currentPromptVersion: promptVersion,
+  })) {
+    // Fresh — skip
+  } else {
+    if (existingDesc) descriptionStale = true;
+    // Mark ALL records for this (business_id, content_type) as stale,
+    // except the current generation key — this catches both "completed"
+    // and "processing" records from any older generation.
+    await supabase
+      .from("business_content_generation")
+      .update({ generation_status: "stale" })
+      .eq("business_id", businessId)
+      .eq("content_type", "description")
+      .neq("generation_key", descGenKey);
+
+    await upsertGenerationRecord(supabase, {
+      businessId,
+      contentType: "description",
+      locale: originalLanguage,
+      promptVersion,
+      sourceHash: currentSourceHash,
+      generationKey: descGenKey,
+      status: "processing",
+      errorMessage: null,
+      retryCount: 0,
+    });
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const output = await generateAIDescription(businessData, originalLanguage);
+        const { error: descErr } = await supabase
+          .from("businesses")
+          .update({ description: output.description })
+          .eq("id", businessId);
+        if (descErr) throw descErr;
+
+        await upsertGenerationRecord(supabase, {
+          businessId,
+          contentType: "description",
+          locale: originalLanguage,
+          promptVersion,
+          sourceHash: currentSourceHash,
+          generationKey: descGenKey,
+          status: "completed",
+          errorMessage: null,
+          retryCount: attempt,
+          generatedContent: output.description,
+        });
+        // After completing, mark any other completed record for this
+        // (biz, type, locale) as stale — handles concurrent completion races.
+        await supabase
+          .from("business_content_generation")
+          .update({ generation_status: "stale" })
+          .eq("business_id", businessId)
+          .eq("content_type", "description")
+          .eq("locale", originalLanguage)
+          .neq("generation_key", descGenKey)
+          .eq("generation_status", "completed");
+        descriptionGenerated = true;
+        latestError = null;
+        lastRetryCount = 0;
+        break;
+      } catch (err) {
+        const e = err as Error;
+        latestError = e.message;
+        lastRetryCount = attempt + 1;
+        const errorType = classifyEnrichmentError(e);
+        if (errorType === "permanent" || attempt >= maxRetries) {
+          await upsertGenerationRecord(supabase, {
+            businessId,
+            contentType: "description",
+            locale: originalLanguage,
+            promptVersion,
+            sourceHash: currentSourceHash,
+            generationKey: descGenKey,
+            status: "failed",
+            errorMessage: e.message,
+            retryCount: attempt,
+          });
+          descriptionFailed = true;
+          break;
+        }
+        await upsertGenerationRecord(supabase, {
+          businessId,
+          contentType: "description",
+          locale: originalLanguage,
+          promptVersion,
+          sourceHash: currentSourceHash,
+          generationKey: descGenKey,
+          status: "processing",
+          errorMessage: e.message,
+          retryCount: attempt + 1,
+        });
+        await sleep(enrichmentBackoff(attempt));
+      }
+    }
+  }
+
+  // ---- SEO (per locale) ----
+  let seoArGenerated = false, seoArFailed = false, seoArStale = false;
+  let seoEnGenerated = false, seoEnFailed = false, seoEnStale = false;
+  let seoTrGenerated = false, seoTrFailed = false, seoTrStale = false;
+
+  for (const locale of SUPPORTED_LOCALES) {
+    let localeGenerated = false, localeFailed = false, localeStale = false;
+
+    const seoGenKey = computeGenerationKey({
+      businessId,
+      contentType: "seo",
+      locale,
+      sourceHash: currentSourceHash,
+      promptVersion,
+    });
+
+    const { data: existingSeo } = await supabase
+      .from("business_content_generation")
+      .select("generation_status, source_content_hash, prompt_version")
+      .eq("generation_key", seoGenKey)
+      .maybeSingle();
+
+    if (
+      existingSeo &&
+      isGenerationFresh({
+        recordStatus: String((existingSeo as Record<string, unknown>).generation_status ?? ""),
+        recordSourceHash: String((existingSeo as Record<string, unknown>).source_content_hash ?? ""),
+        recordPromptVersion: String((existingSeo as Record<string, unknown>).prompt_version ?? ""),
+        currentSourceHash,
+        currentPromptVersion: promptVersion,
+      })
+    ) {
+      continue;
+    }
+
+    if (existingSeo) localeStale = true;
+    await supabase
+      .from("business_content_generation")
+      .update({ generation_status: "stale" })
+      .eq("business_id", businessId)
+      .eq("content_type", "seo")
+      .eq("locale", locale)
+      .neq("generation_key", seoGenKey);
+
+    await upsertGenerationRecord(supabase, {
+      businessId,
+      contentType: "seo",
+      locale,
+      promptVersion,
+      sourceHash: currentSourceHash,
+      generationKey: seoGenKey,
+      status: "processing",
+      errorMessage: null,
+      retryCount: 0,
+    });
+
+    for (let attempt = 0; attempt <= maxRetries; attempt++) {
+      try {
+        const output = await generateSeoContent(businessData, locale);
+        await upsertGenerationRecord(supabase, {
+          businessId,
+          contentType: "seo",
+          locale,
+          promptVersion,
+          sourceHash: currentSourceHash,
+          generationKey: seoGenKey,
+          status: "completed",
+          errorMessage: null,
+          retryCount: attempt,
+          generatedContent: JSON.stringify(output),
+        });
+        // After completing, mark any other completed record for this
+        // (biz, seo, locale) as stale — handles concurrent completion races.
+        await supabase
+          .from("business_content_generation")
+          .update({ generation_status: "stale" })
+          .eq("business_id", businessId)
+          .eq("content_type", "seo")
+          .eq("locale", locale)
+          .neq("generation_key", seoGenKey)
+          .eq("generation_status", "completed");
+        localeGenerated = true;
+        latestError = null;
+        lastRetryCount = 0;
+        break;
+      } catch (err) {
+        const e = err as Error;
+        latestError = e.message;
+        lastRetryCount = attempt + 1;
+        const errorType = classifyEnrichmentError(e);
+        if (errorType === "permanent" || attempt >= maxRetries) {
+          await upsertGenerationRecord(supabase, {
+            businessId,
+            contentType: "seo",
+            locale,
+            promptVersion,
+            sourceHash: currentSourceHash,
+            generationKey: seoGenKey,
+            status: "failed",
+            errorMessage: e.message,
+            retryCount: attempt,
+          });
+          localeFailed = true;
+          break;
+        }
+        await upsertGenerationRecord(supabase, {
+          businessId,
+          contentType: "seo",
+          locale,
+          promptVersion,
+          sourceHash: currentSourceHash,
+          generationKey: seoGenKey,
+          status: "processing",
+          errorMessage: e.message,
+          retryCount: attempt + 1,
+        });
+        await sleep(enrichmentBackoff(attempt));
+      }
+    }
+
+    if (locale === "ar") {
+      seoArGenerated = localeGenerated;
+      seoArFailed = localeFailed;
+      seoArStale = localeStale;
+    } else if (locale === "en") {
+      seoEnGenerated = localeGenerated;
+      seoEnFailed = localeFailed;
+      seoEnStale = localeStale;
+    } else if (locale === "tr") {
+      seoTrGenerated = localeGenerated;
+      seoTrFailed = localeFailed;
+      seoTrStale = localeStale;
+    }
+  }
+
+  return {
+    descriptionGenerated,
+    descriptionFailed,
+    descriptionStale,
+    seoArGenerated,
+    seoArFailed,
+    seoArStale,
+    seoEnGenerated,
+    seoEnFailed,
+    seoEnStale,
+    seoTrGenerated,
+    seoTrFailed,
+    seoTrStale,
+    latestError,
+    lastRetryCount,
+  };
+}
+
+async function upsertGenerationRecord(
+  supabase: Sb,
+  params: {
+    businessId: string;
+    contentType: string;
+    locale: string;
+    promptVersion: string;
+    sourceHash: string;
+    generationKey: string;
+    status: string;
+    errorMessage: string | null;
+    retryCount: number;
+    generatedContent?: string;
+  },
+): Promise<void> {
+  const now = new Date().toISOString();
+
+  // Write-time newer-generation protection:
+  // Before writing "completed" or "processing", check if a newer generation
+  // has already marked this record as stale. If so, abort — the race was lost.
+  if (params.status === "completed" || params.status === "processing") {
+    const { data: existing } = await supabase
+      .from("business_content_generation")
+      .select("generation_status")
+      .eq("generation_key", params.generationKey)
+      .maybeSingle();
+    if (existing && String((existing as Record<string, unknown>).generation_status) === "stale") {
+      throw new Error(
+        `newer_generation: record was marked stale before write completed`,
+      );
+    }
+  }
+
+  const row: Record<string, unknown> = {
+    business_id: params.businessId,
+    content_type: params.contentType,
+    locale: params.locale,
+    prompt_version: params.promptVersion,
+    source_content_hash: params.sourceHash,
+    generation_key: params.generationKey,
+    generation_status: params.status,
+    error_message: params.errorMessage,
+    retry_count: params.retryCount,
+    updated_at: now,
+  };
+  if (params.generatedContent !== undefined) {
+    row.generated_content = params.generatedContent;
+  }
+  if (params.status === "processing") {
+    row.last_attempt_at = now;
+  }
+  if (params.status === "completed") {
+    row.completed_at = now;
+  }
+  const { error } = await supabase
+    .from("business_content_generation")
+    .upsert(row, { onConflict: "generation_key" });
+  if (error) throw error;
+}
+
+export const enqueueBatchEnrichment = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch, error: batchError } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, status, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (batchError) throw new Response(batchError.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot enqueue enrichment for batch with ${batch.failed_items ?? 0} failed and ${batch.invalid_items ?? 0} invalid items.`,
+        { status: 409 },
+      );
+    }
+
+    const { data: rows } = await supabase
+      .from("business_import_provenance")
+      .select("business_id")
+      .eq("import_batch_id", data.id);
+    const businessIds = Array.from(new Set((rows ?? []).map((r: { business_id: string }) => r.business_id))) as string[];
+
+    const metadata = (batch.metadata as Record<string, unknown>) ?? {};
+    const enrich = defaultEnrichmentState();
+    enrich.businessesTotal = businessIds.length;
+
+    await supabase
+      .from("import_batches")
+      .update({ metadata: { ...metadata, enrichment: enrich } })
+      .eq("id", data.id);
+
+    await supabase.rpc("record_audit", {
+      _action: "import.enrich.enqueue",
+      _entity_type: "import_batch",
+      _entity_id: data.id,
+      _before: null,
+      _after: null,
+      _metadata: { businesses: businessIds.length },
+    });
+
+    return { ok: true, enqueued: businessIds.length };
+  });
+
+export const skipBatchEnrichment = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+    const { data: batch, error } = await supabase
+      .from("import_batches")
+      .select("failed_items, invalid_items, stage")
+      .eq("id", data.id)
+      .maybeSingle();
+    if (error) throw new Response(error.message, { status: 500 });
+    if (!batch) throw new Response("Not found", { status: 404 });
+    if ((batch.failed_items ?? 0) > 0 || (batch.invalid_items ?? 0) > 0) {
+      throw new Response(
+        `Cannot skip enrichment for a batch with ${batch.failed_items ?? 0} failed and ${batch.invalid_items ?? 0} invalid items.`,
+        { status: 409 },
+      );
+    }
+    if (batch.stage !== "enrich") {
+      throw new Response(`Cannot skip enrichment in stage ${batch.stage}`, { status: 400 });
+    }
+    await advanceStage(supabase, data.id, "images");
+    await supabase.rpc("record_audit", {
+      _action: "import.enrich.skip",
+      _entity_type: "import_batch",
+      _entity_id: data.id,
+      _before: null,
+      _after: null,
+      _metadata: { reason: "manual_skip" },
+    });
+    return { ok: true };
+  });
+
+export const processEnrichmentChunk = createServerFn({ method: "POST" })
+  .middleware([requireAdmin])
+  .inputValidator((i: { id: string }) => {
+    if (!i?.id) throw new Response("Missing id", { status: 400 });
+    return i;
+  })
+  .handler(async ({ data, context }) => {
+    const supabase = context.supabase as Sb;
+
+    async function readBatch() {
+      const r = await supabase
+        .from("import_batches")
+        .select("metadata, stage, status")
+        .eq("id", data.id)
+        .maybeSingle();
+      if (!r) throw new Response("Not found", { status: 404 });
+      const m = (r.metadata as Record<string, unknown>) ?? {};
+      return { row: r, metadata: m, enrich: (m.enrichment as Record<string, unknown>) ?? {} };
+    }
+
+    let { row, metadata, enrich } = await readBatch();
+    if (enrich.status !== "running") {
+      return { skipped: true, reason: String(enrich.status ?? "idle") };
+    }
+    if (row.stage !== "enrich") {
+      return { skipped: true, reason: `wrong_stage:${row.stage}` };
+    }
+    if (["completed", "partially_completed", "failed", "cancelled", "archived"].includes(String(row.status))) {
+      return { skipped: true, reason: `batch_ended:${row.status}` };
+    }
+
+    const { data: provenance } = await supabase
+      .from("business_import_provenance")
+      .select("business_id")
+      .eq("import_batch_id", data.id);
+    const allBusinessIds = Array.from(new Set((provenance ?? []).map((r: { business_id: string }) => r.business_id))) as string[];
+    const totalBusinesses = allBusinessIds.length;
+
+    const processed = Number(enrich.businessesProcessed ?? 0);
+    if (processed >= totalBusinesses) {
+      const patch = {
+        ...enrich,
+        status: "completed" as const,
+        completedAt: new Date().toISOString(),
+        errorMessage: null,
+        retryAttempt: 0,
+        log: [
+          ...((enrich.log as ExecutionLogEntry[]) ?? []).slice(-99),
+          { at: new Date().toISOString(), type: "info" as const, message: "All businesses enriched" },
+        ],
+      };
+      await supabase
+        .from("import_batches")
+        .update({ metadata: { ...metadata, enrichment: patch } })
+        .eq("id", data.id);
+      return { done: true, skipped: false };
+    }
+
+    const chunk = allBusinessIds.slice(processed, processed + 10);
+    const chunkStart = Date.now();
+    let descGen = 0, descFailed = 0, descStale = 0;
+    let seoArGen = 0, seoArFail = 0, seoArStale = 0;
+    let seoEnGen = 0, seoEnFail = 0, seoEnStale = 0;
+    let seoTrGen = 0, seoTrFail = 0, seoTrStale = 0;
+    let businessHasError = false;
+    let chunkLatestError: string | null = null;
+    let maxRetry = 0;
+
+    for (const businessId of chunk) {
+      const result = await generateContentForBusiness(supabase, businessId);
+      if (result.descriptionGenerated) descGen++;
+      if (result.descriptionFailed) descFailed++;
+      if (result.descriptionStale) descStale++;
+      if (result.seoArGenerated) seoArGen++;
+      if (result.seoArFailed) seoArFail++;
+      if (result.seoArStale) seoArStale++;
+      if (result.seoEnGenerated) seoEnGen++;
+      if (result.seoEnFailed) seoEnFail++;
+      if (result.seoEnStale) seoEnStale++;
+      if (result.seoTrGenerated) seoTrGen++;
+      if (result.seoTrFailed) seoTrFail++;
+      if (result.seoTrStale) seoTrStale++;
+      if (result.latestError) {
+        businessHasError = true;
+        chunkLatestError = result.latestError;
+      }
+      if (result.lastRetryCount > maxRetry) maxRetry = result.lastRetryCount;
+    }
+
+    const chunkDuration = Date.now() - chunkStart;
+    const newProcessed = Math.min(processed + chunk.length, totalBusinesses);
+
+    const seoTotalGen = seoArGen + seoEnGen + seoTrGen;
+    const seoTotalFail = seoArFail + seoEnFail + seoTrFail;
+    const seoTotalStale = seoArStale + seoEnStale + seoTrStale;
+
+    const log = ((enrich.log as ExecutionLogEntry[]) ?? []).slice(-99);
+    log.push({
+      at: new Date().toISOString(),
+      type: "info",
+      message: [
+        `Enrich chunk: ${chunk.length} biz`,
+        descGen > 0 || descFailed > 0 ? `desc +${descGen} -${descFailed} ~${descStale}` : "",
+        seoTotalGen > 0 || seoTotalFail > 0 ? `seo +${seoTotalGen} -${seoTotalFail} ~${seoTotalStale}` : "",
+      ].filter(Boolean).join(", "),
+    });
+
+    const prev = enrich as unknown as ImportEnrichmentState;
+    const patch: ImportEnrichmentState = {
+      ...prev,
+      businessesProcessed: newProcessed,
+      businessesTotal: totalBusinesses,
+      businessesCompleted: prev.businessesCompleted + (descGen > 0 ? 1 : 0),
+      businessesFailed: prev.businessesFailed + (descFailed > 0 || seoArFail > 0 || seoEnFail > 0 || seoTrFail > 0 ? 1 : 0),
+      businessesRetryable: businessHasError ? prev.businessesRetryable + 1 : prev.businessesRetryable,
+      businessesStale: prev.businessesStale + (descStale > 0 || seoArStale > 0 || seoEnStale > 0 || seoTrStale > 0 ? 1 : 0),
+      descriptionsGenerated: prev.descriptionsGenerated + descGen,
+      seoArGenerated: prev.seoArGenerated + seoArGen,
+      seoEnGenerated: prev.seoEnGenerated + seoEnGen,
+      seoTrGenerated: prev.seoTrGenerated + seoTrGen,
+      latestError: chunkLatestError ?? prev.latestError,
+      lastRetryCount: maxRetry,
+      totalDurationMs: prev.totalDurationMs + chunkDuration,
+      status: "running",
+      errorMessage: null,
+      retryAttempt: 0,
+      log,
+    };
+
+    await supabase
+      .from("import_batches")
+      .update({ metadata: { ...metadata, enrichment: patch } })
+      .eq("id", data.id);
+
+    const allDone = newProcessed >= totalBusinesses;
+    if (allDone) {
+      await advanceStage(supabase, data.id, "images");
+    }
+
+    return {
+      ok: true,
+      processed: chunk.length,
+      descriptionsGenerated: descGen,
+      seoGenerated: seoArGen + seoEnGen + seoTrGen,
+      failed: descFailed + seoArFail + seoEnFail + seoTrFail,
+      done: allDone,
+    };
   });
 
 // ---------- Detect schema (stage: detect_schema → field_mapping) ----------
@@ -1487,7 +2743,7 @@ export const enqueueBatchTranslations = createServerFn({ method: "POST" })
     } catch (err) {
       throw new Response(`translation module failed: ${(err as Error).message}`, { status: 500 });
     }
-    await advanceStage(supabase, data.id, "images");
+    await advanceStage(supabase, data.id, "enrich");
     return { ok: true, enqueued, failed, businesses: businessIds.length };
   });
 
@@ -1517,7 +2773,7 @@ export const skipBatchTranslations = createServerFn({ method: "POST" })
     if (batch.stage !== "translations") {
       throw new Response(`Cannot skip translations in stage ${batch.stage}`, { status: 400 });
     }
-    await advanceStage(supabase, data.id, "images");
+    await advanceStage(supabase, data.id, "enrich");
     await supabase.rpc("record_audit", {
       _action: "import.translations.skip",
       _entity_type: "import_batch",

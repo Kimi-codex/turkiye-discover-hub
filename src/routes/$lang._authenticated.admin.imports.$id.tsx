@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useRef, useEffect } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useServerFn } from "@tanstack/react-start";
@@ -20,7 +20,16 @@ import {
   updateImportFieldMapping,
   restoreSuggestedFieldMapping,
   approveImportFieldMapping,
+  getImportExecutionState,
+  updateImportExecutionControl,
+  executeImportChunk,
+  getEnrichmentState,
+  updateEnrichmentControl,
+  enqueueBatchEnrichment,
+  skipBatchEnrichment,
+  processEnrichmentChunk,
 } from "@/lib/admin/imports.functions";
+import type { ImportExecutionState, ImportEnrichmentState, ExecutionLogEntry } from "@/lib/admin/imports.functions";
 import { Button } from "@/components/ui/button";
 import { toast } from "sonner";
 import { IMPORTABLE_FIELDS } from "@/lib/import/preview";
@@ -45,6 +54,7 @@ const TAB_IDS = [
   "validation",
   "import",
   "translations",
+  "enrich",
   "images",
   "logs",
 ] as const;
@@ -66,6 +76,7 @@ const STAGE_ORDER = [
   "preview",
   "execute",
   "translations",
+  "enrich",
   "images",
   "publish",
   "completed",
@@ -81,6 +92,7 @@ const STAGE_TAB: Record<string, TabId> = {
   preview: "import",
   execute: "import",
   translations: "translations",
+  enrich: "enrich",
   images: "images",
   publish: "overview",
   completed: "overview",
@@ -92,7 +104,6 @@ function ImportDetailPage() {
   const navigate = Route.useNavigate();
   const currentTab: TabId = search.tab ?? "overview";
   const qc = useQueryClient();
-  const [autoRun, setAutoRun] = useState(false);
   const returnToCategories = `/${lang}/admin/imports/${id}?tab=categories`;
 
   const q = useQuery({
@@ -101,7 +112,31 @@ function ImportDetailPage() {
     refetchInterval: 2500,
   });
 
+  const execStateQ = useQuery({
+    queryKey: ["admin", "import", id, "exec-state"],
+    queryFn: () => getImportExecutionState({ data: { id } }),
+    refetchInterval: 2000,
+  });
+  const execState = execStateQ.data?.execution ?? null;
+  const execCounters = execStateQ.data?.counters ?? null;
+  const execRemaining = execStateQ.data?.remaining ?? null;
+  const isExecRunning = execState?.status === "running";
+  const isExecActive = execState && ["running", "paused"].includes(execState.status);
+  const [recovered, setRecovered] = useState(false);
+  const showRecover = execState?.status === "running" && !recovered;
+
+  const avgChunkMs = (execState && execState.chunksCompleted > 0)
+    ? Math.round(execState.totalChunkDurationMs / execState.chunksCompleted)
+    : null;
+  const etaMin = (avgChunkMs && execRemaining != null && execRemaining > 0)
+    ? Math.ceil((execRemaining / 50) * avgChunkMs / 60000)
+    : null;
+
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current); }, []);
+
   const invalidate = () => qc.invalidateQueries({ queryKey: ["admin", "import", id] });
+  const invalidateExec = () => qc.invalidateQueries({ queryKey: ["admin", "import", id, "exec-state"] });
   const setTab = (tab: TabId) =>
     navigate({ search: (prev: { tab?: TabId }) => ({ ...prev, tab }), replace: true });
 
@@ -144,23 +179,52 @@ function ImportDetailPage() {
     onSuccess: async (res) => {
       await invalidate();
       if (res.needsRepreview) {
-        setAutoRun(false);
         toast.warning("Stale preview — re-run preview.");
         setTab("import");
         return;
       }
-      if (autoRun && !res.done) {
-        setTimeout(() => runMut.mutate(), 250);
-      } else if (res.done) {
-        setAutoRun(false);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const execControlMut = useMutation({
+    mutationFn: (args: { command: "start" | "pause" | "resume" | "stop" | "set_delay" | "recover"; delayMs?: number }) =>
+      updateImportExecutionControl({ data: { id, command: args.command, delayMs: args.delayMs } }),
+    onSuccess: async () => {
+      await invalidateExec();
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const execChunkMut = useMutation({
+    mutationFn: () => executeImportChunk({ data: { id } }),
+    onSuccess: async (res) => {
+      if (res && "done" in res && res.done) {
+        await qc.invalidateQueries({ queryKey: ["admin", "import", id] });
+        await qc.invalidateQueries({ queryKey: ["admin", "import", id, "exec-state"] });
         toast.success("Execute stage complete");
         setTab("translations");
-      } else {
-        setTab("import");
+        return;
+      }
+
+      const execData = await qc.fetchQuery({
+        queryKey: ["admin", "import", id, "exec-state"],
+        queryFn: () => getImportExecutionState({ data: { id } }),
+      });
+
+      if (res && "skipped" in res && res.skipped) {
+        return;
+      }
+
+      if (execData?.execution?.status === "running") {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          execChunkMut.mutate();
+        }, execData.execution.delayMs);
       }
     },
     onError: (e: Error) => {
-      setAutoRun(false);
       toast.error(e.message);
     },
   });
@@ -170,7 +234,7 @@ function ImportDetailPage() {
     onSuccess: async (r) => {
       toast.success(`Enqueued translations for ${r.businesses} businesses (${r.enqueued} ok, ${r.failed} failed)`);
       await invalidate();
-      setTab("images");
+      setTab("enrich");
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -179,6 +243,88 @@ function ImportDetailPage() {
     mutationFn: () => skipBatchTranslations({ data: { id } }),
     onSuccess: async () => {
       toast.info("Skipped translations");
+      await invalidate();
+      setTab("enrich");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const enrichStateQ = useQuery({
+    queryKey: ["admin", "import", id, "enrich-state"],
+    queryFn: () => getEnrichmentState({ data: { id } }),
+    refetchInterval: 2000,
+  });
+  const enrichState = enrichStateQ.data?.enrichment ?? null;
+  const enrichCounters = enrichStateQ.data?.counters ?? null;
+  const enrichRemaining = enrichStateQ.data?.remaining ?? null;
+  const isEnrichRunning = enrichState?.status === "running";
+  const isEnrichActive = enrichState && ["running", "paused"].includes(enrichState.status);
+  const [enrichRecovered, setEnrichRecovered] = useState(false);
+  const showEnrichRecover = enrichState?.status === "running" && !enrichRecovered;
+
+  const enrichAvgMs = (enrichState && enrichState.businessesProcessed > 0)
+    ? Math.round(enrichState.totalDurationMs / enrichState.businessesProcessed)
+    : null;
+  const enrichEtaMin = (enrichAvgMs && enrichRemaining != null && enrichRemaining > 0)
+    ? Math.ceil((enrichRemaining / 10) * enrichAvgMs / 60000)
+    : null;
+
+  const enrichControlMut = useMutation({
+    mutationFn: (args: { command: "start" | "pause" | "resume" | "stop" | "set_delay" | "recover"; delayMs?: number }) =>
+      updateEnrichmentControl({ data: { id, command: args.command, delayMs: args.delayMs } }),
+    onSuccess: async () => {
+      await qc.invalidateQueries({ queryKey: ["admin", "import", id, "enrich-state"] });
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const enrichChunkMut = useMutation({
+    mutationFn: () => processEnrichmentChunk({ data: { id } }),
+    onSuccess: async (res) => {
+      if (res && "done" in res && res.done) {
+        await qc.invalidateQueries({ queryKey: ["admin", "import", id] });
+        await qc.invalidateQueries({ queryKey: ["admin", "import", id, "enrich-state"] });
+        toast.success("Enrichment stage complete");
+        setTab("images");
+        return;
+      }
+
+      const enrichData = await qc.fetchQuery({
+        queryKey: ["admin", "import", id, "enrich-state"],
+        queryFn: () => getEnrichmentState({ data: { id } }),
+      });
+
+      if (res && "skipped" in res && res.skipped) {
+        return;
+      }
+
+      if (enrichData?.enrichment?.status === "running") {
+        if (timerRef.current) clearTimeout(timerRef.current);
+        timerRef.current = setTimeout(() => {
+          timerRef.current = null;
+          enrichChunkMut.mutate();
+        }, enrichData.enrichment.delayMs);
+      }
+    },
+    onError: (e: Error) => {
+      toast.error(e.message);
+    },
+  });
+
+  const enqueueEnrichMut = useMutation({
+    mutationFn: () => enqueueBatchEnrichment({ data: { id } }),
+    onSuccess: async (r) => {
+      toast.success(`Enqueued enrichment for ${r.enqueued} businesses`);
+      await invalidate();
+      setTab("enrich");
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const skipEnrichMut = useMutation({
+    mutationFn: () => skipBatchEnrichment({ data: { id } }),
+    onSuccess: async () => {
+      toast.info("Skipped enrichment");
       await invalidate();
       setTab("images");
     },
@@ -314,6 +460,16 @@ function ImportDetailPage() {
       STAGE_ORDER.indexOf("preview")
         ? "Compute preview first."
         : "",
+    enrich:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("enrich")
+        ? "Complete the execute stage first."
+        : "",
+    images:
+      STAGE_ORDER.indexOf(stage as typeof STAGE_ORDER[number]) <
+      STAGE_ORDER.indexOf("images")
+        ? "Complete the enrichment stage first."
+        : "",
   };
   const isLocked = (t: TabId) => !!lockedReason[t];
 
@@ -356,13 +512,64 @@ function ImportDetailPage() {
         onConfirmMapping={() => confirmMappingMut.mutate()}
         onPreview={() => previewMut.mutate()}
         onRun={() => runMut.mutate()}
+        onStartExec={() => {
+          setRecovered(true);
+          execControlMut.mutate({ command: "start" });
+          setTimeout(() => execChunkMut.mutate(), 50);
+        }}
+        onPauseExec={() => execControlMut.mutate({ command: "pause" })}
+        onResumeExec={() => {
+          setRecovered(true);
+          execControlMut.mutate({ command: "resume" });
+          setTimeout(() => execChunkMut.mutate(), 50);
+        }}
+        onStopExec={() => execControlMut.mutate({ command: "stop" })}
+        onRecoverExec={() => {
+          setRecovered(true);
+          execControlMut.mutate({ command: "recover" });
+          setTimeout(() => execChunkMut.mutate(), 50);
+        }}
+        showRecover={showRecover}
+        onSetDelay={(ms: number) => execControlMut.mutate({ command: "set_delay", delayMs: ms })}
+        execState={execState}
+        counters={execCounters}
+        remaining={execRemaining}
+        avgChunkMs={avgChunkMs}
+        etaMin={etaMin}
         onTranslations={() => translationsMut.mutate()}
         onSkipTranslations={() => skipTranslationsMut.mutate()}
+        onEnqueueEnrich={() => enqueueEnrichMut.mutate()}
+        onSkipEnrich={() => skipEnrichMut.mutate()}
+        onStartEnrich={() => {
+          setEnrichRecovered(true);
+          enrichControlMut.mutate({ command: "start" });
+          setTimeout(() => enrichChunkMut.mutate(), 50);
+        }}
+        onPauseEnrich={() => enrichControlMut.mutate({ command: "pause" })}
+        onResumeEnrich={() => {
+          setEnrichRecovered(true);
+          enrichControlMut.mutate({ command: "resume" });
+          setTimeout(() => enrichChunkMut.mutate(), 50);
+        }}
+        onStopEnrich={() => enrichControlMut.mutate({ command: "stop" })}
+        onRecoverEnrich={() => {
+          setEnrichRecovered(true);
+          enrichControlMut.mutate({ command: "recover" });
+          setTimeout(() => enrichChunkMut.mutate(), 50);
+        }}
+        showEnrichRecover={showEnrichRecover}
+        onSetEnrichDelay={(ms: number) => enrichControlMut.mutate({ command: "set_delay", delayMs: ms })}
+        enrichState={enrichState}
+        enrichCounters={enrichCounters}
+        enrichRemaining={enrichRemaining}
+        enrichAvgMs={enrichAvgMs}
+        enrichEtaMin={enrichEtaMin}
         onImagesDone={() => imagesDoneMut.mutate()}
         onPublish={() => publishMut.mutate()}
         detecting={detectMut.isPending}
         approving={approveMappingMut.isPending}
-        running={runMut.isPending}
+        running={runMut.isPending || execChunkMut.isPending}
+        enriching={enrichChunkMut.isPending}
       />
 
       <StageProgress currentStage={stage} />
@@ -398,11 +605,29 @@ function ImportDetailPage() {
           onConfirmMapping={() => confirmMappingMut.mutate()}
           onPreview={() => previewMut.mutate()}
           onRun={() => runMut.mutate()}
-          onAutoRun={() => {
-            setAutoRun(true);
-            runMut.mutate();
+          onStartExec={() => {
+            setRecovered(true);
+            execControlMut.mutate({ command: "start" });
+            setTimeout(() => execChunkMut.mutate(), 50);
           }}
-          autoRunning={autoRun}
+          onPauseExec={() => execControlMut.mutate({ command: "pause" })}
+          onResumeExec={() => {
+            setRecovered(true);
+            execControlMut.mutate({ command: "resume" });
+            setTimeout(() => execChunkMut.mutate(), 50);
+          }}
+          onStopExec={() => execControlMut.mutate({ command: "stop" })}
+          onRecoverExec={() => {
+            setRecovered(true);
+            execControlMut.mutate({ command: "recover" });
+            setTimeout(() => execChunkMut.mutate(), 50);
+          }}
+          showRecover={showRecover}
+          execState={execState}
+          counters={execCounters}
+          remaining={execRemaining}
+          avgChunkMs={avgChunkMs}
+          etaMin={etaMin}
           onTranslations={() => translationsMut.mutate()}
           onSkipTranslations={() => skipTranslationsMut.mutate()}
           onImagesDone={() => imagesDoneMut.mutate()}
@@ -484,7 +709,47 @@ function ImportDetailPage() {
           provenance={provenance}
           onSkip={() => skipTranslationsMut.mutate()}
           skipping={skipTranslationsMut.isPending}
+          onEnqueue={() => translationsMut.mutate()}
+          enqueuing={translationsMut.isPending}
         />
+      )}
+      {currentTab === "enrich" && (
+        isLocked("enrich") ? (
+          <LockedPanel reason={lockedReason.enrich!} />
+        ) : (
+          <EnrichmentTab
+            provenance={provenance}
+            enrichState={enrichState}
+            enrichCounters={enrichCounters}
+            enrichRemaining={enrichRemaining}
+            enrichAvgMs={enrichAvgMs}
+            enrichEtaMin={enrichEtaMin}
+            showRecover={showEnrichRecover}
+            onStart={() => {
+              setEnrichRecovered(true);
+              enrichControlMut.mutate({ command: "start" });
+              setTimeout(() => enrichChunkMut.mutate(), 50);
+            }}
+            onPause={() => enrichControlMut.mutate({ command: "pause" })}
+            onResume={() => {
+              setEnrichRecovered(true);
+              enrichControlMut.mutate({ command: "resume" });
+              setTimeout(() => enrichChunkMut.mutate(), 50);
+            }}
+            onStop={() => enrichControlMut.mutate({ command: "stop" })}
+            onRecover={() => {
+              setEnrichRecovered(true);
+              enrichControlMut.mutate({ command: "recover" });
+              setTimeout(() => enrichChunkMut.mutate(), 50);
+            }}
+            onSetDelay={(ms: number) => enrichControlMut.mutate({ command: "set_delay", delayMs: ms })}
+            onEnqueue={() => enqueueEnrichMut.mutate()}
+            onSkip={() => skipEnrichMut.mutate()}
+            enqueuing={enqueueEnrichMut.isPending}
+            skipping={skipEnrichMut.isPending}
+            running={enrichChunkMut.isPending}
+          />
+        )
       )}
       {currentTab === "images" && <ImagesTab provenance={provenance} batchId={id} />}
       {currentTab === "logs" && <LogsTab batch={batch} />}
@@ -522,15 +787,42 @@ function NextAction(props: {
   onConfirmMapping: () => void;
   onPreview: () => void;
   onRun: () => void;
+  onStartExec: () => void;
+  onPauseExec: () => void;
+  onResumeExec: () => void;
+  onStopExec: () => void;
+  onRecoverExec: () => void;
+  showRecover: boolean;
+  onSetDelay: (ms: number) => void;
+  execState: ImportExecutionState | null;
+  counters: { processed: number; total: number; failed: number } | null;
+  remaining: number | null;
+  avgChunkMs: number | null;
+  etaMin: number | null;
   onTranslations: () => void;
   onSkipTranslations: () => void;
+  onEnqueueEnrich: () => void;
+  onSkipEnrich: () => void;
+  onStartEnrich: () => void;
+  onPauseEnrich: () => void;
+  onResumeEnrich: () => void;
+  onStopEnrich: () => void;
+  onRecoverEnrich: () => void;
+  showEnrichRecover: boolean;
+  onSetEnrichDelay: (ms: number) => void;
+  enrichState: ImportEnrichmentState | null;
+  enrichCounters: { processed: number; total: number; failed: number } | null;
+  enrichRemaining: number | null;
+  enrichAvgMs: number | null;
+  enrichEtaMin: number | null;
   onImagesDone: () => void;
   onPublish: () => void;
   detecting: boolean;
   approving: boolean;
   running: boolean;
+  enriching: boolean;
 }) {
-  const { stage, storageExists, isFmApproved } = props;
+  const { stage, storageExists, isFmApproved, execState } = props;
   let label = "";
   let description = "";
   let onClick: (() => void) | null = null;
@@ -566,24 +858,21 @@ function NextAction(props: {
     description = "Diff every record against the database (inserts / updates / noops).";
     onClick = props.onPreview;
   } else if (stage === "preview") {
-    if (props.hasPreviewHash) {
-      label = props.running ? "Running chunk…" : "Run next execute chunk";
-      description = "Write the previewed records to the database. This batch has 40 rows, so one chunk should finish it.";
-      onClick = props.onRun;
-      disabled = props.running;
-    } else {
+    if (!props.hasPreviewHash) {
       label = "Compute import preview";
       description = "Preview hash is missing; recompute the import preview before executing.";
       onClick = props.onPreview;
+    } else {
+      onClick = null;
     }
   } else if (stage === "execute") {
-    label = "Run next execute chunk";
-    description = "Write the next batch of approved records to the database.";
-    onClick = props.onRun;
+    onClick = null;
   } else if (stage === "translations") {
     label = "Skip translations";
-    description = "Do not enqueue translation jobs for this controlled import; advance to images.";
+    description = "Do not enqueue translation jobs for this controlled import; advance to enrichment.";
     onClick = props.onSkipTranslations;
+  } else if (stage === "enrich") {
+    onClick = null;
   } else if (stage === "images") {
     label = "Advance images stage";
     description = "Image pipeline is Blocked; advance past this stage to publish.";
@@ -592,6 +881,217 @@ function NextAction(props: {
     label = "Publish imported businesses";
     description = "Flip imported businesses from pending review to published.";
     onClick = props.onPublish;
+  }
+  if ((stage === "preview" || stage === "execute") && props.hasPreviewHash) {
+    const es = execState;
+    const autoRunning = es?.status === "running";
+    const isBusy = props.running || autoRunning;
+    return (
+      <div className="rounded-xl border-2 border-primary/60 bg-primary/5 p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0 flex-1 text-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+              Next step · stage {stage}
+            </div>
+            <div className="mt-1 text-base font-semibold text-foreground">
+              {es?.status === "running"
+                ? "Import running…"
+                : es?.status === "paused"
+                  ? "Import paused"
+                  : es?.status === "stopped"
+                    ? "Import stopped"
+                    : es?.status === "completed"
+                      ? "Import completed"
+                      : es?.status === "failed"
+                        ? "Import failed"
+                        : "Import ready"}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {props.showRecover ? (
+              <>
+                <Button size="lg" onClick={props.onRecoverExec} disabled={props.running}>
+                  {props.running ? "Recovering…" : "⏏ Recover"}
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopExec}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : (!es || es.status === "stopped" || es.status === "failed" || es.status === "completed") ? (
+              <Button size="lg" onClick={props.onStartExec} disabled={props.running}>
+                {props.running ? "Starting…" : "▶ Start"}
+              </Button>
+            ) : es?.status === "running" ? (
+              <>
+                <Button size="lg" variant="secondary" onClick={props.onPauseExec}>
+                  ⏸ Pause
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopExec}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : es?.status === "paused" ? (
+              <>
+                <Button size="lg" onClick={props.onResumeExec} disabled={props.running}>
+                  {props.running ? "Resuming…" : "▶ Resume"}
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopExec}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : null}
+            <Button size="sm" variant="outline" onClick={props.onRun} disabled={isBusy} title={autoRunning ? "Disabled while automatic execution is running" : "Execute exactly one chunk"}>
+              Run 1 chunk
+            </Button>
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+          <span>Status: <span className="font-medium text-foreground">{es?.status ?? "idle"}</span></span>
+          {es?.startedAt && <span>Started: {new Date(es.startedAt).toLocaleString()}</span>}
+          {props.counters && (
+            <>
+              <span>Processed: <span className="font-medium text-foreground">{props.counters.processed}</span> / {props.counters.total}</span>
+              {props.remaining != null && <span>Remaining: <span className="font-medium text-foreground">{props.remaining}</span></span>}
+              {props.counters.failed > 0 && <span className="text-destructive">Failed: {props.counters.failed}</span>}
+            </>
+          )}
+          {props.avgChunkMs != null && <span>Avg chunk: {props.avgChunkMs}ms</span>}
+          {props.etaMin != null && <span>ETA: ~{props.etaMin} min</span>}
+          {es?.errorMessage && <span className="text-destructive">Error: {es.errorMessage}</span>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-muted-foreground">Delay:</label>
+          <input
+            type="number"
+            min={50}
+            max={10000}
+            className="h-7 w-20 rounded border bg-background px-2 text-xs"
+            value={es?.delayMs ?? 250}
+            onChange={(e) => {
+              const v = Math.max(50, Math.min(10000, Number(e.target.value)));
+              props.onSetDelay(v);
+            }}
+          />
+          <span className="text-[10px] text-muted-foreground">ms (50–10000)</span>
+        </div>
+        {es && es.log && es.log.length > 0 && (
+          <div className="max-h-40 overflow-y-auto rounded border bg-background p-2 font-mono text-[10px] leading-relaxed">
+            {es.log.map((entry: ExecutionLogEntry, i: number) => (
+              <div key={i} className={entry.type === "error" ? "text-red-500" : entry.type === "warn" ? "text-amber-500" : "text-muted-foreground"}>
+                <span className="text-[9px] opacity-60">{new Date(entry.at).toISOString().slice(11, 23)}</span>{" "}
+                {entry.message}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+  if (stage === "enrich") {
+    const es = props.enrichState;
+    const autoRunning = es?.status === "running";
+    const isBusy = props.enriching || autoRunning;
+    return (
+      <div className="rounded-xl border-2 border-primary/60 bg-primary/5 p-5 space-y-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <div className="min-w-0 flex-1 text-sm">
+            <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+              Next step · stage enrich
+            </div>
+            <div className="mt-1 text-base font-semibold text-foreground">
+              {es?.status === "running"
+                ? "Enrichment running…"
+                : es?.status === "paused"
+                  ? "Enrichment paused"
+                  : es?.status === "stopped"
+                    ? "Enrichment stopped"
+                    : es?.status === "completed"
+                      ? "Enrichment completed"
+                      : es?.status === "failed"
+                        ? "Enrichment failed"
+                        : "Enrichment ready (not started)"}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            {props.showEnrichRecover ? (
+              <>
+                <Button size="lg" onClick={props.onRecoverEnrich} disabled={props.enriching}>
+                  {props.enriching ? "Recovering…" : "⏏ Recover"}
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopEnrich}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : (!es || es.status === "stopped" || es.status === "failed" || es.status === "completed") ? (
+              <Button size="lg" onClick={props.onStartEnrich} disabled={props.enriching}>
+                {props.enriching ? "Starting…" : "▶ Start enrichment"}
+              </Button>
+            ) : es?.status === "running" ? (
+              <>
+                <Button size="lg" variant="secondary" onClick={props.onPauseEnrich}>
+                  ⏸ Pause
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopEnrich}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : es?.status === "paused" ? (
+              <>
+                <Button size="lg" onClick={props.onResumeEnrich} disabled={props.enriching}>
+                  {props.enriching ? "Resuming…" : "▶ Resume"}
+                </Button>
+                <Button size="lg" variant="destructive" onClick={props.onStopEnrich}>
+                  ⏹ Stop
+                </Button>
+              </>
+            ) : null}
+          </div>
+        </div>
+        <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+          <span>Status: <span className="font-medium text-foreground">{es?.status ?? "idle"}</span></span>
+          {es?.startedAt && <span>Started: {new Date(es.startedAt).toLocaleString()}</span>}
+          {props.enrichCounters && (
+            <>
+              <span>Processed: <span className="font-medium text-foreground">{props.enrichCounters.processed}</span> / {props.enrichCounters.total}</span>
+              {props.enrichRemaining != null && <span>Remaining: <span className="font-medium text-foreground">{props.enrichRemaining}</span></span>}
+              {props.enrichCounters.failed > 0 && <span className="text-destructive">Failed: {props.enrichCounters.failed}</span>}
+            </>
+          )}
+          {es && es.descriptionsGenerated > 0 && <span>Descriptions: {es.descriptionsGenerated}</span>}
+           {es && es.seoArGenerated > 0 && <span>SEO-AR: {es.seoArGenerated}</span>}
+           {es && es.seoEnGenerated > 0 && <span>SEO-EN: {es.seoEnGenerated}</span>}
+           {es && es.seoTrGenerated > 0 && <span>SEO-TR: {es.seoTrGenerated}</span>}
+           {props.enrichAvgMs != null && <span>Avg per biz: {props.enrichAvgMs}ms</span>}
+          {props.enrichEtaMin != null && <span>ETA: ~{props.enrichEtaMin} min</span>}
+          {es?.errorMessage && <span className="text-destructive">Error: {es.errorMessage}</span>}
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-muted-foreground">Delay:</label>
+          <input
+            type="number"
+            min={50}
+            max={10000}
+            className="h-7 w-20 rounded border bg-background px-2 text-xs"
+            value={es?.delayMs ?? 500}
+            onChange={(e) => {
+              const v = Math.max(50, Math.min(10000, Number(e.target.value)));
+              props.onSetEnrichDelay(v);
+            }}
+          />
+          <span className="text-[10px] text-muted-foreground">ms (50–10000)</span>
+        </div>
+        {es && es.log && es.log.length > 0 && (
+          <div className="max-h-40 overflow-y-auto rounded border bg-background p-2 font-mono text-[10px] leading-relaxed">
+            {es.log.map((entry: ExecutionLogEntry, i: number) => (
+              <div key={i} className={entry.type === "error" ? "text-red-500" : entry.type === "warn" ? "text-amber-500" : "text-muted-foreground"}>
+                <span className="text-[9px] opacity-60">{new Date(entry.at).toISOString().slice(11, 23)}</span>{" "}
+                {entry.message}
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+    );
   }
   if (!onClick) return null;
   return (
@@ -672,8 +1172,17 @@ function OverviewTab(props: {
   onConfirmMapping: () => void;
   onPreview: () => void;
   onRun: () => void;
-  onAutoRun: () => void;
-  autoRunning: boolean;
+  onStartExec: () => void;
+  onPauseExec: () => void;
+  onResumeExec: () => void;
+  onStopExec: () => void;
+  onRecoverExec: () => void;
+  showRecover: boolean;
+  execState: ImportExecutionState | null;
+  counters: { processed: number; total: number; failed: number } | null;
+  remaining: number | null;
+  avgChunkMs: number | null;
+  etaMin: number | null;
   onTranslations: () => void;
   onSkipTranslations: () => void;
   onImagesDone: () => void;
@@ -683,7 +1192,7 @@ function OverviewTab(props: {
   isPreviewing: boolean;
   isRunning: boolean;
 }) {
-  const { batch, storageExists, provenance } = props;
+  const { batch, storageExists, provenance, execState, counters, remaining, avgChunkMs, etaMin, showRecover } = props;
   const stage = String(batch.stage ?? "upload");
   const status = String(batch.status ?? "");
   const total = Number(batch.total_items ?? 0);
@@ -694,6 +1203,7 @@ function OverviewTab(props: {
   const processed = Number(batch.processed_items ?? 0);
   const pct = total > 0 ? Math.min(100, Math.round((processed / total) * 100)) : 0;
   const previewHash = String(batch.preview_hash ?? "");
+  const autoRunning = execState?.status === "running";
 
   return (
     <div className="space-y-4">
@@ -725,6 +1235,12 @@ function OverviewTab(props: {
               style={{ width: `${pct}%` }}
             />
           </div>
+          <div className="mt-2 flex flex-wrap items-center gap-x-6 gap-y-1 text-xs text-muted-foreground">
+            {remaining != null && <span>Remaining: <span className="font-medium text-foreground">{remaining}</span></span>}
+            {counters && counters.failed > 0 && <span className="text-destructive">Failed: {counters.failed}</span>}
+            {avgChunkMs != null && <span>Avg chunk: {avgChunkMs}ms</span>}
+            {etaMin != null && <span>ETA: ~{etaMin} min</span>}
+          </div>
         </div>
       )}
 
@@ -742,26 +1258,22 @@ function OverviewTab(props: {
             {props.isPreviewing ? "Computing preview…" : previewHash ? "Re-compute preview" : "Compute preview"}
           </Button>
         )}
-        {stage === "preview" && previewHash && (
+        {(stage === "preview" && previewHash) || stage === "execute" ? (
           <>
-            <Button onClick={props.onRun} disabled={props.isRunning}>
-              {props.isRunning ? "Running chunk…" : "Run next chunk (50)"}
-            </Button>
-            <Button variant="outline" onClick={props.onAutoRun} disabled={props.isRunning || props.autoRunning}>
-              {props.autoRunning ? "Auto-running…" : "Auto-run all"}
+            {showRecover ? (
+              <Button onClick={props.onRecoverExec} disabled={props.isRunning}>
+                {props.isRunning ? "Recovering…" : "⏏ Recover"}
+              </Button>
+            ) : (
+              <Button onClick={props.onStartExec} disabled={props.isRunning || autoRunning}>
+                {props.isRunning ? "Starting…" : "▶ Start"}
+              </Button>
+            )}
+            <Button variant="outline" onClick={props.onRun} disabled={props.isRunning || autoRunning} title={autoRunning ? "Disabled while execution is running" : "Execute exactly one chunk"}>
+              Run 1 chunk
             </Button>
           </>
-        )}
-        {stage === "execute" && (
-          <>
-            <Button onClick={props.onRun} disabled={props.isRunning}>
-              {props.isRunning ? "Running chunk…" : "Run next chunk (50)"}
-            </Button>
-            <Button variant="outline" onClick={props.onAutoRun} disabled={props.isRunning || props.autoRunning}>
-              {props.autoRunning ? "Auto-running…" : "Auto-run all"}
-            </Button>
-          </>
-        )}
+        ) : null}
         {stage === "translations" && (
           <>
             <Button onClick={props.onSkipTranslations}>Skip translations → images</Button>
@@ -1090,27 +1602,201 @@ function TranslationsTab({
   provenance,
   onSkip,
   skipping,
+  onEnqueue,
+  enqueuing,
 }: {
   provenance: Array<Record<string, unknown>>;
   onSkip: () => void;
   skipping: boolean;
+  onEnqueue: () => void;
+  enqueuing: boolean;
 }) {
   return (
     <div className="rounded-xl border bg-card p-4 text-sm">
       <div className="mb-1 font-medium">Translations stage</div>
       <p className="text-xs text-muted-foreground">
-        This controlled import is verifying source data, images, reviews, and category links.
-        Translation jobs are intentionally not required for this pass.
+        Translation jobs will be created for names and descriptions of all {provenance.length} touched businesses.
+        This advances to the enrichment stage where AI descriptions and SEO metadata will be generated.
       </p>
       <div className="mt-3 flex flex-wrap items-center gap-2">
-        <Button size="sm" onClick={onSkip} disabled={skipping}>
-          {skipping ? "Skipping…" : "Skip translations → images"}
+        <Button size="sm" onClick={onEnqueue} disabled={enqueuing}>
+          {enqueuing ? "Enqueuing…" : "Enqueue translation jobs → enrich"}
         </Button>
-        <span className="text-xs text-muted-foreground">
-          Advances {provenance.length} touched businesses to the images stage without creating
-          translation jobs.
-        </span>
+        <Button size="sm" variant="outline" onClick={onSkip} disabled={skipping}>
+          {skipping ? "Skipping…" : "Skip translations → enrich"}
+        </Button>
       </div>
+    </div>
+  );
+}
+
+function EnrichmentTab({
+  provenance,
+  enrichState,
+  enrichCounters,
+  enrichRemaining,
+  enrichAvgMs,
+  enrichEtaMin,
+  showRecover,
+  onStart,
+  onPause,
+  onResume,
+  onStop,
+  onRecover,
+  onSetDelay,
+  onEnqueue,
+  onSkip,
+  enqueuing,
+  skipping,
+  running,
+}: {
+  provenance: Array<Record<string, unknown>>;
+  enrichState: ImportEnrichmentState | null;
+  enrichCounters: { processed: number; total: number; failed: number } | null;
+  enrichRemaining: number | null;
+  enrichAvgMs: number | null;
+  enrichEtaMin: number | null;
+  showRecover: boolean;
+  onStart: () => void;
+  onPause: () => void;
+  onResume: () => void;
+  onStop: () => void;
+  onRecover: () => void;
+  onSetDelay: (ms: number) => void;
+  onEnqueue: () => void;
+  onSkip: () => void;
+  enqueuing: boolean;
+  skipping: boolean;
+  running: boolean;
+}) {
+  const es = enrichState;
+  const isAutoRunning = es?.status === "running";
+  const isBusy = running || isAutoRunning;
+
+  return (
+    <div className="space-y-4">
+      <div className="rounded-xl border bg-card p-4 text-sm">
+        <div className="mb-1 font-medium">AI Enrichment stage</div>
+        <p className="text-xs text-muted-foreground">
+          Generate AI-powered business descriptions and SEO metadata (title + meta description)
+          for all {provenance.length} touched businesses across supported locales.
+          Idempotent — already generated content will not be regenerated.
+        </p>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          {!es || (es.status !== "running" && es.status !== "paused") ? (
+            <>
+              <Button size="sm" onClick={onEnqueue} disabled={enqueuing}>
+                {enqueuing ? "Initializing…" : "Initialize enrichment"}
+              </Button>
+              <Button size="sm" variant="outline" onClick={onSkip} disabled={skipping}>
+                {skipping ? "Skipping…" : "Skip enrichment → images"}
+              </Button>
+            </>
+          ) : null}
+        </div>
+      </div>
+
+      {es && (
+        <div className="rounded-xl border-2 border-primary/60 bg-primary/5 p-5 space-y-4">
+          <div className="flex flex-wrap items-center justify-between gap-4">
+            <div className="min-w-0 flex-1 text-sm">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-primary">
+                Enrichment execution
+              </div>
+              <div className="mt-1 text-base font-semibold text-foreground">
+                {es?.status === "running"
+                  ? "Enrichment running…"
+                  : es?.status === "paused"
+                    ? "Enrichment paused"
+                    : es?.status === "stopped"
+                      ? "Enrichment stopped"
+                      : es?.status === "completed"
+                        ? "Enrichment completed"
+                        : es?.status === "failed"
+                          ? "Enrichment failed"
+                          : "Enrichment ready"}
+              </div>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              {showRecover ? (
+                <>
+                  <Button size="lg" onClick={onRecover} disabled={running}>
+                    {running ? "Recovering…" : "⏏ Recover"}
+                  </Button>
+                  <Button size="lg" variant="destructive" onClick={onStop}>
+                    ⏹ Stop
+                  </Button>
+                </>
+              ) : (!es || es.status === "stopped" || es.status === "failed" || es.status === "completed") ? (
+                <Button size="lg" onClick={onStart} disabled={running}>
+                  {running ? "Starting…" : "▶ Start"}
+                </Button>
+              ) : es?.status === "running" ? (
+                <>
+                  <Button size="lg" variant="secondary" onClick={onPause}>
+                    ⏸ Pause
+                  </Button>
+                  <Button size="lg" variant="destructive" onClick={onStop}>
+                    ⏹ Stop
+                  </Button>
+                </>
+              ) : es?.status === "paused" ? (
+                <>
+                  <Button size="lg" onClick={onResume} disabled={running}>
+                    {running ? "Resuming…" : "▶ Resume"}
+                  </Button>
+                  <Button size="lg" variant="destructive" onClick={onStop}>
+                    ⏹ Stop
+                  </Button>
+                </>
+              ) : null}
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-x-6 gap-y-2 text-xs">
+            <span>Status: <span className="font-medium text-foreground">{es?.status ?? "idle"}</span></span>
+            {es?.startedAt && <span>Started: {new Date(es.startedAt).toLocaleString()}</span>}
+            {enrichCounters && (
+              <>
+                <span>Processed: <span className="font-medium text-foreground">{enrichCounters.processed}</span> / {enrichCounters.total}</span>
+                {enrichRemaining != null && <span>Remaining: <span className="font-medium text-foreground">{enrichRemaining}</span></span>}
+                {enrichCounters.failed > 0 && <span className="text-destructive">Failed: {enrichCounters.failed}</span>}
+              </>
+            )}
+            {es && es.descriptionsGenerated > 0 && <span>Descriptions: {es.descriptionsGenerated}</span>}
+            {es && es.seoArGenerated > 0 && <span>SEO-AR: {es.seoArGenerated}</span>}
+            {es && es.seoEnGenerated > 0 && <span>SEO-EN: {es.seoEnGenerated}</span>}
+            {es && es.seoTrGenerated > 0 && <span>SEO-TR: {es.seoTrGenerated}</span>}
+            {enrichAvgMs != null && <span>Avg per biz: {enrichAvgMs}ms</span>}
+            {enrichEtaMin != null && <span>ETA: ~{enrichEtaMin} min</span>}
+            {es?.errorMessage && <span className="text-destructive">Error: {es.errorMessage}</span>}
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <label className="text-xs text-muted-foreground">Delay:</label>
+            <input
+              type="number"
+              min={50}
+              max={10000}
+              className="h-7 w-20 rounded border bg-background px-2 text-xs"
+              value={es?.delayMs ?? 500}
+              onChange={(e) => {
+                const v = Math.max(50, Math.min(10000, Number(e.target.value)));
+                onSetDelay(v);
+              }}
+            />
+            <span className="text-[10px] text-muted-foreground">ms (50–10000)</span>
+          </div>
+          {es && es.log && es.log.length > 0 && (
+            <div className="max-h-40 overflow-y-auto rounded border bg-background p-2 font-mono text-[10px] leading-relaxed">
+              {es.log.map((entry: ExecutionLogEntry, i: number) => (
+                <div key={i} className={entry.type === "error" ? "text-red-500" : entry.type === "warn" ? "text-amber-500" : "text-muted-foreground"}>
+                  <span className="text-[9px] opacity-60">{new Date(entry.at).toISOString().slice(11, 23)}</span>{" "}
+                  {entry.message}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
