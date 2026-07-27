@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { normalizeGooglePlace, validateNormalizedBusiness } from "@/lib/import/normalize";
+import { normalizeGoogleMapsUrl, normalizeGooglePlace, validateNormalizedBusiness } from "@/lib/import/normalize";
 
 describe("normalizeGooglePlace — clinic alias early-return fix", () => {
   it("resolves Place_id when place_id/placeId are absent", () => {
@@ -62,5 +62,25 @@ describe("normalizeGooglePlace — clinic alias early-return fix", () => {
 
     expect(result).not.toBeNull();
     expect(result!.placeId).toBe("ChIJ_STANDARD");
+  });
+
+  it("rejects unsafe clinic website and maps URL aliases", () => {
+    const result = normalizeGooglePlace({
+      Place_id: "ChIJ_UNSAFE_LINKS",
+      Title: "Unsafe Links Clinic",
+      Website: "javascript:alert(1)",
+      Page_URL: "javascript:google.com/maps/alert(1)",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result!.website).toBeNull();
+    expect(result!.googleMapsUrl).toBeNull();
+  });
+
+  it("accepts only real Google Maps URLs for map links", () => {
+    expect(normalizeGoogleMapsUrl("https://www.google.com/maps/place/Istanbul")).toBe(
+      "https://www.google.com/maps/place/Istanbul",
+    );
+    expect(normalizeGoogleMapsUrl("https://google.com.evil.test/maps/place/Istanbul")).toBeNull();
   });
 });

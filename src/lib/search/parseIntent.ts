@@ -99,6 +99,8 @@ const SOFT_DESCRIPTOR_WORDS = new Set([
   "راقية",
   "راقيًا",
   "راقيه",
+  "غالي",
+  "غالية",
   "fancy",
   "elegant",
   "upscale",
@@ -112,6 +114,7 @@ const BUDGET_WORDS: Record<string, 1 | 2 | 3 | 4> = {
   cheap: 1,
   budget: 1,
   affordable: 1,
+  "pas cher": 1,
   ekonomik: 1,
   ucuz: 1,
   رخيص: 1,
@@ -294,6 +297,9 @@ export function parseDirectorySearchIntent(query: string, locale: Locale, dict: 
   residual = removeTerm(residual, matchedCategory?.matchedText ?? null);
   residual = removeTerm(residual, matchedCity?.matchedText ?? null);
   residual = removeTerm(residual, matchedDistrict?.matchedText ?? null);
+  residual = removeTerm(residual, matchedPriceTerm);
+  residual = removeTerm(residual, matchedRatingTerm);
+  residual = removeTerm(residual, matchedAudienceTerm);
 
   const remaining = tokens(residual).filter((word) => {
     const normalizedWord = normalize(word);
@@ -318,7 +324,7 @@ export function parseDirectorySearchIntent(query: string, locale: Locale, dict: 
   if (audienceIntent === "family") interpretation.push({ key: "audience-family", label: locale === "tr" ? "Aile dostu" : locale === "ar" ? "عائلي" : "Family-friendly", urlParam: "audience" });
 
   const structuredMatchFound = matchedCategory !== null || matchedCity !== null;
-  const descriptiveIntent = structuredMatchFound;
+  const descriptiveIntent = structuredMatchFound && remaining.length === 0;
 
   return {
     rawQuery: raw,

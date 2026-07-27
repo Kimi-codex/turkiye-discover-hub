@@ -39,7 +39,7 @@ export function DirectoryPagination({
 
   return (
     <nav
-      aria-label="Pagination"
+      aria-label={t("pagination.label")}
       className={cn("flex items-center justify-between gap-3", className)}
     >
       <Button

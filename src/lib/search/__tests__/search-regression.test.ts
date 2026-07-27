@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import type { Category, City, District } from "@/types/domain";
 import {
   parseDirectorySearchIntent,
+  queryForParsedSearchIntent,
   removeConsumedIntentTerm,
 } from "../parseIntent";
 import { removePublicSearchChip } from "../search-url-state";
@@ -98,17 +99,19 @@ describe("public search regression behavior", () => {
     expect(intent.descriptiveIntent).toBe(false);
   });
 
-  it("does not use remaining query as filter when descriptiveIntent is true", () => {
+  it("does not use consumed soft descriptors as mandatory filters", () => {
     const { intent, chip } = categoryChip("مطعم غالي");
     expect(intent.descriptiveIntent).toBe(true);
-    expect(intent.remainingQuery).toBe("غالي");
+    expect(intent.remainingQuery).toBe("");
+    expect(queryForParsedSearchIntent(intent)).toBe("");
   });
 
-  it("parses Arabic mixed descriptor without hardcoded word list dependency", () => {
+  it("parses Arabic category plus soft descriptor as descriptive intent", () => {
     const intent = parseDirectorySearchIntent("مطعم غالي", "ar", dict);
     expect(intent.matchedCategorySlug).toBe("restaurants");
     expect(intent.descriptiveIntent).toBe(true);
-    expect(intent.remainingQuery).toBe("غالي");
+    expect(intent.remainingQuery).toBe("");
+    expect(queryForParsedSearchIntent(intent)).toBe("");
   });
 
   it("parses Turkish search with city and category", () => {

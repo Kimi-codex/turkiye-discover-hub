@@ -17,6 +17,9 @@ This document records the final remediation and verification pass for Phase E on
 - Medium: localized pagination accessibility labels.
 - Medium: map/list duplicate visible list behavior.
 - Low: production origin no longer silently falls back to the Lovable preview host.
+- Additional final-pass finding: imported clinic `Website` and `Page_URL` aliases are now normalized before becoming public links, preventing unsafe protocols and Google Maps lookalike hosts.
+- Additional final-pass finding: descriptive search intent now keeps proper-name residuals, so queries such as `pasha restaurant` still filter by `pasha` instead of broadening to all restaurants.
+- Additional final-pass finding: a new additive migration refreshes category/alias-aware search vectors when a business status changes to `published`.
 
 ## Production migration runbook
 
@@ -28,6 +31,7 @@ This document records the final remediation and verification pass for Phase E on
 2. Apply schema:
    - Apply migrations in timestamp order.
    - Do not run `public.rebuild_search_vectors()` during deploy.
+   - Include `20260726104000_refresh_search_vector_on_publish.sql` after the Phase E search additions migration.
 3. Backfill search vectors in bounded batches:
    - Start: `select * from public.backfill_business_search_vectors_batch(null, 500);`
    - Continue with returned cursor: `select * from public.backfill_business_search_vectors_batch('<last_id>', 500);`
@@ -58,19 +62,22 @@ This document records the final remediation and verification pass for Phase E on
 
 Reviewed public-path XSS, unsafe HTML, JSON-LD serialization, URL construction, sitemap XML escaping, map popup content, service-role usage, public server functions, SQL/RPC usage, unpublished data exposure, and telemetry behavior. No new service-role exposure, RLS redesign, auth redesign, raw user-controlled SQL, or public unpublished-data path was introduced by the remediation.
 
+Final pass additionally reviewed imported public link normalization for website and map URLs. `javascript:` values and Google Maps lookalike hosts are rejected before they can render as business-detail links.
+
 Residual security risk: existing admin/import/image worker service-role paths remain high-privilege by design and should continue to be monitored separately from Phase E.
 
 ## Regression review summary
 
 - Phase A: no auth, role, membership, RLS, review, favorite, report, or protected route architecture changes were made.
-- Phase B: no import schema detection, mapping, place_id conflict, provenance, image reference, imported review/rating, or draft/publish behavior changes were made.
+- Phase B: import schema detection, mapping, place_id conflict, provenance, image reference, imported review/rating, and draft/publish behavior were preserved. Imported website/map URL aliases now pass through stricter public-link normalization.
 - Phase C: source-hash selection was aligned; generation keys, prompt versioning, stale detection, failed-record exclusion, and no-AI-on-public-page behavior were preserved.
-- Phase D: FTS-first search, fallback threshold, browse mode, aliases, blended ranking, telemetry, filters, and stable ordering were preserved.
+- Phase D: FTS-first search, fallback threshold, browse mode, aliases, blended ranking, telemetry, filters, and stable ordering were preserved. Proper-name residual query text remains mandatory while consumed descriptive modifiers remain soft.
 - Phase E: SEO, sitemap, robots, metadata, hreflang, JSON-LD, directory UX, pagination, autocomplete, did-you-mean, and map/list behavior were remediated without adding excluded architectures.
 
 ## Residual risks and manual checks
 
 - Local `npm run preview` could not serve the built TanStack/Nitro output in this workspace because Vite preview looked for `dist/server/server.js` while the production build emitted `.output`. Browser/Lighthouse validation must therefore be run against a deployed preview before production.
+- Local dev-server SSR probing could load locale homepages and SEO endpoints, but data-backed directory/search routes returned `column businesses.ranking_score does not exist` against the configured local Supabase target. This indicates the local/preview database must apply Phase D/E migrations before runtime browser validation can pass.
 - Rich Results validation must be run against reachable preview URLs with production-like data.
 - Production origin env vars must be verified in the deployment environment.
 - Search-vector backfill must be run incrementally and monitored.
@@ -85,6 +92,7 @@ Run these checks against the deployed preview before production:
 - Representative category, city, district, and business detail pages.
 - Search pagination, filter changes, sort changes, autocomplete, did-you-mean, and map/list mode.
 - `/robots.txt`, `/sitemap.xml`, `/sitemap-pages.xml`, `/sitemap-categories.xml`, `/sitemap-cities.xml`, `/sitemap-directory-1.xml`, and `/sitemap-businesses-1.xml`.
+- Confirm the target database has `businesses.ranking_score`, `businesses.search_vector`, search aliases, and Phase E vector trigger migrations before validating data-backed routes.
 - Browser console and hydration logs.
 - Canonical, hreflang, Open Graph, Twitter, JSON-LD, and robots meta output.
 - Keyboard access for autocomplete, filters, pagination, breadcrumbs, map/list toggle, and empty states.

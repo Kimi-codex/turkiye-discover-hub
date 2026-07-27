@@ -301,10 +301,15 @@ The final remediation pass addressed the release-blocking audit findings before 
 - Medium accessibility issue: pagination labels are localized for Turkish, Arabic, English, French, and Russian.
 - Medium map/list issue: map mode avoids duplicate visible lists while preserving a screen-reader fallback list of canonical business links.
 - Low production-origin issue: production canonical/sitemap/robots generation now requires an explicit configured site origin or request origin instead of silently falling back to the Lovable preview host.
+- Final verification follow-up: imported clinic website and maps aliases are normalized before public rendering; unsafe protocols and Google Maps lookalike hosts are rejected.
+- Final verification follow-up: descriptive search intent only suppresses residual query text after all remaining terms are consumed descriptors. Proper-name residuals remain mandatory search text.
+- Final verification follow-up: `20260726104000_refresh_search_vector_on_publish.sql` widens the after-write vector refresh trigger to include `status`, so draft-to-published transitions receive complete category/alias-aware vectors.
 
 Production deployment prerequisite: set one of `VITE_PUBLIC_SITE_URL`, `PUBLIC_SITE_URL`, `SITE_URL`, or `URL` to the canonical production origin before building/running production.
 
 Local runtime note: `npm run preview` could not serve the built output in this workspace because Vite preview looked for `dist/server/server.js` while the production build emitted `.output`. Run browser, Lighthouse, and crawl checks against a deployed preview before production.
+
+Final local dev-server note: locale homepages and SEO endpoints responded locally, but data-backed search/directory routes returned `column businesses.ranking_score does not exist` from the configured Supabase target. Apply Phase D/E migrations to the preview/local database before treating browser/runtime checks as complete.
 
 ### Production migration runbook
 
@@ -315,6 +320,7 @@ Local runtime note: `npm run preview` could not serve the built output in this w
    - Confirm `PUBLIC_SITE_URL`/canonical origin configuration is present in the deployment environment.
 2. Schema migration order:
    - Apply migrations in timestamp order through `20260726103000_phase_e_search_experience_additions.sql`.
+   - Then apply `20260726104000_refresh_search_vector_on_publish.sql`.
    - Do not call `public.rebuild_search_vectors()` as part of deployment.
 3. Bounded backfill:
    - Run `select * from public.backfill_business_search_vectors_batch(null, 500);`

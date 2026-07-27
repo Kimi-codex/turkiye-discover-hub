@@ -94,7 +94,6 @@ const searchDictQuery = () =>
       // Load category aliases from the search_aliases table
       const categoryAliases: Record<string, string[]> = {};
       try {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const qb = (supabase as any).from("search_aliases");
         const { data: aliasRows } = await qb
           .select("entity_id, alias, entity_type")

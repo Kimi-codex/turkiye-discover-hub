@@ -100,6 +100,21 @@ export function normalizeWebsite(input: unknown): string | null {
   }
 }
 
+export function normalizeGoogleMapsUrl(input: unknown): string | null {
+  const url = normalizeWebsite(input);
+  if (!url) return null;
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    const isGoogleHost = host === "google.com" || host.endsWith(".google.com");
+    if (!isGoogleHost) return null;
+    if (!u.pathname.toLowerCase().startsWith("/maps")) return null;
+    return u.toString();
+  } catch {
+    return null;
+  }
+}
+
 export function normalizeCoordinates(
   raw: Record<string, unknown>,
 ): { lat: number | null; lng: number | null } {
@@ -457,8 +472,8 @@ export function normalizeGooglePlace(raw: Record<string, unknown>): NormalizedBu
   const finalLatitude = lat ?? clinicLatitude;
   const finalLongitude = lng ?? clinicLongitude;
   const finalPhone = clinicPhone || normalizePhone(raw.formatted_phone_number ?? raw.phone);
-  const finalWebsite = clinicWebsite || normalizeWebsite(raw.website ?? raw.url);
-  const finalGoogleMapsUrl = clinicPageUrl.includes("google.com/maps") ? clinicPageUrl : normalizeWebsite(raw.google_maps_url);
+  const finalWebsite = normalizeWebsite(clinicWebsite) || normalizeWebsite(raw.website ?? raw.url);
+  const finalGoogleMapsUrl = normalizeGoogleMapsUrl(clinicPageUrl) || normalizeGoogleMapsUrl(raw.google_maps_url);
   const finalDescription = clinicDescription ||
     (typeof raw.editorial_summary === "object" &&
       raw.editorial_summary &&

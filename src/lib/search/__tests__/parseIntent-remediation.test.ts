@@ -68,4 +68,13 @@ describe("descriptive search intent remediation", () => {
       expect(queryForParsedSearchIntent(intent)).toBe("");
     },
   );
+
+  it("keeps proper-name residual text as a mandatory search query", () => {
+    const intent = parseDirectorySearchIntent("pasha restaurant", "en", dict);
+
+    expect(intent.matchedCategorySlug).toBe("restaurants");
+    expect(intent.remainingQuery).toBe("pasha");
+    expect(intent.descriptiveIntent).toBe(false);
+    expect(queryForParsedSearchIntent(intent)).toBe("pasha");
+  });
 });

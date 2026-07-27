@@ -27,8 +27,13 @@ describe("Phase E search-vector migration safety", () => {
       resolve(migrationsDir, "20260726103000_phase_e_search_experience_additions.sql"),
       "utf8",
     );
+    const publishRefresh = readFileSync(
+      resolve(migrationsDir, "20260726104000_refresh_search_vector_on_publish.sql"),
+      "utf8",
+    );
 
     expect(phaseEAdditions).toMatch(/after\s+insert\s+or\s+update\s+of\s+name,\s+slug,\s+description,\s+primary_category_id/i);
+    expect(publishRefresh).toMatch(/after\s+insert\s+or\s+update\s+of\s+name,\s+slug,\s+description,\s+primary_category_id,\s+status/i);
     expect(phaseEAdditions).toMatch(/refresh_business_search_vector_after_category_link/i);
     expect(phaseEAdditions).toMatch(/public\.refresh_business_search_vector\(new\.id\)/i);
   });
